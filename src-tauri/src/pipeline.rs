@@ -522,6 +522,18 @@ impl PipelineHandle {
         if self.abort_flag.load(Ordering::SeqCst) {
             tracing::info!("Pipeline aborted during setup, discarding audio capture");
             // handle drops here, stopping the capture thread
+            *self
+                .preloaded_config
+                .lock()
+                .unwrap_or_else(|e| e.into_inner()) = None;
+            *self
+                .preloaded_app_ctx
+                .lock()
+                .unwrap_or_else(|e| e.into_inner()) = None;
+            *self
+                .preloaded_dictionary
+                .lock()
+                .unwrap_or_else(|e| e.into_inner()) = None;
             self.set_state(PipelineState::Idle);
             return Ok(());
         }
