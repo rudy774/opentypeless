@@ -5,12 +5,15 @@ use crate::error::AppError;
 use super::{SttConfig, SttProvider, TranscriptEvent};
 
 /// Configuration for a Whisper-compatible HTTP file-upload STT provider.
+#[derive(Debug)]
 pub struct WhisperCompatConfig {
     pub provider_name: String,
     pub endpoint: String,
     pub model: String,
     /// Extra form text fields (e.g. GLM-ASR needs "stream"="false").
     pub extra_fields: Vec<(String, String)>,
+    /// Local OpenAI-compatible servers often do not require authentication.
+    pub api_key_required: bool,
 }
 
 /// Max audio buffer: ~24 MB PCM ≈ 12.5 min at 16kHz 16-bit mono.
@@ -240,5 +243,29 @@ impl SttProvider for WhisperCompatProvider {
 
     fn name(&self) -> &str {
         &self.provider_config.provider_name
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn recv_transcript_waits_for_file_based_provider() {
+        let mut provider = WhisperCompatProvider::new(WhisperCompatConfig {
+            provider_name: "test-whisper".to_string(),
+            endpoint: "https://example.test/transcriptions".to_string(),
+            model: "test-model".to_string(),
+            extra_fields: vec![],
+            api_key_required: true,
+        });
+
+        let result = tokio::time::timeout(
+            std::time::Duration::from_millis(20),
+            provider.recv_transcript(),
+        )
+        .await;
+
+        assert!(result.is_err());
     }
 }

@@ -81,6 +81,7 @@ pub fn create_provider(
                     .iter()
                     .map(|(k, v)| (k.to_string(), v.to_string()))
                     .collect(),
+                api_key_required: true,
             };
             match client {
                 Some(ref c) => Box::new(WhisperCompatProvider::with_client(wc, c.clone())),
