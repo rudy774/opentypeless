@@ -79,7 +79,7 @@ impl WhisperCompatProvider {
 #[async_trait]
 impl SttProvider for WhisperCompatProvider {
     async fn connect(&mut self, config: &SttConfig) -> Result<(), AppError> {
-        if config.api_key.is_empty() {
+        if self.provider_config.api_key_required && config.api_key.is_empty() {
             return Err(AppError::Auth(format!(
                 "{} API key is empty",
                 self.provider_config.provider_name
@@ -156,14 +156,17 @@ impl SttProvider for WhisperCompatProvider {
                 form = form.text(key.clone(), value.clone());
             }
 
-            let resp_result = self
+            let mut request = self
                 .client
                 .post(&self.provider_config.endpoint)
-                .header("Authorization", format!("Bearer {}", config.api_key))
                 .multipart(form)
-                .timeout(std::time::Duration::from_secs(60))
-                .send()
-                .await;
+                .timeout(std::time::Duration::from_secs(60));
+
+            if !config.api_key.trim().is_empty() {
+                request = request.header("Authorization", format!("Bearer {}", config.api_key));
+            }
+
+            let resp_result = request.send().await;
 
             match resp_result {
                 Ok(resp) => {
@@ -249,6 +252,28 @@ impl SttProvider for WhisperCompatProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn connect_allows_empty_api_key_when_not_required() {
+        let mut provider = WhisperCompatProvider::new(WhisperCompatConfig {
+            provider_name: "custom-whisper".to_string(),
+            endpoint: "http://localhost:8000/v1/audio/transcriptions".to_string(),
+            model: "test-model".to_string(),
+            extra_fields: vec![],
+            api_key_required: false,
+        });
+
+        let result = provider
+            .connect(&SttConfig {
+                api_key: String::new(),
+                language: None,
+                smart_format: true,
+                sample_rate: 16000,
+            })
+            .await;
+
+        assert!(result.is_ok());
+    }
 
     #[tokio::test]
     async fn recv_transcript_waits_for_file_based_provider() {
