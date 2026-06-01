@@ -24,24 +24,50 @@ export const PRO_PLAN = {
   ],
 } as const
 
+export const CUSTOM_WHISPER_PROVIDER = 'custom-whisper' as const
+
+export const CUSTOM_STT_DEFAULTS = {
+  preset: 'speaches',
+  baseUrl: 'http://localhost:8000/v1',
+  model: 'Systran/faster-whisper-large-v3',
+} as const
+
+export const CUSTOM_STT_PRESETS = [
+  {
+    value: 'speaches',
+    labelKey: 'settings.customSttPresetSpeaches',
+    baseUrl: CUSTOM_STT_DEFAULTS.baseUrl,
+    model: CUSTOM_STT_DEFAULTS.model,
+  },
+  {
+    value: 'custom',
+    labelKey: 'settings.customSttPresetCustom',
+  },
+] as const
+
 export const STT_PROVIDERS = [
   { value: 'deepgram', label: 'Deepgram Nova-3' },
   { value: 'assemblyai', label: 'AssemblyAI' },
-  { value: 'glm-asr', label: 'GLM-ASR (智谱)' },
+  { value: 'glm-asr', label: 'GLM-ASR (Zhipu)' },
   { value: 'openai-whisper', label: 'OpenAI Whisper' },
   { value: 'groq-whisper', label: 'Groq Whisper' },
-  { value: 'siliconflow', label: 'SiliconFlow (硅基流动)' },
+  { value: 'siliconflow', label: 'SiliconFlow' },
+  { value: CUSTOM_WHISPER_PROVIDER, label: 'Local / Custom Whisper' },
   { value: 'cloud', label: 'OpenTypeless Cloud' },
 ] as const
 
+export const ONBOARDING_STT_PROVIDERS = STT_PROVIDERS.filter(
+  (provider) => provider.value !== CUSTOM_WHISPER_PROVIDER,
+)
+
 export const LLM_PROVIDERS = [
-  { value: 'zhipu', label: '智谱 (Zhipu)' },
+  { value: 'zhipu', label: 'Zhipu' },
   { value: 'deepseek', label: 'DeepSeek' },
-  { value: 'siliconflow', label: '硅基流动 (SiliconFlow)' },
+  { value: 'siliconflow', label: 'SiliconFlow' },
   { value: 'openai', label: 'OpenAI' },
   { value: 'gemini', label: 'Google Gemini' },
   { value: 'moonshot', label: 'Moonshot (Kimi)' },
-  { value: 'qwen', label: '通义千问 (Qwen)' },
+  { value: 'qwen', label: 'Qwen' },
   { value: 'groq', label: 'Groq' },
   { value: 'claude', label: 'Claude' },
   { value: 'ollama', label: 'Ollama (Local)' },
