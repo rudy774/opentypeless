@@ -106,8 +106,9 @@ impl SttProvider for WhisperCompatProvider {
     }
 
     async fn recv_transcript(&mut self) -> Result<Option<TranscriptEvent>, AppError> {
-        // File-based — transcription happens in disconnect().
-        Ok(None)
+        // File-based providers transcribe in disconnect(); keep this future
+        // pending so the pipeline select loop does not busy-spin while recording.
+        std::future::pending().await
     }
 
     async fn disconnect(&mut self) -> Result<Option<String>, AppError> {
