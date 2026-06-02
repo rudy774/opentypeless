@@ -33,6 +33,8 @@ vi.mock('react-i18next', () => ({
         'settings.customSttApiKeyOptional': 'API Key (optional)',
         'settings.customSttSetupHint':
           'Start your local OpenAI-compatible STT server first, then test the connection here.',
+        'settings.customSttConnectionFailed':
+          'Local STT server is not reachable. Check that it is running and the port is correct.',
       }
       return translations[key] || key
     },
@@ -192,10 +194,14 @@ describe('SttPane', () => {
 
     it('shows preset, base URL, model, and optional API key fields', () => {
       render(<SttPane />)
+      const selects = screen.getAllByRole('combobox')
+      const presetSelect = selects[1]
+
       expect(screen.getByText('Preset')).toBeInTheDocument()
       expect(screen.getByText('Base URL')).toBeInTheDocument()
       expect(screen.getByText('Model')).toBeInTheDocument()
       expect(screen.getByText('API Key (optional)')).toBeInTheDocument()
+      expect(presetSelect).toHaveValue('speaches')
       expect(screen.getByDisplayValue('http://localhost:8000/v1')).toBeInTheDocument()
       expect(screen.getByDisplayValue('Systran/faster-whisper-large-v3')).toBeInTheDocument()
     })
