@@ -66,10 +66,7 @@ pub fn create_provider(
             })
         }
         "assemblyai" => Ok(Box::new(assemblyai::AssemblyAiProvider::new())),
-        "deepgram" => Ok(match client {
-            Some(ref c) => Box::new(deepgram::DeepgramProvider::with_client(c.clone())),
-            None => Box::new(deepgram::DeepgramProvider::new()),
-        }),
+        "deepgram" => Ok(Box::new(deepgram::DeepgramProvider::new())),
         config::CUSTOM_WHISPER_PROVIDER => {
             let wc = custom_whisper_config.ok_or_else(|| {
                 AppError::Config("Local / Custom Whisper is missing base URL or model".to_string())
