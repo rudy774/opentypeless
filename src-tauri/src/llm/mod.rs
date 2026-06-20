@@ -36,6 +36,10 @@ pub struct PolishRequest {
     pub translate_enabled: bool,
     pub target_lang: String,
     pub selected_text: Option<String>,
+    #[serde(default)]
+    pub cloud_operation_id: Option<String>,
+    #[serde(default)]
+    pub client_version: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -21,7 +21,9 @@
     "output_fallback_clipboard": "文本输出失败，结果已改为复制到剪贴板。{{details}}",
     "output_wayland_unsupported": "Wayland 暂不支持键盘输出，结果已改为复制到剪贴板。",
     "llm_failed": "AI 润色失败，已改为输出原始文本。{{details}}",
-    "llm_quota_exceeded": "云端 AI 额度已用完。请升级到 Pro 或切换到 BYOK 模式。"
+    "llm_quota_exceeded": "云端 AI 额度已用完。请升级到 Pro 或切换到 BYOK 模式。",
+    "cloud_quota_exceeded": "Cloud words used up. Switch to BYOK or wait until your monthly reset.",
+    "client_upgrade_required": "Update OpenTypeless to use AppSumo cloud words."
   },
   "home": {
     "welcome": "欢迎使用 OpenTypeless",
@@ -189,7 +191,9 @@
       "stt_connection_failed": "STT 连接失败",
       "audio_failed": "麦克风失败",
       "output_failed": "输出失败",
-      "unknown": "出错了"
+      "unknown": "出错了",
+      "cloud_quota_exceeded": "Cloud words used up",
+      "client_upgrade_required": "Update required"
     },
     "menu": {
       "hideWhenIdle": "空闲时隐藏胶囊",
@@ -364,6 +368,9 @@
     "plan": "计划",
     "renews": "续期",
     "usageThisMonth": "本月用量",
+    "cloudWords": "云端润色字数",
+    "words": "字",
+    "resets": "重置时间",
     "cloudBackup": "云端备份",
     "backup": "备份",
     "restore": "恢复",
@@ -379,7 +386,14 @@
     "quotaHours": "小时",
     "quotaTokens": "千 token",
     "quotaUsage": "{{label}}使用量：{{used}} / {{limit}} {{unit}}",
+    "cloudQuotaWarning": "云端字数额度已超过 90%，请留意本月剩余额度。",
     "backToSignIn": "返回登录",
+    "appsumoRedeemTitle": "兑换 AppSumo 许可证",
+    "appsumoRedeemDesc": "粘贴 AppSumo license key，解锁 lifetime 云端字数额度。",
+    "appsumoLicensePlaceholder": "AppSumo license key",
+    "appsumoLicenseRequired": "请输入 AppSumo license key",
+    "activateLicense": "兑换",
+    "licenseActivated": "兑换成功",
     "freeCredit": "免费额度",
     "resendVerification": "重新发送验证邮件",
     "sending": "发送中...",
@@ -391,7 +405,8 @@
       "backupFail": "备份失败",
       "restoreOk": "恢复成功",
       "restoreFail": "恢复失败",
-      "subscriptionFail": "加载订阅信息失败"
+      "subscriptionFail": "加载订阅信息失败",
+      "licenseFail": "兑换失败"
     },
     "quotaMin": "分钟"
   },

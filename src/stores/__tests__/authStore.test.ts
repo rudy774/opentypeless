@@ -17,6 +17,7 @@ vi.mock('../../lib/auth-client', () => ({
 
 vi.mock('../../lib/api', () => ({
   getSubscriptionStatus: vi.fn(),
+  activateAppSumoLicense: vi.fn(),
 }))
 
 vi.mock('../../components/Toast', () => ({
@@ -25,7 +26,7 @@ vi.mock('../../components/Toast', () => ({
 
 import { invoke } from '@tauri-apps/api/core'
 import { authClient } from '../../lib/auth-client'
-import { getSubscriptionStatus } from '../../lib/api'
+import { activateAppSumoLicense, getSubscriptionStatus } from '../../lib/api'
 
 function getState() {
   return useAuthStore.getState()
@@ -37,7 +38,16 @@ describe('authStore', () => {
     useAuthStore.setState({
       user: null,
       plan: 'free',
+      planSource: 'free',
+      displayName: 'Free',
       subscriptionEnd: null,
+      subscriptionStatus: null,
+      licenseStatus: null,
+      cloudWordsUsed: 0,
+      cloudWordsLimit: 0,
+      cloudWordsResetAt: null,
+      byokUnlimited: true,
+      minimumDesktopVersion: null,
       sttSecondsUsed: 0,
       sttSecondsLimit: 0,
       llmTokensUsed: 0,
@@ -50,9 +60,23 @@ describe('authStore', () => {
     vi.mocked(invoke).mockResolvedValue(undefined)
     vi.mocked(authClient.getSession).mockResolvedValue({ data: null } as never)
     vi.mocked(authClient.signOut).mockResolvedValue(undefined as never)
+    vi.mocked(activateAppSumoLicense).mockResolvedValue({
+      ok: true,
+      plan: 'appsumo_tier2',
+      displayName: 'AppSumo Tier 2',
+      cloudWordsLimit: 700000,
+    })
     vi.mocked(getSubscriptionStatus).mockResolvedValue({
       plan: 'pro',
+      source: 'creem',
+      displayName: 'Pro',
       subscriptionEnd: '2025-12-31',
+      subscriptionStatus: 'active',
+      licenseStatus: null,
+      cloudWordsUsed: 0,
+      cloudWordsLimit: 0,
+      cloudWordsResetAt: null,
+      byokUnlimited: true,
       sttSecondsUsed: 100,
       sttSecondsLimit: 36000,
       llmTokensUsed: 5000,
@@ -74,7 +98,16 @@ describe('authStore', () => {
       useAuthStore.setState({
         user: { id: '1', email: 'test@example.com', name: 'Test' },
         plan: 'pro',
+        planSource: 'creem',
+        displayName: 'Pro',
         subscriptionEnd: '2025-12-31',
+        subscriptionStatus: 'active',
+        licenseStatus: null,
+        cloudWordsUsed: 0,
+        cloudWordsLimit: 0,
+        cloudWordsResetAt: null,
+        byokUnlimited: true,
+        minimumDesktopVersion: null,
         sttSecondsUsed: 100,
         sttSecondsLimit: 36000,
         llmTokensUsed: 5000,
@@ -105,6 +138,53 @@ describe('authStore', () => {
       expect(getState().sttSecondsLimit).toBe(36000)
       expect(getState().llmTokensUsed).toBe(5000)
       expect(getState().llmTokensLimit).toBe(5000000)
+    })
+
+    it('updates AppSumo cloud words fields from API response', async () => {
+      vi.mocked(getSubscriptionStatus).mockResolvedValueOnce({
+        plan: 'appsumo_tier2',
+        source: 'appsumo',
+        displayName: 'AppSumo Tier 2',
+        subscriptionEnd: null,
+        subscriptionStatus: null,
+        licenseStatus: 'active',
+        cloudWordsUsed: 12345,
+        cloudWordsLimit: 700000,
+        cloudWordsResetAt: '2026-07-01T00:00:00.000Z',
+        byokUnlimited: true,
+        minimumDesktopVersion: '0.1.1',
+        sttSecondsUsed: 0,
+        sttSecondsLimit: 0,
+        llmTokensUsed: 0,
+        llmTokensLimit: 0,
+      })
+      useAuthStore.setState({
+        user: { id: '1', email: 'test@example.com', name: 'Test' },
+      })
+
+      await getState().refreshSubscription()
+
+      expect(getState().plan).toBe('appsumo_tier2')
+      expect(getState().planSource).toBe('appsumo')
+      expect(getState().displayName).toBe('AppSumo Tier 2')
+      expect(getState().licenseStatus).toBe('active')
+      expect(getState().cloudWordsUsed).toBe(12345)
+      expect(getState().cloudWordsLimit).toBe(700000)
+      expect(getState().cloudWordsResetAt).toBe('2026-07-01T00:00:00.000Z')
+      expect(getState().minimumDesktopVersion).toBe('0.1.1')
+    })
+  })
+
+  describe('activateAppSumoLicense', () => {
+    it('activates license through API then refreshes subscription status', async () => {
+      useAuthStore.setState({
+        user: { id: '1', email: 'test@example.com', name: 'Test' },
+      })
+
+      await getState().activateAppSumoLicense('SUMO-ABC-123')
+
+      expect(activateAppSumoLicense).toHaveBeenCalledWith('SUMO-ABC-123')
+      expect(getSubscriptionStatus).toHaveBeenCalled()
     })
   })
 

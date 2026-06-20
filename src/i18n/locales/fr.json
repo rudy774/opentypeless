@@ -21,7 +21,9 @@
     "output_fallback_clipboard": "La sortie de texte a échoué. Le résultat a été copié dans le presse-papiers. {{details}}",
     "output_wayland_unsupported": "La sortie clavier n'est pas prise en charge sur Wayland. Le résultat a été copié dans le presse-papiers.",
     "llm_failed": "Le polissage IA a échoué. Le texte original a été sorti à la place. {{details}}",
-    "llm_quota_exceeded": "Le quota IA cloud est dépassé. Passez à Pro ou utilisez le mode BYOK."
+    "llm_quota_exceeded": "Le quota IA cloud est dépassé. Passez à Pro ou utilisez le mode BYOK.",
+    "cloud_quota_exceeded": "Cloud words used up. Switch to BYOK or wait until your monthly reset.",
+    "client_upgrade_required": "Update OpenTypeless to use AppSumo cloud words."
   },
   "home": {
     "welcome": "Bienvenue dans OpenTypeless",
@@ -189,7 +191,9 @@
       "stt_connection_failed": "STT hors ligne",
       "audio_failed": "Micro échoué",
       "output_failed": "Échec sortie",
-      "unknown": "Erreur"
+      "unknown": "Erreur",
+      "cloud_quota_exceeded": "Cloud words used up",
+      "client_upgrade_required": "Update required"
     },
     "menu": {
       "hideWhenIdle": "Masquer la capsule au repos",

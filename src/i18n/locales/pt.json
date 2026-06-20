@@ -21,7 +21,9 @@
     "output_fallback_clipboard": "A saída de texto falhou. O resultado foi copiado para a área de transferência. {{details}}",
     "output_wayland_unsupported": "A saída por teclado não é compatível com Wayland. O resultado foi copiado para a área de transferência.",
     "llm_failed": "O polimento por IA falhou. O texto original foi gerado em vez disso. {{details}}",
-    "llm_quota_exceeded": "A cota de IA na nuvem acabou. Atualize para Pro ou mude para o modo BYOK."
+    "llm_quota_exceeded": "A cota de IA na nuvem acabou. Atualize para Pro ou mude para o modo BYOK.",
+    "cloud_quota_exceeded": "Cloud words used up. Switch to BYOK or wait until your monthly reset.",
+    "client_upgrade_required": "Update OpenTypeless to use AppSumo cloud words."
   },
   "home": {
     "welcome": "Bem-vindo ao OpenTypeless",
@@ -189,7 +191,9 @@
       "stt_connection_failed": "STT offline",
       "audio_failed": "Falha micro",
       "output_failed": "Falha saída",
-      "unknown": "Erro"
+      "unknown": "Erro",
+      "cloud_quota_exceeded": "Cloud words used up",
+      "client_upgrade_required": "Update required"
     },
     "menu": {
       "hideWhenIdle": "Ocultar cápsula em repouso",

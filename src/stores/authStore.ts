@@ -1,12 +1,19 @@
 import { create } from 'zustand'
 import { invoke } from '@tauri-apps/api/core'
 import { authClient } from '../lib/auth-client'
-import { getSubscriptionStatus } from '../lib/api'
+import {
+  activateAppSumoLicense,
+  getSubscriptionStatus,
+  type LicenseStatus,
+  type PlanId,
+  type PlanSource,
+} from '../lib/api'
 import { toast } from '../components/Toast'
 import i18n from '../i18n'
 
 let sttWarningShown = false
 let llmWarningShown = false
+let cloudWordsWarningShown = false
 
 export interface AuthUser {
   id: string
@@ -17,10 +24,19 @@ export interface AuthUser {
 interface AuthState {
   // User
   user: AuthUser | null
-  plan: 'free' | 'pro'
+  plan: PlanId
+  planSource: PlanSource
+  displayName: string
   subscriptionEnd: string | null
+  subscriptionStatus: string | null
+  licenseStatus: LicenseStatus | null
 
   // Quotas
+  cloudWordsUsed: number
+  cloudWordsLimit: number
+  cloudWordsResetAt: string | null
+  byokUnlimited: boolean
+  minimumDesktopVersion: string | null
   sttSecondsUsed: number
   sttSecondsLimit: number
   llmTokensUsed: number
@@ -42,13 +58,23 @@ interface AuthState {
   resendVerification: () => Promise<void>
   signOut: () => Promise<void>
   refreshSubscription: () => Promise<void>
+  activateAppSumoLicense: (licenseKey: string) => Promise<void>
   handleDeepLinkToken: (token: string) => Promise<void>
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   plan: 'free',
+  planSource: 'free',
+  displayName: 'Free',
   subscriptionEnd: null,
+  subscriptionStatus: null,
+  licenseStatus: null,
+  cloudWordsUsed: 0,
+  cloudWordsLimit: 0,
+  cloudWordsResetAt: null,
+  byokUnlimited: true,
+  minimumDesktopVersion: null,
   sttSecondsUsed: 0,
   sttSecondsLimit: 0,
   llmTokensUsed: 0,
@@ -186,7 +212,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({
         user: null,
         plan: 'free',
+        planSource: 'free',
+        displayName: 'Free',
         subscriptionEnd: null,
+        subscriptionStatus: null,
+        licenseStatus: null,
+        cloudWordsUsed: 0,
+        cloudWordsLimit: 0,
+        cloudWordsResetAt: null,
+        byokUnlimited: true,
+        minimumDesktopVersion: null,
         sttSecondsUsed: 0,
         sttSecondsLimit: 0,
         llmTokensUsed: 0,
@@ -198,6 +233,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       })
       sttWarningShown = false
       llmWarningShown = false
+      cloudWordsWarningShown = false
     }
   },
 
@@ -206,7 +242,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const status = await getSubscriptionStatus()
       set({
         plan: status.plan,
+        planSource: status.source ?? (status.plan === 'pro' ? 'creem' : 'free'),
+        displayName: status.displayName ?? (status.plan === 'pro' ? 'Pro' : 'Free'),
         subscriptionEnd: status.subscriptionEnd,
+        subscriptionStatus: status.subscriptionStatus ?? null,
+        licenseStatus: status.licenseStatus ?? null,
+        cloudWordsUsed: status.cloudWordsUsed ?? 0,
+        cloudWordsLimit: status.cloudWordsLimit ?? 0,
+        cloudWordsResetAt: status.cloudWordsResetAt ?? null,
+        byokUnlimited: status.byokUnlimited ?? true,
+        minimumDesktopVersion: status.minimumDesktopVersion ?? null,
         sttSecondsUsed: status.sttSecondsUsed,
         sttSecondsLimit: status.sttSecondsLimit,
         llmTokensUsed: status.llmTokensUsed,
@@ -217,6 +262,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         set({ checkoutPending: false })
       }
       if (
+        (status.cloudWordsLimit ?? 0) > 0 &&
+        (status.cloudWordsUsed ?? 0) / (status.cloudWordsLimit ?? 1) >= 0.9 &&
+        !cloudWordsWarningShown
+      ) {
+        toast(i18n.t('account.cloudQuotaWarning'), 'error')
+        cloudWordsWarningShown = true
+      } else if (
         status.sttSecondsLimit > 0 &&
         status.sttSecondsUsed / status.sttSecondsLimit >= 0.9 &&
         !sttWarningShown
@@ -234,6 +286,20 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
     } catch (e) {
       console.warn('Failed to refresh subscription status:', e instanceof Error ? e.message : e)
+    }
+  },
+
+  activateAppSumoLicense: async (licenseKey: string) => {
+    set({ loading: true, error: null })
+    try {
+      await activateAppSumoLicense(licenseKey)
+      await get().refreshSubscription()
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Failed to activate AppSumo license'
+      set({ error: msg })
+      throw e
+    } finally {
+      set({ loading: false })
     }
   },
 

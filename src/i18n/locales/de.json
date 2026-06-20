@@ -21,7 +21,9 @@
     "output_fallback_clipboard": "Die Textausgabe ist fehlgeschlagen. Das Ergebnis wurde stattdessen in die Zwischenablage kopiert. {{details}}",
     "output_wayland_unsupported": "Tastaturausgabe wird unter Wayland nicht unterstützt. Das Ergebnis wurde in die Zwischenablage kopiert.",
     "llm_failed": "Die KI-Glättung ist fehlgeschlagen. Stattdessen wurde der Originaltext ausgegeben. {{details}}",
-    "llm_quota_exceeded": "Das Cloud-KI-Kontingent ist aufgebraucht. Wechseln Sie zu Pro oder in den BYOK-Modus."
+    "llm_quota_exceeded": "Das Cloud-KI-Kontingent ist aufgebraucht. Wechseln Sie zu Pro oder in den BYOK-Modus.",
+    "cloud_quota_exceeded": "Cloud words used up. Switch to BYOK or wait until your monthly reset.",
+    "client_upgrade_required": "Update OpenTypeless to use AppSumo cloud words."
   },
   "home": {
     "welcome": "Willkommen bei OpenTypeless",
@@ -189,7 +191,9 @@
       "stt_connection_failed": "STT offline",
       "audio_failed": "Mikrofehler",
       "output_failed": "Ausgabe-Fehler",
-      "unknown": "Fehler"
+      "unknown": "Fehler",
+      "cloud_quota_exceeded": "Cloud words used up",
+      "client_upgrade_required": "Update required"
     },
     "menu": {
       "hideWhenIdle": "Kapsel im Leerlauf ausblenden",

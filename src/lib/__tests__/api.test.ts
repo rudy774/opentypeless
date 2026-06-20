@@ -56,6 +56,113 @@ describe('request() via getSubscriptionStatus', () => {
     expect(result.plan).toBe('pro')
     expect(result.sttSecondsLimit).toBe(36000)
   })
+
+  it('parses AppSumo cloud words status', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          plan: 'appsumo_tier2',
+          source: 'appsumo',
+          displayName: 'AppSumo Tier 2',
+          subscriptionEnd: null,
+          subscriptionStatus: null,
+          licenseStatus: 'active',
+          cloudWordsUsed: 12345,
+          cloudWordsLimit: 700000,
+          cloudWordsResetAt: '2026-07-01T00:00:00.000Z',
+          byokUnlimited: true,
+          minimumDesktopVersion: '0.1.1',
+          sttSecondsUsed: 0,
+          sttSecondsLimit: 0,
+          llmTokensUsed: 0,
+          llmTokensLimit: 0,
+        }),
+    } as Response)
+
+    const { getSubscriptionStatus } = await import('../api')
+    const result = await getSubscriptionStatus()
+
+    expect(result.plan).toBe('appsumo_tier2')
+    expect(result.source).toBe('appsumo')
+    expect(result.licenseStatus).toBe('active')
+    expect(result.cloudWordsLimit).toBe(700000)
+  })
+})
+
+describe('hasManagedCloudAccess', () => {
+  it('requires active AppSumo license and compatible desktop version', async () => {
+    const { hasManagedCloudAccess } = await import('../api')
+
+    expect(
+      hasManagedCloudAccess(
+        {
+          plan: 'appsumo_tier1',
+          source: 'appsumo',
+          displayName: 'AppSumo Tier 1',
+          subscriptionEnd: null,
+          subscriptionStatus: null,
+          licenseStatus: 'active',
+          cloudWordsUsed: 0,
+          cloudWordsLimit: 200000,
+          cloudWordsResetAt: '2026-07-01T00:00:00.000Z',
+          byokUnlimited: true,
+          minimumDesktopVersion: '0.1.1',
+          sttSecondsUsed: 0,
+          sttSecondsLimit: 0,
+          llmTokensUsed: 0,
+          llmTokensLimit: 0,
+        },
+        '0.1.1',
+      ),
+    ).toBe(true)
+
+    expect(
+      hasManagedCloudAccess(
+        {
+          plan: 'appsumo_tier1',
+          source: 'appsumo',
+          displayName: 'AppSumo Tier 1',
+          subscriptionEnd: null,
+          subscriptionStatus: null,
+          licenseStatus: 'pending',
+          cloudWordsUsed: 0,
+          cloudWordsLimit: 200000,
+          cloudWordsResetAt: '2026-07-01T00:00:00.000Z',
+          byokUnlimited: true,
+          minimumDesktopVersion: '0.1.1',
+          sttSecondsUsed: 0,
+          sttSecondsLimit: 0,
+          llmTokensUsed: 0,
+          llmTokensLimit: 0,
+        },
+        '0.1.1',
+      ),
+    ).toBe(false)
+
+    expect(
+      hasManagedCloudAccess(
+        {
+          plan: 'appsumo_tier1',
+          source: 'appsumo',
+          displayName: 'AppSumo Tier 1',
+          subscriptionEnd: null,
+          subscriptionStatus: null,
+          licenseStatus: 'active',
+          cloudWordsUsed: 0,
+          cloudWordsLimit: 200000,
+          cloudWordsResetAt: '2026-07-01T00:00:00.000Z',
+          byokUnlimited: true,
+          minimumDesktopVersion: '0.1.1',
+          sttSecondsUsed: 0,
+          sttSecondsLimit: 0,
+          llmTokensUsed: 0,
+          llmTokensLimit: 0,
+        },
+        '0.1.0',
+      ),
+    ).toBe(false)
+  })
 })
 
 describe('request() error handling', () => {
@@ -120,6 +227,41 @@ describe('createCheckout', () => {
       }),
     )
     expect(result.url).toBe('https://checkout.stripe.com/xxx')
+  })
+})
+
+describe('activateAppSumoLicense', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('sends the license key to the TalkMore activation endpoint', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            ok: true,
+            plan: 'appsumo_tier2',
+            displayName: 'AppSumo Tier 2',
+            cloudWordsLimit: 700000,
+          }),
+      }),
+    )
+
+    const { activateAppSumoLicense } = await import('../api')
+    const result = await activateAppSumoLicense(' SUMO-ABC-123 ')
+
+    expect(fetch).toHaveBeenCalledWith(
+      `${API_BASE}/api/appsumo/activate`,
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ licenseKey: ' SUMO-ABC-123 ' }),
+      }),
+    )
+    expect(result.plan).toBe('appsumo_tier2')
+    expect(result.cloudWordsLimit).toBe(700000)
   })
 })
 

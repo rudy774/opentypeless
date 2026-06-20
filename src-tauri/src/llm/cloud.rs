@@ -93,6 +93,65 @@ fn cloud_llm_forbidden_error(body: &str) -> AppError {
     AppError::Auth("Cloud LLM access denied".to_string())
 }
 
+fn app_type_context_value(app_type: super::AppType) -> &'static str {
+    match app_type {
+        super::AppType::Email => "email",
+        super::AppType::Chat => "chat",
+        super::AppType::Code => "code",
+        super::AppType::Document => "document",
+        super::AppType::General => "general",
+    }
+}
+
+fn build_cloud_llm_body(req: &PolishRequest, stream: bool) -> serde_json::Value {
+    let has_selected_text = req
+        .selected_text
+        .as_ref()
+        .is_some_and(|s| !s.trim().is_empty());
+
+    let system_prompt = prompt::build_system_prompt(
+        req.app_type,
+        &req.dictionary,
+        req.translate_enabled,
+        &req.target_lang,
+        has_selected_text,
+    );
+
+    let mut messages = vec![serde_json::json!({ "role": "system", "content": system_prompt })];
+    if has_selected_text {
+        messages.push(serde_json::json!({
+            "role": "user",
+            "content": format!("<selected_text>\n{}\n</selected_text>", req.selected_text.as_ref().unwrap())
+        }));
+    }
+    messages.push(serde_json::json!({
+        "role": "user",
+        "content": format!("<transcription>\n{}\n</transcription>", req.raw_text)
+    }));
+
+    let mut body = serde_json::json!({
+        "messages": messages,
+        "stream": stream
+    });
+
+    if let Some(operation_id) = req.cloud_operation_id.as_ref() {
+        body["context"] = serde_json::json!({
+            "operationId": operation_id,
+            "stageKey": format!("{operation_id}:llm"),
+            "requestType": "voice_pipeline",
+            "clientVersion": req.client_version.as_deref().unwrap_or(env!("CARGO_PKG_VERSION")),
+            "appType": app_type_context_value(req.app_type),
+            "hasSelectedText": has_selected_text,
+            "translateEnabled": req.translate_enabled,
+            "targetLang": req.target_lang,
+            "rawTextChars": req.raw_text.chars().count(),
+            "selectedTextChars": req.selected_text.as_deref().map(|s| s.chars().count()).unwrap_or(0),
+        });
+    }
+
+    body
+}
+
 #[async_trait]
 impl LlmProvider for CloudLlmProvider {
     async fn polish(
@@ -107,37 +166,8 @@ impl LlmProvider for CloudLlmProvider {
             ));
         }
 
-        let has_selected_text = req
-            .selected_text
-            .as_ref()
-            .is_some_and(|s| !s.trim().is_empty());
-
-        let system_prompt = prompt::build_system_prompt(
-            req.app_type,
-            &req.dictionary,
-            req.translate_enabled,
-            &req.target_lang,
-            has_selected_text,
-        );
-
-        let mut messages = vec![serde_json::json!({ "role": "system", "content": system_prompt })];
-        if has_selected_text {
-            messages.push(serde_json::json!({
-                "role": "user",
-                "content": format!("<selected_text>\n{}\n</selected_text>", req.selected_text.as_ref().unwrap())
-            }));
-        }
-        messages.push(serde_json::json!({
-            "role": "user",
-            "content": format!("<transcription>\n{}\n</transcription>", req.raw_text)
-        }));
-
         let api_base_url = crate::api_base_url();
-
-        let body = serde_json::json!({
-            "messages": messages,
-            "stream": on_chunk.is_some()
-        });
+        let body = build_cloud_llm_body(req, on_chunk.is_some());
 
         // Retry the initial connection (not once streaming starts)
         #[allow(unused_assignments)]
@@ -282,6 +312,7 @@ impl LlmProvider for CloudLlmProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::llm::{AppType, PolishRequest};
 
     #[test]
     fn forbidden_error_uses_llm_quota_code() {
@@ -297,5 +328,37 @@ mod tests {
             r#"{"error":{"code":"llm_quota_exceeded","message":"LLM quota exceeded"}}"#,
         );
         assert!(matches!(err, AppError::LlmQuota(_)));
+    }
+
+    #[test]
+    fn cloud_llm_body_includes_context_without_duplicating_text() {
+        let req = PolishRequest {
+            raw_text: "hello world".to_string(),
+            app_type: AppType::Email,
+            dictionary: vec![],
+            translate_enabled: false,
+            target_lang: "en".to_string(),
+            selected_text: Some("selected private text".to_string()),
+            cloud_operation_id: Some("018f9a9b-7c3e-7b1a-a2f3-2e1b8a6a8f10".to_string()),
+            client_version: Some("0.1.1".to_string()),
+        };
+
+        let body = build_cloud_llm_body(&req, true);
+
+        assert_eq!(body["stream"], true);
+        assert_eq!(
+            body["context"]["operationId"],
+            "018f9a9b-7c3e-7b1a-a2f3-2e1b8a6a8f10"
+        );
+        assert_eq!(
+            body["context"]["stageKey"],
+            "018f9a9b-7c3e-7b1a-a2f3-2e1b8a6a8f10:llm"
+        );
+        assert_eq!(body["context"]["requestType"], "voice_pipeline");
+        assert_eq!(body["context"]["clientVersion"], "0.1.1");
+        assert_eq!(body["context"]["appType"], "email");
+        assert_eq!(body["context"]["hasSelectedText"], true);
+        assert_eq!(body["context"]["selectedTextChars"], 21);
+        assert!(body["context"].to_string().find("selected private text").is_none());
     }
 }

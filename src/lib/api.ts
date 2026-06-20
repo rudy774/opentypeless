@@ -29,7 +29,7 @@ async function request<T>(
 
     if (!res.ok) {
       const body = await res.json().catch(() => ({ error: res.statusText }))
-      throw new ApiError(res.status, body.error ?? res.statusText)
+      throw new ApiError(res.status, body.error ?? res.statusText, body.code)
     }
 
     return res.json()
@@ -42,6 +42,7 @@ export class ApiError extends Error {
   constructor(
     public status: number,
     message: string,
+    public code?: string,
   ) {
     super(message)
     this.name = 'ApiError'
@@ -49,9 +50,22 @@ export class ApiError extends Error {
 }
 
 // Subscription
+export type PlanId = 'free' | 'pro' | 'appsumo_tier1' | 'appsumo_tier2' | 'appsumo_tier3'
+export type PlanSource = 'free' | 'creem' | 'appsumo'
+export type LicenseStatus = 'active' | 'refunded' | 'deactivated' | 'pending'
+
 export interface SubscriptionStatus {
-  plan: 'free' | 'pro'
+  plan: PlanId
+  source?: PlanSource
+  displayName?: string
   subscriptionEnd: string | null
+  subscriptionStatus?: string | null
+  licenseStatus?: LicenseStatus | null
+  cloudWordsUsed?: number
+  cloudWordsLimit?: number
+  cloudWordsResetAt?: string | null
+  byokUnlimited?: boolean
+  minimumDesktopVersion?: string
   sttSecondsUsed: number
   sttSecondsLimit: number
   llmTokensUsed: number
@@ -60,6 +74,51 @@ export interface SubscriptionStatus {
 
 export function getSubscriptionStatus(): Promise<SubscriptionStatus> {
   return request('/api/subscription/status')
+}
+
+export interface AppSumoActivationResponse {
+  ok: true
+  plan: Extract<PlanId, `appsumo_${string}`>
+  displayName: string
+  cloudWordsLimit: number
+}
+
+export function activateAppSumoLicense(licenseKey: string): Promise<AppSumoActivationResponse> {
+  return request('/api/appsumo/activate', {
+    method: 'POST',
+    body: JSON.stringify({ licenseKey }),
+  })
+}
+
+function compareVersions(a: string, b: string): number {
+  const left = a.split('.').map((part) => Number.parseInt(part, 10) || 0)
+  const right = b.split('.').map((part) => Number.parseInt(part, 10) || 0)
+  const length = Math.max(left.length, right.length)
+  for (let i = 0; i < length; i += 1) {
+    const diff = (left[i] ?? 0) - (right[i] ?? 0)
+    if (diff !== 0) return diff
+  }
+  return 0
+}
+
+export function hasManagedCloudAccess(status: SubscriptionStatus, appVersion: string): boolean {
+  if (status.source === 'appsumo') {
+    if (status.licenseStatus !== 'active') return false
+    if (!status.cloudWordsLimit || status.cloudWordsLimit <= 0) return false
+    if (
+      status.minimumDesktopVersion &&
+      compareVersions(appVersion, status.minimumDesktopVersion) < 0
+    ) {
+      return false
+    }
+    return true
+  }
+
+  if (status.source === 'creem') {
+    return status.plan === 'pro'
+  }
+
+  return status.plan === 'pro'
 }
 
 // Checkout
@@ -94,7 +153,7 @@ export async function proxyStt(audioBlob: Blob, language: string): Promise<{ tex
 
     if (!res.ok) {
       const body = await res.json().catch(() => ({ error: res.statusText }))
-      throw new ApiError(res.status, body.error ?? res.statusText)
+      throw new ApiError(res.status, body.error ?? res.statusText, body.code)
     }
 
     return res.json()

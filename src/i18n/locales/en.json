@@ -21,7 +21,9 @@
     "output_fallback_clipboard": "Text output failed. The result was copied to clipboard instead. {{details}}",
     "output_wayland_unsupported": "Keyboard output is not supported on Wayland. The result was copied to clipboard instead.",
     "llm_failed": "AI polishing failed. The original text was output instead. {{details}}",
-    "llm_quota_exceeded": "Cloud AI quota exceeded. Upgrade to Pro or switch to BYOK mode."
+    "llm_quota_exceeded": "Cloud AI quota exceeded. Upgrade to Pro or switch to BYOK mode.",
+    "cloud_quota_exceeded": "Cloud words used up. Switch to BYOK or wait until your monthly reset.",
+    "client_upgrade_required": "Update OpenTypeless to use AppSumo cloud words."
   },
   "home": {
     "welcome": "Welcome to OpenTypeless",
@@ -189,7 +191,9 @@
       "stt_connection_failed": "STT offline",
       "audio_failed": "Mic failed",
       "output_failed": "Output failed",
-      "unknown": "Error"
+      "unknown": "Error",
+      "cloud_quota_exceeded": "Cloud words used up",
+      "client_upgrade_required": "Update required"
     },
     "menu": {
       "hideWhenIdle": "Hide capsule when idle",
@@ -364,6 +368,9 @@
     "plan": "Plan",
     "renews": "Renews",
     "usageThisMonth": "Usage This Month",
+    "cloudWords": "Cloud words",
+    "words": "words",
+    "resets": "Resets",
     "cloudBackup": "Cloud Backup",
     "backup": "Backup",
     "restore": "Restore",
@@ -377,8 +384,15 @@
     "quotaHours": "hours",
     "quotaTokens": "k tokens",
     "quotaUsage": "{{label}}: {{used}} / {{limit}} {{unit}}",
+    "cloudQuotaWarning": "Cloud words usage has exceeded 90% of your monthly quota",
     "sttQuotaWarning": "STT usage has exceeded 90% of your monthly quota",
     "llmQuotaWarning": "LLM usage has exceeded 90% of your monthly quota",
+    "appsumoRedeemTitle": "Redeem AppSumo license",
+    "appsumoRedeemDesc": "Paste your AppSumo license key to unlock lifetime cloud words.",
+    "appsumoLicensePlaceholder": "AppSumo license key",
+    "appsumoLicenseRequired": "Enter your AppSumo license key",
+    "activateLicense": "Activate license",
+    "licenseActivated": "License activated",
     "backToSignIn": "Back to Sign In",
     "freeCredit": "Free Credit",
     "resendVerification": "Resend verification email",
@@ -391,7 +405,8 @@
       "backupFail": "Backup failed",
       "restoreOk": "Restore successful",
       "restoreFail": "Restore failed",
-      "subscriptionFail": "Failed to load subscription"
+      "subscriptionFail": "Failed to load subscription",
+      "licenseFail": "Failed to activate license"
     },
     "quotaMin": "min"
   },

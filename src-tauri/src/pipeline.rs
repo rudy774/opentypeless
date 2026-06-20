@@ -68,6 +68,7 @@ const CLIPBOARD_COPY_SETTLE_MS: u64 = 100;
 const VOLUME_POLL_INTERVAL_MS: u64 = 50;
 /// Timeout for STT finalization after recording stops.
 const STT_FINALIZE_TIMEOUT_SECS: u64 = 120;
+static CLOUD_OPERATION_COUNTER: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -170,6 +171,23 @@ fn clipboard_copy_sentinel() -> String {
     )
 }
 
+fn new_cloud_operation_id() -> String {
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|duration| duration.as_nanos())
+        .unwrap_or_default();
+    let counter = CLOUD_OPERATION_COUNTER.fetch_add(1, Ordering::Relaxed) as u128;
+    let value = nanos ^ (counter << 32) ^ (std::process::id() as u128);
+    format!(
+        "{:08x}-{:04x}-7{:03x}-a{:03x}-{:012x}",
+        (value >> 96) as u32,
+        (value >> 80) as u16,
+        ((value >> 64) as u16) & 0x0fff,
+        ((value >> 48) as u16) & 0x0fff,
+        value & 0x0000_ffff_ffff_ffff
+    )
+}
+
 #[cfg(target_os = "macos")]
 fn copy_selected_text_to_clipboard() -> bool {
     match std::process::Command::new("/usr/bin/osascript")
@@ -222,6 +240,7 @@ pub struct PipelineHandle {
     preloaded_app_ctx: Arc<Mutex<Option<app_detector::AppContext>>>,
     preloaded_dictionary: Arc<Mutex<Option<Vec<String>>>>,
     preloaded_selected_text: Arc<Mutex<Option<String>>>,
+    cloud_operation_id: Arc<Mutex<Option<String>>>,
     recording_start: Arc<Mutex<Option<std::time::Instant>>>,
     shared_client: reqwest::Client,
     /// Serializes start()/stop() so that stop() waits for start() to finish
@@ -247,6 +266,7 @@ impl PipelineHandle {
             preloaded_app_ctx: Arc::new(Mutex::new(None)),
             preloaded_dictionary: Arc::new(Mutex::new(None)),
             preloaded_selected_text: Arc::new(Mutex::new(None)),
+            cloud_operation_id: Arc::new(Mutex::new(None)),
             recording_start: Arc::new(Mutex::new(None)),
             shared_client,
             pipeline_lock: tokio::sync::Mutex::new(()),
@@ -313,6 +333,10 @@ impl PipelineHandle {
             .lock()
             .unwrap_or_else(|e| e.into_inner())
             .clear();
+        *self
+            .cloud_operation_id
+            .lock()
+            .unwrap_or_else(|e| e.into_inner()) = None;
         *self.stt_error.lock().unwrap_or_else(|e| e.into_inner()) = None;
 
         // Force state to Idle — emits pipeline:state event to sync frontend
@@ -506,6 +530,17 @@ impl PipelineHandle {
             config_data.stt_api_key.clone()
         };
 
+        let cloud_operation_id =
+            if config_data.stt_provider == "cloud" || config_data.llm_provider == "cloud" {
+                Some(new_cloud_operation_id())
+            } else {
+                None
+            };
+        *self
+            .cloud_operation_id
+            .lock()
+            .unwrap_or_else(|e| e.into_inner()) = cloud_operation_id.clone();
+
         let stt_config = SttConfig {
             api_key: stt_api_key,
             language: if config_data.stt_language == "multi" {
@@ -515,6 +550,13 @@ impl PipelineHandle {
             },
             smart_format: true,
             sample_rate: 16000,
+            cloud_operation_id: if config_data.stt_provider == "cloud" {
+                cloud_operation_id.clone()
+            } else {
+                None
+            },
+            expects_cloud_llm: config_data.polish_enabled && config_data.llm_provider == "cloud",
+            client_version: Some(env!("CARGO_PKG_VERSION").to_string()),
         };
 
         let mut provider = match stt::create_provider(
@@ -1013,6 +1055,10 @@ impl PipelineHandle {
         // Save to history
         self.save_history(&raw_text, &final_text, &app_ctx, duration_ms)
             .await;
+        *self
+            .cloud_operation_id
+            .lock()
+            .unwrap_or_else(|e| e.into_inner()) = None;
 
         if let Some(control) = &stt_control {
             self.clear_stt_session(control.id);
@@ -1131,6 +1177,15 @@ impl PipelineHandle {
             translate_enabled: config.translate_enabled,
             target_lang: config.target_lang.clone(),
             selected_text,
+            cloud_operation_id: if config.llm_provider == "cloud" {
+                self.cloud_operation_id
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .clone()
+            } else {
+                None
+            },
+            client_version: Some(env!("CARGO_PKG_VERSION").to_string()),
         };
 
         let (final_text, llm_elapsed) =
@@ -1357,6 +1412,14 @@ mod tests {
         let active_session_id = AtomicU64::new(7);
 
         assert!(should_finalize_stt_task(&abort_flag, &active_session_id, 7));
+    }
+
+    #[test]
+    fn cloud_operation_id_is_uuid_like() {
+        let id = new_cloud_operation_id();
+        assert_eq!(id.len(), 36);
+        assert_eq!(id.chars().filter(|c| *c == '-').count(), 4);
+        assert!(id.chars().all(|c| c.is_ascii_hexdigit() || c == '-'));
     }
 
     #[test]

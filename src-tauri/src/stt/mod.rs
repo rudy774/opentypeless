@@ -17,6 +17,12 @@ pub struct SttConfig {
     pub language: Option<String>,
     pub smart_format: bool,
     pub sample_rate: u32,
+    #[serde(default)]
+    pub cloud_operation_id: Option<String>,
+    #[serde(default)]
+    pub expects_cloud_llm: bool,
+    #[serde(default)]
+    pub client_version: Option<String>,
 }
 
 impl Default for SttConfig {
@@ -26,6 +32,9 @@ impl Default for SttConfig {
             language: None,
             smart_format: true,
             sample_rate: 16000,
+            cloud_operation_id: None,
+            expects_cloud_llm: false,
+            client_version: None,
         }
     }
 }

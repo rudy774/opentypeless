@@ -80,6 +80,34 @@ fn cloud_stt_forbidden_error(body: &str) -> AppError {
     AppError::Auth("Cloud STT access denied".to_string())
 }
 
+fn cloud_stt_metadata_fields(config: &SttConfig) -> Vec<(&'static str, String)> {
+    let Some(operation_id) = config.cloud_operation_id.as_ref() else {
+        return Vec::new();
+    };
+
+    vec![
+        ("operationId", operation_id.clone()),
+        ("stageKey", format!("{operation_id}:stt")),
+        (
+            "requestType",
+            if config.expects_cloud_llm {
+                "voice_pipeline"
+            } else {
+                "stt_only"
+            }
+            .to_string(),
+        ),
+        ("expectsCloudLlm", config.expects_cloud_llm.to_string()),
+        (
+            "clientVersion",
+            config
+                .client_version
+                .clone()
+                .unwrap_or_else(|| env!("CARGO_PKG_VERSION").to_string()),
+        ),
+    ]
+}
+
 impl CloudSttProvider {
     pub fn new(api_base_url: String) -> Self {
         Self {
@@ -161,6 +189,10 @@ impl SttProvider for CloudSttProvider {
 
             if let Some(ref lang) = config.language {
                 form = form.text("language", lang.clone());
+            }
+
+            for (key, value) in cloud_stt_metadata_fields(&config) {
+                form = form.text(key, value);
             }
 
             let resp_result = self
@@ -276,6 +308,38 @@ mod tests {
     fn forbidden_error_unknown_json_is_auth_not_quota() {
         let err = cloud_stt_forbidden_error(r#"{"error":"Forbidden"}"#);
         assert!(matches!(err, AppError::Auth(_)));
+    }
+
+    #[test]
+    fn cloud_stt_metadata_fields_include_operation_context() {
+        let config = SttConfig {
+            api_key: "token".to_string(),
+            language: Some("en".to_string()),
+            smart_format: true,
+            sample_rate: 16000,
+            cloud_operation_id: Some("018f9a9b-7c3e-7b1a-a2f3-2e1b8a6a8f10".to_string()),
+            expects_cloud_llm: true,
+            client_version: Some("0.1.1".to_string()),
+        };
+
+        let fields = cloud_stt_metadata_fields(&config);
+
+        assert_eq!(
+            fields,
+            vec![
+                (
+                    "operationId",
+                    "018f9a9b-7c3e-7b1a-a2f3-2e1b8a6a8f10".to_string()
+                ),
+                (
+                    "stageKey",
+                    "018f9a9b-7c3e-7b1a-a2f3-2e1b8a6a8f10:stt".to_string()
+                ),
+                ("requestType", "voice_pipeline".to_string()),
+                ("expectsCloudLlm", "true".to_string()),
+                ("clientVersion", "0.1.1".to_string()),
+            ]
+        );
     }
 
     #[tokio::test]

@@ -17,6 +17,8 @@ const requiredErrorKeys = [
   'stt_invalid_key',
   'stt_failed',
   'stt_quota_exceeded',
+  'cloud_quota_exceeded',
+  'client_upgrade_required',
   'stt_no_speech_detected',
   'output_fallback_clipboard',
   'output_wayland_unsupported',

@@ -270,6 +270,9 @@ mod tests {
                 language: None,
                 smart_format: true,
                 sample_rate: 16000,
+                cloud_operation_id: None,
+                expects_cloud_llm: false,
+                client_version: None,
             })
             .await;
 

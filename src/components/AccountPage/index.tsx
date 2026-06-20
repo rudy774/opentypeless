@@ -363,12 +363,19 @@ function AccountDetails() {
   const {
     user,
     plan,
+    planSource,
+    displayName,
     subscriptionEnd,
+    licenseStatus,
+    cloudWordsUsed,
+    cloudWordsLimit,
+    cloudWordsResetAt,
     sttSecondsUsed,
     sttSecondsLimit,
     llmTokensUsed,
     llmTokensLimit,
     signOut,
+    activateAppSumoLicense,
   } = useAuthStore()
   const config = useAppStore((s) => s.config)
   const history = useAppStore((s) => s.history)
@@ -380,8 +387,14 @@ function AccountDetails() {
   const [backupLoading, setBackupLoading] = useState(false)
   const [backupMsg, setBackupMsg] = useState<string | null>(null)
   const [portalLoading, setPortalLoading] = useState(false)
+  const [licenseKey, setLicenseKey] = useState('')
+  const [licenseLoading, setLicenseLoading] = useState(false)
+  const [licenseMsg, setLicenseMsg] = useState<string | null>(null)
+  const [licenseError, setLicenseError] = useState<string | null>(null)
 
   const isPro = plan === 'pro'
+  const isAppSumo = planSource === 'appsumo' && licenseStatus === 'active'
+  const planLabel = isAppSumo ? displayName : isPro ? t('upgrade.pro') : t('upgrade.free')
 
   const handleBackup = async () => {
     setBackupLoading(true)
@@ -430,6 +443,29 @@ function AccountDetails() {
     }
   }
 
+  const handleActivateLicense = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const trimmedKey = licenseKey.trim()
+    setLicenseMsg(null)
+    setLicenseError(null)
+
+    if (!trimmedKey) {
+      setLicenseError(t('account.appsumoLicenseRequired'))
+      return
+    }
+
+    setLicenseLoading(true)
+    try {
+      await activateAppSumoLicense(trimmedKey)
+      setLicenseKey('')
+      setLicenseMsg(t('account.licenseActivated'))
+    } catch (e) {
+      setLicenseError(e instanceof Error ? e.message : t('account.toast.licenseFail'))
+    } finally {
+      setLicenseLoading(false)
+    }
+  }
+
   return (
     <div className="max-w-[400px] mx-auto py-8 px-6 space-y-5 text-[13px]">
       <div className="text-center mb-2">
@@ -440,7 +476,7 @@ function AccountDetails() {
       <div className="border border-border rounded-[10px] overflow-hidden">
         <InfoRow label={t('account.email')} value={user!.email} />
         {user!.name && <InfoRow label={t('account.name')} value={user!.name} />}
-        <InfoRow label={t('account.plan')} value={isPro ? t('upgrade.pro') : t('upgrade.free')} />
+        <InfoRow label={t('account.plan')} value={planLabel} />
         {isPro && subscriptionEnd && (
           <InfoRow
             label={t('account.renews')}
@@ -448,6 +484,33 @@ function AccountDetails() {
           />
         )}
       </div>
+
+      {/* AppSumo monthly cloud words */}
+      {cloudWordsLimit > 0 && (
+        <div className="border border-border rounded-[10px] overflow-hidden">
+          <div className="px-3 py-2.5 bg-bg-secondary/50 border-b border-border">
+            <h3 className="text-[13px] font-medium text-text-primary">
+              {t('account.usageThisMonth')}
+            </h3>
+          </div>
+          <div className="px-3 py-3 space-y-3">
+            <QuotaBar
+              label={t('account.cloudWords')}
+              used={cloudWordsUsed}
+              limit={cloudWordsLimit}
+              unit={t('account.words')}
+              divisor={1000}
+              valueSuffix="K"
+            />
+            {cloudWordsResetAt && (
+              <div className="flex justify-between text-[12px]">
+                <span className="text-text-secondary">{t('account.resets')}</span>
+                <span className="text-text-tertiary">{formatResetDate(cloudWordsResetAt)}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Quota */}
       {sttSecondsLimit > 0 && (
@@ -529,6 +592,36 @@ function AccountDetails() {
         </button>
       )}
 
+      {/* AppSumo redemption */}
+      <form onSubmit={handleActivateLicense} className="border border-border rounded-[10px]">
+        <div className="px-3 py-2.5 bg-bg-secondary/50 border-b border-border">
+          <h3 className="text-[13px] font-medium text-text-primary">
+            {t('account.appsumoRedeemTitle')}
+          </h3>
+        </div>
+        <div className="px-3 py-3 space-y-2">
+          <p className="text-[12px] text-text-secondary">{t('account.appsumoRedeemDesc')}</p>
+          <div className="flex gap-2">
+            <input
+              value={licenseKey}
+              onChange={(e) => setLicenseKey(e.target.value)}
+              placeholder={t('account.appsumoLicensePlaceholder')}
+              className="min-w-0 flex-1 px-3 py-2 rounded-[8px] border border-border bg-bg-secondary text-text-primary text-[13px] outline-none focus:border-accent transition-colors"
+            />
+            <button
+              type="submit"
+              disabled={licenseLoading}
+              className="px-3 py-2 rounded-[8px] bg-accent text-white text-[13px] font-medium cursor-pointer border-none hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-1.5 whitespace-nowrap"
+            >
+              {licenseLoading && <Loader2 size={14} className="animate-spin" />}
+              {t('account.activateLicense')}
+            </button>
+          </div>
+          {licenseMsg && <p className="text-[12px] text-green-500">{licenseMsg}</p>}
+          {licenseError && <p className="text-[12px] text-red-500">{licenseError}</p>}
+        </div>
+      </form>
+
       {/* Sign out */}
       <button
         onClick={signOut}
@@ -556,17 +649,19 @@ function QuotaBar({
   limit,
   unit,
   divisor,
+  valueSuffix = '',
 }: {
   label: string
   used: number
   limit: number
   unit: string
   divisor: number
+  valueSuffix?: string
 }) {
   const { t } = useTranslation()
   const pct = limit > 0 ? Math.min((used / limit) * 100, 100) : 0
-  const usedDisplay = (used / divisor).toFixed(1)
-  const limitDisplay = (limit / divisor).toFixed(1)
+  const usedDisplay = `${(used / divisor).toFixed(1)}${valueSuffix}`
+  const limitDisplay = `${(limit / divisor).toFixed(1)}${valueSuffix}`
 
   return (
     <div className="space-y-1">
@@ -596,4 +691,13 @@ function QuotaBar({
       </div>
     </div>
   )
+}
+
+function formatResetDate(value: string) {
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(new Date(value))
 }

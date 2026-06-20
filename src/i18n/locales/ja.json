@@ -21,7 +21,9 @@
     "output_fallback_clipboard": "テキスト出力に失敗しました。代わりに結果をクリップボードにコピーしました。{{details}}",
     "output_wayland_unsupported": "Waylandではキーボード出力に対応していません。結果をクリップボードにコピーしました。",
     "llm_failed": "AIによる整形に失敗しました。代わりに元のテキストを出力しました。{{details}}",
-    "llm_quota_exceeded": "クラウドAIの利用枠を超えました。Proにアップグレードするか、BYOKモードに切り替えてください。"
+    "llm_quota_exceeded": "クラウドAIの利用枠を超えました。Proにアップグレードするか、BYOKモードに切り替えてください。",
+    "cloud_quota_exceeded": "Cloud words used up. Switch to BYOK or wait until your monthly reset.",
+    "client_upgrade_required": "Update OpenTypeless to use AppSumo cloud words."
   },
   "home": {
     "welcome": "OpenTypelessへようこそ",
@@ -189,7 +191,9 @@
       "stt_connection_failed": "STT 接続失敗",
       "audio_failed": "マイク失敗",
       "output_failed": "出力失敗",
-      "unknown": "エラー"
+      "unknown": "エラー",
+      "cloud_quota_exceeded": "Cloud words used up",
+      "client_upgrade_required": "Update required"
     },
     "menu": {
       "hideWhenIdle": "待機中はカプセルを非表示",
