@@ -799,6 +799,7 @@
       "glmAsr": "智谱 GLM-ASR",
       "openaiWhisper": "OpenAI Whisper",
       "groqWhisper": "Groq Whisper",
+      "elevenlabs": "ElevenLabs Scribe v2",
       "siliconflow": "硅基流动 SiliconFlow",
       "appleSpeech": "Apple Speech（本地）",
       "customWhisper": "本地 / 自定义 Whisper",

@@ -4,6 +4,40 @@ use crate::stt::SttProvider;
 use crate::SessionTokenStore;
 use crate::{api_base_url, with_desktop_client_version};
 
+fn build_upload_test_request(
+    client: &reqwest::Client,
+    cfg: &stt::whisper_compat::WhisperCompatConfig,
+    api_key: &str,
+) -> Result<reqwest::RequestBuilder, String> {
+    // ElevenLabs requires at least 100 ms; use 200 ms to avoid boundary rounding.
+    let silent_pcm = vec![0u8; 6400];
+    let wav = stt::whisper_compat::WhisperCompatProvider::build_wav(&silent_pcm, 16000);
+    let file_part = reqwest::multipart::Part::bytes(wav)
+        .file_name("test.wav")
+        .mime_str("audio/wav")
+        .map_err(|e| e.to_string())?;
+    let mut form = reqwest::multipart::Form::new()
+        .text(cfg.model_field, cfg.model.clone())
+        .part("file", file_part);
+    for (key, value) in &cfg.extra_fields {
+        form = form.text(key.clone(), value.clone());
+    }
+
+    let request = client
+        .post(&cfg.endpoint)
+        .multipart(form)
+        .timeout(std::time::Duration::from_secs(15));
+    Ok(match cfg.auth {
+        stt::whisper_compat::ApiKeyAuth::Bearer if !api_key.trim().is_empty() => {
+            request.header("Authorization", format!("Bearer {}", api_key))
+        }
+        stt::whisper_compat::ApiKeyAuth::Header(name) if !api_key.trim().is_empty() => {
+            request.header(name, api_key)
+        }
+        _ => request,
+    })
+}
+
 async fn check_volcengine_doubao_connection(
     api_key: &str,
     resource_id: Option<String>,
@@ -366,31 +400,10 @@ pub async fn test_stt_connection(
         "openai-whisper" => Ok(check_openai_whisper_model(&client, &api_key).await.is_ok()),
         _ => {
             let cfg = resolve_whisper_test_config(&provider, custom_base_url, custom_model)?;
-
-            let silent_pcm = vec![0u8; 3200]; // 0.1s at 16kHz 16-bit mono
-            let wav = stt::whisper_compat::WhisperCompatProvider::build_wav(&silent_pcm, 16000);
-
-            let file_part = reqwest::multipart::Part::bytes(wav)
-                .file_name("test.wav")
-                .mime_str("audio/wav")
+            let resp = build_upload_test_request(&client, &cfg, &api_key)?
+                .send()
+                .await
                 .map_err(|e| e.to_string())?;
-            let mut form = reqwest::multipart::Form::new()
-                .text("model", cfg.model.clone())
-                .part("file", file_part);
-            for (key, value) in &cfg.extra_fields {
-                form = form.text(key.clone(), value.clone());
-            }
-
-            let mut request = client
-                .post(&cfg.endpoint)
-                .multipart(form)
-                .timeout(std::time::Duration::from_secs(15));
-
-            if !api_key.trim().is_empty() {
-                request = request.header("Authorization", format!("Bearer {}", api_key));
-            }
-
-            let resp = request.send().await.map_err(|e| e.to_string())?;
             Ok(resp.status().is_success())
         }
     }
@@ -666,32 +679,11 @@ pub async fn bench_stt_connection(
         }
         _ => {
             let cfg = resolve_whisper_test_config(&provider, custom_base_url, custom_model)?;
-
-            let silent_pcm = vec![0u8; 3200]; // 0.1s at 16kHz 16-bit mono
-            let wav = stt::whisper_compat::WhisperCompatProvider::build_wav(&silent_pcm, 16000);
-
-            let file_part = reqwest::multipart::Part::bytes(wav)
-                .file_name("test.wav")
-                .mime_str("audio/wav")
-                .map_err(|e| e.to_string())?;
-            let mut form = reqwest::multipart::Form::new()
-                .text("model", cfg.model.clone())
-                .part("file", file_part);
-            for (key, value) in &cfg.extra_fields {
-                form = form.text(key.clone(), value.clone());
-            }
-
             let t0 = std::time::Instant::now();
-            let mut request = client
-                .post(&cfg.endpoint)
-                .multipart(form)
-                .timeout(std::time::Duration::from_secs(15));
-
-            if !api_key.trim().is_empty() {
-                request = request.header("Authorization", format!("Bearer {}", api_key));
-            }
-
-            let resp = request.send().await.map_err(|e| e.to_string())?;
+            let resp = build_upload_test_request(&client, &cfg, &api_key)?
+                .send()
+                .await
+                .map_err(|e| e.to_string())?;
             let elapsed = t0.elapsed().as_millis() as u32;
             if !resp.status().is_success() {
                 return Err(format!("HTTP {}", resp.status()));

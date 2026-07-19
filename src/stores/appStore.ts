@@ -21,6 +21,7 @@ export type SttProvider =
   | 'openai-whisper'
   | 'groq-whisper'
   | 'siliconflow'
+  | 'elevenlabs'
   | 'apple-speech'
   | 'custom-whisper'
   | 'cloud'

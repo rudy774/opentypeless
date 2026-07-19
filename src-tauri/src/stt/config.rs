@@ -5,10 +5,11 @@
 /// - `lib::test_stt_connection`
 /// - `lib::bench_stt_connection`
 ///
-use super::whisper_compat::WhisperCompatConfig;
+use super::whisper_compat::{ApiKeyAuth, WhisperCompatConfig};
 
 pub const APPLE_SPEECH_PROVIDER: &str = "apple-speech";
 pub const CUSTOM_WHISPER_PROVIDER: &str = "custom-whisper";
+pub const ELEVENLABS_PROVIDER: &str = "elevenlabs";
 pub const CUSTOM_WHISPER_PRESET_SPEACHES: &str = "speaches";
 pub const CUSTOM_WHISPER_PRESET_CUSTOM: &str = "custom";
 pub const DEFAULT_CUSTOM_WHISPER_BASE_URL: &str = "http://localhost:8000/v1";
@@ -46,6 +47,11 @@ pub fn get_whisper_config(provider: &str) -> Option<SttProviderConfig> {
             model: "FunAudioLLM/SenseVoiceSmall",
             extra_fields: &[],
         }),
+        ELEVENLABS_PROVIDER => Some(SttProviderConfig {
+            endpoint: "https://api.elevenlabs.io/v1/speech-to-text",
+            model: "scribe_v2",
+            extra_fields: &[("tag_audio_events", "false"), ("diarize", "false")],
+        }),
         _ => None,
     }
 }
@@ -82,6 +88,9 @@ pub fn build_custom_whisper_config(
         provider_name: CUSTOM_WHISPER_PROVIDER.to_string(),
         endpoint: normalize_custom_whisper_endpoint(base_url)?,
         model: model.to_string(),
+        model_field: "model",
+        language_field: "language",
+        auth: ApiKeyAuth::Bearer,
         extra_fields: vec![],
         api_key_required: false,
     })
@@ -93,6 +102,21 @@ pub fn build_known_whisper_config(provider: &str) -> Option<WhisperCompatConfig>
         provider_name: provider.to_string(),
         endpoint: cfg.endpoint.to_string(),
         model: cfg.model.to_string(),
+        model_field: if provider == ELEVENLABS_PROVIDER {
+            "model_id"
+        } else {
+            "model"
+        },
+        language_field: if provider == ELEVENLABS_PROVIDER {
+            "language_code"
+        } else {
+            "language"
+        },
+        auth: if provider == ELEVENLABS_PROVIDER {
+            ApiKeyAuth::Header("xi-api-key")
+        } else {
+            ApiKeyAuth::Bearer
+        },
         extra_fields: cfg
             .extra_fields
             .iter()
@@ -143,6 +167,22 @@ mod tests {
         assert!(cfg.endpoint.contains("siliconflow"));
         assert_eq!(cfg.model, "FunAudioLLM/SenseVoiceSmall");
         assert!(cfg.extra_fields.is_empty());
+    }
+
+    #[test]
+    fn test_elevenlabs_config_uses_scribe_request_dialect() {
+        let cfg = build_known_whisper_config(ELEVENLABS_PROVIDER).unwrap();
+        assert_eq!(cfg.endpoint, "https://api.elevenlabs.io/v1/speech-to-text");
+        assert_eq!(cfg.model, "scribe_v2");
+        assert_eq!(cfg.model_field, "model_id");
+        assert_eq!(cfg.language_field, "language_code");
+        assert_eq!(cfg.auth, ApiKeyAuth::Header("xi-api-key"));
+        assert!(cfg
+            .extra_fields
+            .contains(&("tag_audio_events".to_string(), "false".to_string())));
+        assert!(cfg
+            .extra_fields
+            .contains(&("diarize".to_string(), "false".to_string())));
     }
 
     #[test]

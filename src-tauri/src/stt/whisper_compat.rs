@@ -4,12 +4,22 @@ use crate::error::AppError;
 
 use super::{SttConfig, SttProvider, TranscriptEvent};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ApiKeyAuth {
+    Bearer,
+    Header(&'static str),
+}
+
 /// Configuration for a Whisper-compatible HTTP file-upload STT provider.
 #[derive(Debug)]
 pub struct WhisperCompatConfig {
     pub provider_name: String,
     pub endpoint: String,
     pub model: String,
+    /// Multipart field names vary between otherwise compatible upload APIs.
+    pub model_field: &'static str,
+    pub language_field: &'static str,
+    pub auth: ApiKeyAuth,
     /// Extra form text fields (e.g. GLM-ASR needs "stream"="false").
     pub extra_fields: Vec<(String, String)>,
     /// Local OpenAI-compatible servers often do not require authentication.
@@ -142,13 +152,16 @@ impl SttProvider for WhisperCompatProvider {
                 .map_err(|e| AppError::Config(e.to_string()))?;
 
             let mut form = reqwest::multipart::Form::new()
-                .text("model", self.provider_config.model.to_string())
+                .text(
+                    self.provider_config.model_field,
+                    self.provider_config.model.to_string(),
+                )
                 .part("file", file_part);
 
             // Language hint (OpenAI/Groq support `language` field, others use `prompt`)
             if let Some(ref lang) = config.language {
                 if lang != "multi" {
-                    form = form.text("language", lang.clone());
+                    form = form.text(self.provider_config.language_field, lang.clone());
                 }
             }
 
@@ -164,7 +177,12 @@ impl SttProvider for WhisperCompatProvider {
                 .timeout(std::time::Duration::from_secs(60));
 
             if !config.api_key.trim().is_empty() {
-                request = request.header("Authorization", format!("Bearer {}", config.api_key));
+                request = match self.provider_config.auth {
+                    ApiKeyAuth::Bearer => {
+                        request.header("Authorization", format!("Bearer {}", config.api_key))
+                    }
+                    ApiKeyAuth::Header(name) => request.header(name, config.api_key.clone()),
+                };
             }
 
             let resp_result = request.send().await;
@@ -260,6 +278,9 @@ mod tests {
             provider_name: "custom-whisper".to_string(),
             endpoint: "http://localhost:8000/v1/audio/transcriptions".to_string(),
             model: "test-model".to_string(),
+            model_field: "model",
+            language_field: "language",
+            auth: ApiKeyAuth::Bearer,
             extra_fields: vec![],
             api_key_required: false,
         });
@@ -284,6 +305,9 @@ mod tests {
             provider_name: "test-whisper".to_string(),
             endpoint: "https://example.test/transcriptions".to_string(),
             model: "test-model".to_string(),
+            model_field: "model",
+            language_field: "language",
+            auth: ApiKeyAuth::Bearer,
             extra_fields: vec![],
             api_key_required: true,
         });

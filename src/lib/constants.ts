@@ -115,6 +115,7 @@ export const STT_PROVIDERS: { value: string; labelKey: string }[] = [
   { value: 'openai-whisper', labelKey: 'providers.stt.openaiWhisper' },
   { value: 'groq-whisper', labelKey: 'providers.stt.groqWhisper' },
   { value: 'siliconflow', labelKey: 'providers.stt.siliconflow' },
+  { value: 'elevenlabs', labelKey: 'providers.stt.elevenlabs' },
   { value: APPLE_SPEECH_PROVIDER, labelKey: 'providers.stt.appleSpeech' },
   { value: CUSTOM_WHISPER_PROVIDER, labelKey: 'providers.stt.customWhisper' },
   { value: 'cloud', labelKey: 'providers.stt.cloud' },
@@ -165,7 +166,7 @@ export const LLM_DEFAULT_CONFIG: Record<string, { baseUrl: string; model: string
   openai: { baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini' },
   gemini: {
     baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
-    model: 'gemini-2.0-flash',
+    model: 'gemini-2.5-flash',
   },
   moonshot: { baseUrl: 'https://api.moonshot.cn/v1', model: 'moonshot-v1-8k' },
   doubao: {
