@@ -1,10 +1,20 @@
-import { Mic, Settings, History, Crown } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Mic, Settings, History, Crown, AudioLines } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import { spring } from '../../lib/animations'
 import { useAppStore } from '../../stores/appStore'
 import { hasManagedCloudAccess, useAuthStore } from '../../stores/authStore'
 import { useRoute } from '../../lib/router'
+import { getTranscriptionTimeStats, type TranscriptionTimeStats } from '../../lib/tauri'
+import {
+  formatTranscriptionDuration,
+  type TranscriptionTimeRange,
+} from '../../lib/transcription-time'
+
+const EMPTY_TRANSCRIPTION_TIME: TranscriptionTimeStats = { dayMs: 0, weekMs: 0, monthMs: 0 }
+
+const TIME_RANGE_KEYS: TranscriptionTimeRange[] = ['day', 'week', 'month']
 
 export function HomePage() {
   const config = useAppStore((s) => s.config)
@@ -27,6 +37,23 @@ export function HomePage() {
   } = useAuthStore()
   const { t } = useTranslation()
   const hasCloudAccess = useAuthStore(hasManagedCloudAccess)
+  const [timeRange, setTimeRange] = useState<TranscriptionTimeRange>('day')
+  const [transcriptionTime, setTranscriptionTime] =
+    useState<TranscriptionTimeStats>(EMPTY_TRANSCRIPTION_TIME)
+
+  useEffect(() => {
+    let cancelled = false
+    getTranscriptionTimeStats()
+      .then((stats) => {
+        if (!cancelled) setTranscriptionTime(stats)
+      })
+      .catch((error) => {
+        console.warn('Failed to load transcription time:', error)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [history])
 
   const now = new Date()
   const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
@@ -43,6 +70,11 @@ export function HomePage() {
     quotaModel === 'legacy_dual_meter' && displayWordsLimit > 0
       ? displayWordsResetAt
       : cloudWordsResetAt
+  const durationByRange: Record<TranscriptionTimeRange, number> = {
+    day: transcriptionTime.dayMs,
+    week: transcriptionTime.weekMs,
+    month: transcriptionTime.monthMs,
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -79,6 +111,50 @@ export function HomePage() {
           <p className="text-[22px] font-semibold">{todayCount}</p>
         </div>
       </div>
+
+      <section className="rounded-[18px] p-4 jelly-card" aria-labelledby="dictation-time-title">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] bg-accent/10 text-accent">
+              <AudioLines size={16} />
+            </div>
+            <div className="min-w-0">
+              <p
+                id="dictation-time-title"
+                className="text-[11px] text-text-tertiary uppercase tracking-wider"
+              >
+                {t('home.dictationTime')}
+              </p>
+              <p className="mt-1 text-[26px] font-semibold tabular-nums tracking-[-0.02em]">
+                {formatTranscriptionDuration(durationByRange[timeRange])}
+              </p>
+            </div>
+          </div>
+
+          <div
+            className="flex shrink-0 rounded-[9px] bg-bg-secondary/80 p-0.5"
+            role="group"
+            aria-label={t('home.timeRange')}
+          >
+            {TIME_RANGE_KEYS.map((range) => (
+              <button
+                key={range}
+                type="button"
+                onClick={() => setTimeRange(range)}
+                aria-pressed={timeRange === range}
+                className={`rounded-[7px] px-2.5 py-1.5 text-[11px] font-medium transition-colors ${
+                  timeRange === range
+                    ? 'bg-bg-primary text-text-primary shadow-sm'
+                    : 'text-text-tertiary hover:text-text-secondary'
+                }`}
+              >
+                {t(`home.${range}`)}
+              </button>
+            ))}
+          </div>
+        </div>
+        <p className="mt-2 text-[11px] text-text-tertiary">{t('home.savedRecordingTime')}</p>
+      </section>
 
       {/* Plan / Quota summary */}
       {user && (

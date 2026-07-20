@@ -449,6 +449,16 @@ export async function getHistory(limit: number, offset: number): Promise<History
   return invoke('get_history', { limit, offset })
 }
 
+export interface TranscriptionTimeStats {
+  dayMs: number
+  weekMs: number
+  monthMs: number
+}
+
+export async function getTranscriptionTimeStats(): Promise<TranscriptionTimeStats> {
+  return invoke('get_transcription_time_stats')
+}
+
 export async function clearHistory(): Promise<void> {
   return invoke('clear_history')
 }

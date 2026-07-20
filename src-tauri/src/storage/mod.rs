@@ -1195,6 +1195,14 @@ pub struct HistoryEntry {
     pub output_error: Option<String>,
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TranscriptionTimeStats {
+    pub day_ms: i64,
+    pub week_ms: i64,
+    pub month_ms: i64,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum HistoryProviderKind {
@@ -1433,6 +1441,31 @@ impl HistoryStore {
             entries.push(row?);
         }
         Ok(entries)
+    }
+
+    pub async fn transcription_time_stats(
+        &self,
+        day_start: &str,
+        week_start: &str,
+        month_start: &str,
+    ) -> Result<TranscriptionTimeStats> {
+        let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
+        let stats = conn.query_row(
+            "SELECT
+                COALESCE(SUM(CASE WHEN created_at >= ?1 AND duration_ms > 0 THEN duration_ms ELSE 0 END), 0),
+                COALESCE(SUM(CASE WHEN created_at >= ?2 AND duration_ms > 0 THEN duration_ms ELSE 0 END), 0),
+                COALESCE(SUM(CASE WHEN created_at >= ?3 AND duration_ms > 0 THEN duration_ms ELSE 0 END), 0)
+             FROM history",
+            rusqlite::params![day_start, week_start, month_start],
+            |row| {
+                Ok(TranscriptionTimeStats {
+                    day_ms: row.get(0)?,
+                    week_ms: row.get(1)?,
+                    month_ms: row.get(2)?,
+                })
+            },
+        )?;
+        Ok(stats)
     }
 
     pub async fn clear(&self) -> Result<()> {
@@ -3160,6 +3193,39 @@ mod tests {
         assert_eq!(entries.len(), 2);
         assert_eq!(entries[0].polished_text, "polished 3");
         assert_eq!(entries[1].polished_text, "polished 2");
+    }
+
+    #[tokio::test]
+    async fn history_store_aggregates_transcription_time_by_calendar_cutoff() {
+        let store = temp_history_store("transcription-time");
+        for (id, created_at, duration_ms) in [
+            (1, "2026-07-01T09:00:00", 1_000),
+            (2, "2026-07-14T09:00:00", 2_000),
+            (3, "2026-07-19T09:00:00", 3_000),
+            (4, "2026-07-19T10:00:00", -500),
+        ] {
+            let mut entry = test_history_entry(id, created_at);
+            entry.duration_ms = Some(duration_ms);
+            store.add(entry).await.unwrap();
+        }
+
+        let stats = store
+            .transcription_time_stats(
+                "2026-07-19T00:00:00",
+                "2026-07-13T00:00:00",
+                "2026-07-01T00:00:00",
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(
+            stats,
+            TranscriptionTimeStats {
+                day_ms: 3_000,
+                week_ms: 5_000,
+                month_ms: 6_000,
+            }
+        );
     }
 
     #[tokio::test]

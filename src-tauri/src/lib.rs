@@ -1087,6 +1087,7 @@ pub fn run() {
             commands::stt::bench_stt_connection,
             commands::llm::fetch_llm_models,
             commands::history::get_history,
+            commands::history::get_transcription_time_stats,
             commands::history::clear_history,
             commands::backup::restore_backup_data,
             commands::dictionary::get_dictionary,
