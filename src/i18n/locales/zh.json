@@ -230,6 +230,7 @@
     }
   },
   "capsule": {
+    "microphoneLevel": "麦克风音量",
     "cancelRecording": "取消录音",
     "translationTarget": "翻译目标",
     "translationTargets": "翻译目标列表",
@@ -466,7 +467,14 @@
     "mappingResetConfirm": "删除所有仅保存在本机的应用映射？",
     "mappingResetConfirmAction": "重置映射",
     "mappingNoMappings": "暂无自定义应用映射",
-    "dictationMode": "听写触发方式"
+    "dictationMode": "听写触发方式",
+    "automaticStop": "自动停止",
+    "automaticStopHint": "达到所选录音时长后停止并转写。关闭后，只会在你再次按下快捷键时停止。",
+    "automaticStopToggle": "开启",
+    "stopAfter": "停止时间",
+    "seconds": "秒",
+    "recordingLimitSeconds": "录音时限（秒）",
+    "manualStopActive": "已启用手动停止 — 完成后再次按下快捷键。"
   },
   "contextFamilies": {
     "email": "邮件",

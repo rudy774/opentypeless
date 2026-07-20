@@ -230,6 +230,7 @@
     }
   },
   "capsule": {
+    "microphoneLevel": "Nivel del micrófono",
     "cancelRecording": "Cancelar grabación",
     "translationTarget": "Idioma de destino",
     "translationTargets": "Idiomas de destino",
@@ -466,7 +467,14 @@
     "mappingResetConfirm": "Delete all device-only app mappings?",
     "mappingResetConfirmAction": "Reset mappings",
     "mappingNoMappings": "No custom app mappings",
-    "dictationMode": "Modo de dictado"
+    "dictationMode": "Modo de dictado",
+    "automaticStop": "Parada automática",
+    "automaticStopHint": "Detiene y transcribe después del tiempo elegido. Desactívalo para detener solo al volver a pulsar el atajo.",
+    "automaticStopToggle": "Activada",
+    "stopAfter": "Detener después de",
+    "seconds": "segundos",
+    "recordingLimitSeconds": "Límite de grabación en segundos",
+    "manualStopActive": "La parada manual está activa: vuelve a pulsar el atajo cuando termines."
   },
   "contextFamilies": {
     "email": "Email",

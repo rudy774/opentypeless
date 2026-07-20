@@ -565,7 +565,15 @@ impl AppConfig {
         self.normalize_paste_shortcut();
         self.normalize_windows_sendinput_newline_mode();
         self.normalize_hotkey_settings();
+        self.normalize_recording_limit();
         self.normalize_history_settings();
+    }
+
+    fn normalize_recording_limit(&mut self) {
+        // Zero means recording continues until the user explicitly stops it.
+        if self.max_recording_seconds != 0 {
+            self.max_recording_seconds = self.max_recording_seconds.clamp(5, 720);
+        }
     }
 
     fn normalize_insertion_strategy(&mut self) {
@@ -2672,6 +2680,24 @@ mod tests {
         });
         let invalid_config = AppConfig::from_stored_value(invalid_value).unwrap();
         assert_eq!(invalid_config.windows_sendinput_newline_mode, "enter");
+    }
+
+    #[test]
+    fn app_config_normalizes_recording_limit_and_preserves_manual_stop() {
+        let mut manual = AppConfig::default();
+        manual.max_recording_seconds = 0;
+        manual.normalize_values();
+        assert_eq!(manual.max_recording_seconds, 0);
+
+        let mut too_short = AppConfig::default();
+        too_short.max_recording_seconds = 1;
+        too_short.normalize_values();
+        assert_eq!(too_short.max_recording_seconds, 5);
+
+        let mut too_long = AppConfig::default();
+        too_long.max_recording_seconds = 10_000;
+        too_long.normalize_values();
+        assert_eq!(too_long.max_recording_seconds, 720);
     }
 
     #[test]

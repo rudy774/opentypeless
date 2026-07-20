@@ -1,35 +1,36 @@
 import { useEffect, useRef } from 'react'
 import { useReducedMotion } from 'framer-motion'
+import { useTranslation } from 'react-i18next'
 import { useAppStore } from '../../stores/appStore'
+import { normalizeAudioLevel, smoothAudioLevel } from '../../lib/audio-level'
 
 const BAR_COUNT = 7
 const MIN_HEIGHT = 3
 const MAX_HEIGHT = 16
+const BAR_SHAPES = [0.48, 0.72, 0.94, 0.68, 1, 0.76, 0.52]
 
 export function Waveform() {
   const barsRef = useRef<(HTMLDivElement | null)[]>([])
+  const meterRef = useRef<HTMLDivElement | null>(null)
   const rafRef = useRef<number>(0)
   const reduced = useReducedMotion()
+  const { t } = useTranslation()
 
   useEffect(() => {
-    if (reduced) {
-      // Static bars at mid-height when reduced motion is preferred
-      barsRef.current.forEach((bar) => {
-        if (!bar) return
-        bar.style.height = `${(MIN_HEIGHT + MAX_HEIGHT) / 2}px`
-        bar.style.opacity = '0.7'
-      })
-      return
-    }
-
+    let smoothed = 0
     const animate = () => {
-      const volume = useAppStore.getState().audioVolume
+      const target = normalizeAudioLevel(useAppStore.getState().audioVolume)
+      smoothed = smoothAudioLevel(smoothed, target)
+      meterRef.current?.setAttribute('aria-valuenow', smoothed.toFixed(2))
       barsRef.current.forEach((bar, i) => {
         if (!bar) return
-        const offset = Math.sin(Date.now() / 200 + i * 0.9) * 0.15
-        const normalized = Math.max(0, Math.min(1, volume + offset))
-        const height = MIN_HEIGHT + (MAX_HEIGHT - MIN_HEIGHT) * normalized
-        const opacity = Math.max(0.5, normalized)
+        // Reduced Motion still shows live input, but without decorative oscillation.
+        const flutter =
+          !reduced && smoothed > 0.03 ? 0.86 + Math.sin(Date.now() / 95 + i * 1.15) * 0.14 : 1
+        const normalized = Math.max(0, Math.min(1, smoothed * BAR_SHAPES[i] * flutter))
+        const visualMax = reduced ? 11 : MAX_HEIGHT
+        const height = MIN_HEIGHT + (visualMax - MIN_HEIGHT) * normalized
+        const opacity = 0.45 + normalized * 0.55
         bar.style.height = `${height}px`
         bar.style.opacity = `${opacity}`
       })
@@ -41,7 +42,15 @@ export function Waveform() {
   }, [reduced])
 
   return (
-    <div className="flex items-center justify-center gap-[3px] h-4">
+    <div
+      ref={meterRef}
+      className="flex items-center justify-center gap-[3px] h-4"
+      role="meter"
+      aria-label={t('capsule.microphoneLevel')}
+      aria-valuemin={0}
+      aria-valuemax={1}
+      aria-valuenow={0}
+    >
       {Array.from({ length: BAR_COUNT }).map((_, i) => (
         <div
           key={i}
@@ -52,7 +61,7 @@ export function Waveform() {
           style={{
             height: `${MIN_HEIGHT}px`,
             opacity: 0.5,
-            transition: 'height 75ms ease-out, opacity 75ms ease-out',
+            transition: reduced ? 'none' : 'height 75ms ease-out, opacity 75ms ease-out',
           }}
         />
       ))}

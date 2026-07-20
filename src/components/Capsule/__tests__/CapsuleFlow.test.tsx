@@ -1,5 +1,5 @@
 import React from 'react'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { invoke } from '@tauri-apps/api/core'
 import { useAppStore } from '../../../stores/appStore'
@@ -46,6 +46,7 @@ vi.mock('@tauri-apps/api/core', () => ({
 }))
 
 afterEach(() => {
+  vi.useRealTimers()
   cleanup()
   vi.clearAllMocks()
   useAppStore.setState(useAppStore.getInitialState())
@@ -81,6 +82,32 @@ describe('Capsule flow states', () => {
     render(<Capsule />)
 
     expect(screen.getByText(/hello world/)).toBeInTheDocument()
+  })
+
+  it('keeps recording until explicitly stopped when the recording limit is off', () => {
+    vi.useFakeTimers()
+    useAppStore.setState((state) => ({
+      pipelineState: 'recording',
+      config: { ...state.config, max_recording_seconds: 0 },
+    }))
+
+    render(<Capsule />)
+    act(() => vi.advanceTimersByTime(65_000))
+
+    expect(invoke).not.toHaveBeenCalledWith('stop_recording')
+  })
+
+  it('stops recording when the configured recording limit is reached', () => {
+    vi.useFakeTimers()
+    useAppStore.setState((state) => ({
+      pipelineState: 'recording',
+      config: { ...state.config, max_recording_seconds: 5 },
+    }))
+
+    render(<Capsule />)
+    act(() => vi.advanceTimersByTime(5_000))
+
+    expect(invoke).toHaveBeenCalledWith('stop_recording')
   })
 
   it('renders thinking state during polishing', () => {

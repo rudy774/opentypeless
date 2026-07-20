@@ -230,6 +230,7 @@
     }
   },
   "capsule": {
+    "microphoneLevel": "마이크 레벨",
     "cancelRecording": "녹음 취소",
     "translationTarget": "번역 대상",
     "translationTargets": "번역 대상 목록",
@@ -466,7 +467,14 @@
     "mappingResetConfirm": "Delete all device-only app mappings?",
     "mappingResetConfirmAction": "Reset mappings",
     "mappingNoMappings": "No custom app mappings",
-    "dictationMode": "받아쓰기 모드"
+    "dictationMode": "받아쓰기 모드",
+    "automaticStop": "자동 중지",
+    "automaticStopHint": "선택한 녹음 시간이 지나면 중지하고 받아씁니다. 단축키를 다시 누를 때만 중지하려면 끄세요.",
+    "automaticStopToggle": "켜짐",
+    "stopAfter": "다음 시간 후 중지",
+    "seconds": "초",
+    "recordingLimitSeconds": "녹음 제한(초)",
+    "manualStopActive": "수동 중지가 활성화되었습니다. 완료되면 단축키를 다시 누르세요."
   },
   "contextFamilies": {
     "email": "Email",

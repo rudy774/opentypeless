@@ -11,6 +11,8 @@ name = "opentypeless_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
 devtools = ["tauri/devtools"]
 
 [build-dependencies]

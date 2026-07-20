@@ -19,7 +19,12 @@ export function DurationTimer() {
   }, [pipelineState])
 
   useEffect(() => {
-    if (pipelineState === 'recording' && seconds >= maxSeconds && !stoppedRef.current) {
+    if (
+      pipelineState === 'recording' &&
+      maxSeconds > 0 &&
+      seconds >= maxSeconds &&
+      !stoppedRef.current
+    ) {
       stoppedRef.current = true
       invoke('stop_recording').catch((e: unknown) => {
         console.error('Failed to auto-stop recording at max duration:', e)

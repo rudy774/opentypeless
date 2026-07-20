@@ -13,6 +13,7 @@ import type { HotkeyStatus } from '../../lib/tauri'
 import { SegmentedControl } from './shared/SegmentedControl'
 import { Toggle } from './shared/Toggle'
 import { ShortcutBindingList } from './ShortcutBindingList'
+import { RecordingLimitControl } from './RecordingLimitControl'
 
 const MAC_ACCESSIBILITY_HOTKEY_ERROR = 'Accessibility permission may be denied'
 
@@ -210,6 +211,10 @@ export function GeneralPane() {
           ]}
           value={config.hotkey_mode}
           onChange={(v) => updateConfig({ hotkey_mode: v as HotkeyMode })}
+        />
+        <RecordingLimitControl
+          seconds={config.max_recording_seconds}
+          onChange={(seconds) => updateConfig({ max_recording_seconds: seconds })}
         />
       </Section>
 

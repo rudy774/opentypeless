@@ -230,6 +230,7 @@
     }
   },
   "capsule": {
+    "microphoneLevel": "Уровень микрофона",
     "cancelRecording": "Отменить запись",
     "translationTarget": "Язык перевода",
     "translationTargets": "Языки перевода",
@@ -466,7 +467,14 @@
     "mappingResetConfirm": "Delete all device-only app mappings?",
     "mappingResetConfirmAction": "Reset mappings",
     "mappingNoMappings": "No custom app mappings",
-    "dictationMode": "Режим диктовки"
+    "dictationMode": "Режим диктовки",
+    "automaticStop": "Автоматическая остановка",
+    "automaticStopHint": "Останавливает запись и запускает расшифровку через выбранное время. Отключите, чтобы останавливать только повторным нажатием сочетания клавиш.",
+    "automaticStopToggle": "Вкл.",
+    "stopAfter": "Остановить через",
+    "seconds": "секунд",
+    "recordingLimitSeconds": "Лимит записи в секундах",
+    "manualStopActive": "Ручная остановка включена — нажмите сочетание клавиш снова, когда закончите."
   },
   "contextFamilies": {
     "email": "Email",
