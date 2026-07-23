@@ -470,7 +470,7 @@
     "dictationMode": "Diktiermodus",
     "automaticStop": "Automatisch stoppen",
     "automaticStopHint": "Stoppt die Aufnahme nach der gewählten Zeit und transkribiert sie. Deaktivieren, um nur per Tastenkürzel zu stoppen.",
-    "automaticStopToggle": "Ein",
+    "automaticStopToggle": "Zeitlimit",
     "stopAfter": "Stoppen nach",
     "seconds": "Sekunden",
     "recordingLimitSeconds": "Aufnahmelimit in Sekunden",

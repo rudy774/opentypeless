@@ -470,7 +470,7 @@
     "dictationMode": "Mode de dictee",
     "automaticStop": "Arrêt automatique",
     "automaticStopHint": "Arrête et transcrit après la durée choisie. Désactivez cette option pour arrêter uniquement en appuyant à nouveau sur le raccourci.",
-    "automaticStopToggle": "Activé",
+    "automaticStopToggle": "Minuté",
     "stopAfter": "Arrêter après",
     "seconds": "secondes",
     "recordingLimitSeconds": "Limite d'enregistrement en secondes",

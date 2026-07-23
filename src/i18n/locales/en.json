@@ -470,7 +470,7 @@
     "dictationMode": "Dictation mode",
     "automaticStop": "Automatic stop",
     "automaticStopHint": "Stops and transcribes after the selected recording time. Turn this off to stop only when you press your shortcut again.",
-    "automaticStopToggle": "On",
+    "automaticStopToggle": "Timed",
     "stopAfter": "Stop after",
     "seconds": "seconds",
     "recordingLimitSeconds": "Recording limit in seconds",

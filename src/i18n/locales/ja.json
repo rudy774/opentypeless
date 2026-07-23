@@ -470,7 +470,7 @@
     "dictationMode": "ディクテーションモード",
     "automaticStop": "自動停止",
     "automaticStopHint": "選択した録音時間後に停止して文字起こしします。ショートカットをもう一度押すまで録音するにはオフにします。",
-    "automaticStopToggle": "オン",
+    "automaticStopToggle": "時間制限",
     "stopAfter": "停止まで",
     "seconds": "秒",
     "recordingLimitSeconds": "録音上限（秒）",

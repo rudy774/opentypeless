@@ -470,7 +470,7 @@
     "dictationMode": "Modalita dettatura",
     "automaticStop": "Arresto automatico",
     "automaticStopHint": "Interrompe e trascrive dopo il tempo scelto. Disattiva per fermare solo premendo di nuovo la scorciatoia.",
-    "automaticStopToggle": "Attivo",
+    "automaticStopToggle": "A tempo",
     "stopAfter": "Interrompi dopo",
     "seconds": "secondi",
     "recordingLimitSeconds": "Limite di registrazione in secondi",

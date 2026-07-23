@@ -470,7 +470,7 @@
     "dictationMode": "Modo de dictado",
     "automaticStop": "Parada automática",
     "automaticStopHint": "Detiene y transcribe después del tiempo elegido. Desactívalo para detener solo al volver a pulsar el atajo.",
-    "automaticStopToggle": "Activada",
+    "automaticStopToggle": "Con límite",
     "stopAfter": "Detener después de",
     "seconds": "segundos",
     "recordingLimitSeconds": "Límite de grabación en segundos",

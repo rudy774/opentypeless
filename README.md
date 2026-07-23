@@ -36,6 +36,31 @@
   If OpenTypeless helps your workflow, a GitHub star helps more people discover the project.
 </p>
 
+## What This Fork Adds
+
+This fork keeps the OpenTypeless desktop workflow and adds a BYOK setup aimed at accurate, pause-friendly Windows dictation:
+
+- **ElevenLabs Scribe v2** is available as a Speech Recognition provider. Enter your own ElevenLabs API key in the app; no key is included in this repository.
+- **Manual toggle recording** lets one shortcut press start recording and the next press stop and transcribe. In **Settings > General**, set Dictation mode to **Press to start/stop** and turn **Automatic stop** off. Quiet pauses will not end the recording.
+- **Live microphone feedback** animates the recording capsule from the captured audio level, so you can see that the selected microphone is receiving sound.
+- **Dictation-time statistics** on the Home page can be filtered by day, week, or month.
+- **Optional AI cleanup** can send the transcription to your configured LLM, including Google Gemini, before inserting the polished text into the active app.
+
+For a Logitech mouse or another programmable device, assign a keyboard shortcut in OpenTypeless and map a mouse button to that same shortcut. OpenTypeless handles the recording; the mouse software only needs to send the key combination.
+
+### ElevenLabs + Gemini setup
+
+1. Open **Settings > Speech Recognition**, choose **ElevenLabs Scribe v2**, and enter your ElevenLabs API key.
+2. Open **Settings > AI Polish**, choose **Google Gemini**, enter your Gemini API key, select a supported Flash model, and enable **AI cleanup for dictation**.
+3. Open **Settings > General**, choose **Press to start/stop**, turn **Automatic stop** off, and assign a shortcut that does not conflict with another application.
+4. Put the cursor in any text field, press the shortcut once, speak (including pauses), then press it again. OpenTypeless transcribes, optionally polishes, and inserts the result.
+
+### API-key safety
+
+Provider keys are entered at runtime and stored locally using the operating-system credential vault where supported. They are not hard-coded in the source tree, committed to Git, or sent to an OpenTypeless server in BYOK mode. Local environment files (`.env` and `.env.*`) and common test credential files are excluded by `.gitignore`.
+
+Before publishing changes, scan both the working tree and Git history for secrets. If a real key is ever committed, revoke it with the provider first; deleting it in a later commit does not remove it from Git history.
+
 <p align="center">
   <img src="docs/images/website-hero.png" width="860" alt="OpenTypeless website hero" />
 </p>
@@ -284,9 +309,12 @@ npm run tauri dev
 
 # Build for production
 npm run tauri build
+
+# Build only the standalone executable (no installer bundle)
+npm run tauri -- build --no-bundle
 ```
 
-The built application will be in `src-tauri/target/release/bundle/`.
+The standalone executable is written to `src-tauri/target/release/`. Installer bundles are written below `src-tauri/target/release/bundle/`.
 
 ## Configuration
 
