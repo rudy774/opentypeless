@@ -706,6 +706,30 @@ pub struct PipelineHandle {
     pipeline_lock: tokio::sync::Mutex<()>,
 }
 
+/// Restores a usable idle state if `stop()` exits through an error or early
+/// return. This also runs while unwinding.
+struct StopStateGuard<'a> {
+    pipeline: &'a PipelineHandle,
+}
+
+impl Drop for StopStateGuard<'_> {
+    fn drop(&mut self) {
+        let state = self.pipeline.current_state();
+        if state != PipelineState::Idle {
+            tracing::warn!(
+                ?state,
+                "Recording stop exited before normal cleanup; forcing pipeline back to idle"
+            );
+            self.pipeline.set_state(PipelineState::Idle);
+        }
+        *self
+            .pipeline
+            .recording_start
+            .lock()
+            .unwrap_or_else(|error| error.into_inner()) = None;
+    }
+}
+
 struct PolishTextInput<'a> {
     raw_text: &'a str,
     voice_mode: crate::voice_intent::VoiceMode,
@@ -913,7 +937,14 @@ impl PipelineHandle {
     }
 
     fn set_state(&self, new_state: PipelineState) {
-        self.state.store(new_state.as_u8(), Ordering::SeqCst);
+        let previous = PipelineState::from_u8(self.state.swap(new_state.as_u8(), Ordering::SeqCst));
+        if previous != new_state {
+            tracing::info!(
+                from = ?previous,
+                to = ?new_state,
+                "Pipeline state transition"
+            );
+        }
         if new_state == PipelineState::Idle {
             *self
                 .active_translation_operation
@@ -1008,6 +1039,17 @@ impl PipelineHandle {
             .cloud_operation_id
             .lock()
             .unwrap_or_else(|e| e.into_inner()) = None;
+        if let Some(started_at) = self
+            .recording_start
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .take()
+        {
+            tracing::warn!(
+                abandoned_recording_ms = started_at.elapsed().as_millis() as u64,
+                "Discarding recording duration because the pipeline was aborted"
+            );
+        }
 
         // Force state to Idle — emits pipeline:state event to sync frontend
         self.set_state(PipelineState::Idle);
@@ -1045,8 +1087,14 @@ impl PipelineHandle {
         // partially-initialised state (preloaded_config, audio_handle, etc.).
         let _guard = self.pipeline_lock.lock().await;
 
-        // Reset abort flag for new recording
-        self.abort_flag.store(false, Ordering::SeqCst);
+        // Record every attempt before reserving the state so ignored hotkeys
+        // remain visible in diagnostics.
+        let state_before_start = self.current_state();
+        tracing::info!(
+            ?state_before_start,
+            force_translate = options.force_translate,
+            "Recording start requested"
+        );
 
         // Atomic CAS: only one caller can transition Idle → Preparing. Recording is emitted only
         // after audio capture is ready, so the capsule does not tell users to speak too early.
@@ -1060,8 +1108,15 @@ impl PipelineHandle {
             )
             .is_err()
         {
+            tracing::warn!(
+                current_state = ?self.current_state(),
+                "Recording start ignored because the pipeline is not idle"
+            );
             return Ok(());
         }
+        // A rejected start must not reset an abort flag that belongs to an
+        // older stop task.
+        self.abort_flag.store(false, Ordering::SeqCst);
         self.set_state(PipelineState::Preparing);
 
         // Clear accumulated text
@@ -1400,6 +1455,12 @@ impl PipelineHandle {
             .force_translate
             .then(|| TranslationOperationState::new(config_data.translation.active_target.clone()));
         self.set_state(PipelineState::Recording);
+        tracing::info!(
+            provider = %config_data.stt_provider,
+            language = %config_data.stt_language,
+            force_translate = options.force_translate,
+            "Audio recording started"
+        );
         let _ = self.app_handle.emit("pipeline:voice_mode", voice_mode);
 
         // Volume monitoring task
@@ -1594,6 +1655,8 @@ impl PipelineHandle {
         // (load_config, connect STT, start audio) before reading shared state.
         // Released before the long stt_done wait so start() isn't blocked 120s.
         let guard = self.pipeline_lock.lock().await;
+        let state_before_stop = self.current_state();
+        tracing::info!(?state_before_stop, "Recording stop requested");
 
         // Atomic CAS: only one caller can transition Recording → Transcribing
         if self
@@ -1606,8 +1669,34 @@ impl PipelineHandle {
             )
             .is_err()
         {
+            tracing::warn!(
+                current_state = ?self.current_state(),
+                "Recording stop ignored because no recording is active"
+            );
             return Ok(());
         }
+        // Freeze the duration at the recording-to-transcribing transition.
+        // Provider finalization and AI cleanup must not inflate dictation time.
+        let duration_ms = self
+            .recording_start
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .take()
+            .map(|start| start.elapsed().as_millis() as i64);
+        tracing::info!(
+            recording_ms = duration_ms,
+            "Recording clock stopped; beginning transcription"
+        );
+        if duration_ms
+            .is_some_and(|duration| duration > storage::MAX_COUNTED_TRANSCRIPTION_DURATION_MS)
+        {
+            tracing::warn!(
+                recording_ms = duration_ms,
+                maximum_counted_ms = storage::MAX_COUNTED_TRANSCRIPTION_DURATION_MS,
+                "Recording duration exceeds the homepage accounting limit"
+            );
+        }
+        let _stop_state_guard = StopStateGuard { pipeline: self };
         let _ = self
             .app_handle
             .emit("pipeline:state", PipelineState::Transcribing);
@@ -1783,14 +1872,6 @@ impl PipelineHandle {
 
         // ── Phase 3: Timing, history, cleanup ──────────────────────────
         let total_elapsed = stop_start.elapsed();
-
-        // Compute recording duration
-        let duration_ms = self
-            .recording_start
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .take()
-            .map(|start| start.elapsed().as_millis() as i64);
 
         tracing::info!(
             "[Pipeline Timing] Total stop(): {}ms (STT: {}ms, LLM: {}ms, Output+Save: {}ms)",
@@ -2722,6 +2803,9 @@ impl PipelineHandle {
             "siliconflow" => "https://api.siliconflow.cn/v1/audio/transcriptions".to_string(),
             "deepgram" => "https://api.deepgram.com/v1/listen".to_string(),
             "assemblyai" => "https://api.assemblyai.com/v2/transcript".to_string(),
+            stt::config::ELEVENLABS_PROVIDER => {
+                "https://api.elevenlabs.io/v1/speech-to-text".to_string()
+            }
             stt::volcengine::VOLCENGINE_DOUBAO_PROVIDER => {
                 "https://openspeech.bytedance.com/api/v3/sauc/bigmodel_async".to_string()
             }

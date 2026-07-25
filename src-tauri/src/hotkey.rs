@@ -14,6 +14,7 @@ use tauri_plugin_global_shortcut::{Code, Modifiers, Shortcut, ShortcutState};
 
 pub const HOTKEY_SUPERVISOR_RETRY_DELAY_SECS: u64 = 3;
 pub const HOTKEY_SUPERVISOR_FAST_RETRY_LIMIT: u8 = 3;
+pub const HOTKEY_SUPERVISOR_SLOW_RETRY_DELAY_SECS: u64 = 60;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HotkeySupervisorState {
@@ -72,9 +73,7 @@ impl HotkeySupervisor {
 
     pub fn begin_retry_registration_attempt(&self) -> Option<u64> {
         let mut guard = self.0.lock().unwrap_or_else(|e| e.into_inner());
-        if guard.state != HotkeySupervisorState::Failed
-            || guard.retry_attempts > HOTKEY_SUPERVISOR_FAST_RETRY_LIMIT
-        {
+        if guard.state != HotkeySupervisorState::Failed {
             return None;
         }
         guard.state = HotkeySupervisorState::Starting;
@@ -147,13 +146,14 @@ impl HotkeySupervisor {
 
     pub fn next_retry_delay(&self) -> Option<Duration> {
         let guard = self.0.lock().unwrap_or_else(|e| e.into_inner());
-        if guard.state == HotkeySupervisorState::Failed
-            && guard.retry_attempts <= HOTKEY_SUPERVISOR_FAST_RETRY_LIMIT
-        {
-            Some(Duration::from_secs(HOTKEY_SUPERVISOR_RETRY_DELAY_SECS))
-        } else {
-            None
-        }
+        (guard.state == HotkeySupervisorState::Failed).then(|| {
+            let seconds = if guard.retry_attempts <= HOTKEY_SUPERVISOR_FAST_RETRY_LIMIT {
+                HOTKEY_SUPERVISOR_RETRY_DELAY_SECS
+            } else {
+                HOTKEY_SUPERVISOR_SLOW_RETRY_DELAY_SECS
+            };
+            Duration::from_secs(seconds)
+        })
     }
 }
 
@@ -857,6 +857,7 @@ fn handle_recording_shortcut(handle: tauri::AppHandle, action: RecordingShortcut
         RecordingShortcutAction::Start { options } => {
             tauri::async_runtime::spawn(async move {
                 if handle.state::<commands::ask::AskDictationState>().is_busy() {
+                    tracing::warn!("Dictation hotkey start ignored because Ask is busy");
                     return;
                 }
 
@@ -870,6 +871,7 @@ fn handle_recording_shortcut(handle: tauri::AppHandle, action: RecordingShortcut
         RecordingShortcutAction::Stop => {
             tauri::async_runtime::spawn(async move {
                 if handle.state::<commands::ask::AskDictationState>().is_busy() {
+                    tracing::warn!("Dictation hotkey stop ignored because Ask is busy");
                     return;
                 }
 
@@ -900,6 +902,13 @@ pub fn handle_hotkey_role_event(
     role: HotkeyRole,
     event_state: ShortcutState,
 ) {
+    tracing::info!(
+        role = role.as_str(),
+        ?event_state,
+        pipeline_state = ?handle.state::<pipeline::PipelineHandle>().current_state(),
+        ask_busy = handle.state::<commands::ask::AskDictationState>().is_busy(),
+        "Hotkey event received"
+    );
     match role {
         HotkeyRole::Ask => {
             let ask_state = handle.state::<commands::ask::AskDictationState>();
@@ -1652,7 +1661,7 @@ mod tests {
     }
 
     #[test]
-    fn hotkey_supervisor_stops_fast_retry_after_configured_attempts() {
+    fn hotkey_supervisor_switches_to_slow_retry_after_fast_attempts() {
         let supervisor = HotkeySupervisor::default();
 
         for attempt in 0..=HOTKEY_SUPERVISOR_FAST_RETRY_LIMIT {
@@ -1666,7 +1675,13 @@ mod tests {
             snapshot.retry_attempts,
             HOTKEY_SUPERVISOR_FAST_RETRY_LIMIT + 1
         );
-        assert_eq!(supervisor.next_retry_delay(), None);
+        assert_eq!(
+            supervisor.next_retry_delay(),
+            Some(std::time::Duration::from_secs(
+                HOTKEY_SUPERVISOR_SLOW_RETRY_DELAY_SECS
+            ))
+        );
+        assert!(supervisor.begin_retry_registration_attempt().is_some());
     }
 
     #[test]

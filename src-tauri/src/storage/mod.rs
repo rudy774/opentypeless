@@ -1209,7 +1209,13 @@ pub struct TranscriptionTimeStats {
     pub day_ms: i64,
     pub week_ms: i64,
     pub month_ms: i64,
+    pub excluded_count: i64,
 }
+
+/// Durations longer than this are preserved in History for investigation but
+/// excluded from the homepage aggregate. A background or stuck session must
+/// not turn one recording into an implausible multi-day usage total.
+pub const MAX_COUNTED_TRANSCRIPTION_DURATION_MS: i64 = 12 * 60 * 60 * 1_000;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -1460,19 +1466,33 @@ impl HistoryStore {
         let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
         let stats = conn.query_row(
             "SELECT
-                COALESCE(SUM(CASE WHEN created_at >= ?1 AND duration_ms > 0 THEN duration_ms ELSE 0 END), 0),
-                COALESCE(SUM(CASE WHEN created_at >= ?2 AND duration_ms > 0 THEN duration_ms ELSE 0 END), 0),
-                COALESCE(SUM(CASE WHEN created_at >= ?3 AND duration_ms > 0 THEN duration_ms ELSE 0 END), 0)
+                COALESCE(SUM(CASE WHEN created_at >= ?1 AND duration_ms > 0 AND duration_ms <= ?4 THEN duration_ms ELSE 0 END), 0),
+                COALESCE(SUM(CASE WHEN created_at >= ?2 AND duration_ms > 0 AND duration_ms <= ?4 THEN duration_ms ELSE 0 END), 0),
+                COALESCE(SUM(CASE WHEN created_at >= ?3 AND duration_ms > 0 AND duration_ms <= ?4 THEN duration_ms ELSE 0 END), 0),
+                COALESCE(SUM(CASE WHEN created_at >= ?3 AND duration_ms > ?4 THEN 1 ELSE 0 END), 0)
              FROM history",
-            rusqlite::params![day_start, week_start, month_start],
+            rusqlite::params![
+                day_start,
+                week_start,
+                month_start,
+                MAX_COUNTED_TRANSCRIPTION_DURATION_MS
+            ],
             |row| {
                 Ok(TranscriptionTimeStats {
                     day_ms: row.get(0)?,
                     week_ms: row.get(1)?,
                     month_ms: row.get(2)?,
+                    excluded_count: row.get(3)?,
                 })
             },
         )?;
+        if stats.excluded_count > 0 {
+            tracing::warn!(
+                excluded_count = stats.excluded_count,
+                maximum_counted_ms = MAX_COUNTED_TRANSCRIPTION_DURATION_MS,
+                "Excluded implausible recording durations from transcription-time statistics"
+            );
+        }
         Ok(stats)
     }
 
@@ -3250,8 +3270,41 @@ mod tests {
                 day_ms: 3_000,
                 week_ms: 5_000,
                 month_ms: 6_000,
+                excluded_count: 0,
             }
         );
+    }
+
+    #[tokio::test]
+    async fn transcription_time_stats_preserve_but_exclude_implausible_durations() {
+        let store = temp_history_store("transcription-time-outlier");
+        let mut normal = test_history_entry(1, "2026-07-19T09:00:00");
+        normal.duration_ms = Some(30_000);
+        store.add(normal).await.unwrap();
+
+        let mut outlier = test_history_entry(2, "2026-07-19T10:00:00");
+        outlier.duration_ms = Some(MAX_COUNTED_TRANSCRIPTION_DURATION_MS + 1);
+        store.add(outlier).await.unwrap();
+
+        let stats = store
+            .transcription_time_stats(
+                "2026-07-19T00:00:00",
+                "2026-07-13T00:00:00",
+                "2026-07-01T00:00:00",
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(
+            stats,
+            TranscriptionTimeStats {
+                day_ms: 30_000,
+                week_ms: 30_000,
+                month_ms: 30_000,
+                excluded_count: 1,
+            }
+        );
+        assert_eq!(store.list(10, 0).await.unwrap().len(), 2);
     }
 
     #[tokio::test]

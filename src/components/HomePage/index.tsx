@@ -12,7 +12,12 @@ import {
   type TranscriptionTimeRange,
 } from '../../lib/transcription-time'
 
-const EMPTY_TRANSCRIPTION_TIME: TranscriptionTimeStats = { dayMs: 0, weekMs: 0, monthMs: 0 }
+const EMPTY_TRANSCRIPTION_TIME: TranscriptionTimeStats = {
+  dayMs: 0,
+  weekMs: 0,
+  monthMs: 0,
+  excludedCount: 0,
+}
 
 const TIME_RANGE_KEYS: TranscriptionTimeRange[] = ['day', 'week', 'month']
 
@@ -154,6 +159,13 @@ export function HomePage() {
           </div>
         </div>
         <p className="mt-2 text-[11px] text-text-tertiary">{t('home.savedRecordingTime')}</p>
+        {transcriptionTime.excludedCount > 0 && (
+          <p className="mt-2 rounded-[8px] border border-amber-500/30 bg-amber-500/10 px-2.5 py-2 text-[11px] leading-relaxed text-text-secondary">
+            {t('home.durationOutliersExcluded', {
+              count: transcriptionTime.excludedCount,
+            })}
+          </p>
+        )}
       </section>
 
       {/* Plan / Quota summary */}

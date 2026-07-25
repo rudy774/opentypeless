@@ -25,6 +25,7 @@ use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent}
 use tauri::{Emitter, Manager};
 use tauri_plugin_autostart::MacosLauncher;
 use tauri_plugin_store::StoreExt;
+use tracing_subscriber::fmt::writer::MakeWriterExt;
 use tracing_subscriber::EnvFilter;
 
 use std::sync::{Arc, Mutex};
@@ -52,6 +53,70 @@ pub struct HotkeyModeCache(pub Arc<Mutex<String>>);
 
 /// Cached Ask Anything hotkey to route global-shortcut events without disk I/O.
 pub struct AskHotkeyCache(pub Arc<Mutex<String>>);
+
+/// Keeps the non-blocking file logger alive for the lifetime of the app.
+pub struct LogWorkerGuard(pub Mutex<Option<tracing_appender::non_blocking::WorkerGuard>>);
+
+fn init_tracing(app: &tauri::App) -> Option<tracing_appender::non_blocking::WorkerGuard> {
+    let filter = || {
+        EnvFilter::from_default_env().add_directive(
+            "opentypeless=debug"
+                .parse()
+                .expect("static directive is valid"),
+        )
+    };
+
+    if let Ok(log_dir) = app.path().app_log_dir() {
+        if let Err(error) = std::fs::create_dir_all(&log_dir) {
+            eprintln!(
+                "OpenTypeless could not create diagnostic log directory {}: {error}",
+                log_dir.display()
+            );
+        } else {
+            match tracing_appender::rolling::RollingFileAppender::builder()
+                .rotation(tracing_appender::rolling::Rotation::DAILY)
+                .filename_prefix("opentypeless")
+                .filename_suffix("log")
+                .max_log_files(7)
+                .build(&log_dir)
+            {
+                Ok(appender) => {
+                    let (file_writer, guard) = tracing_appender::non_blocking(appender);
+                    if let Err(error) = tracing_subscriber::fmt()
+                        .with_env_filter(filter())
+                        .with_ansi(false)
+                        .with_writer(std::io::stdout.and(file_writer))
+                        .try_init()
+                    {
+                        eprintln!("OpenTypeless could not initialize diagnostic logging: {error}");
+                        return None;
+                    }
+                    tracing::info!(
+                        log_directory = %log_dir.display(),
+                        retained_files = 7,
+                        "Persistent diagnostic logging initialized"
+                    );
+                    return Some(guard);
+                }
+                Err(error) => {
+                    eprintln!(
+                        "OpenTypeless could not create diagnostic log file in {}: {error}",
+                        log_dir.display()
+                    );
+                }
+            }
+        }
+    }
+
+    if let Err(error) = tracing_subscriber::fmt()
+        .with_env_filter(filter())
+        .with_ansi(false)
+        .try_init()
+    {
+        eprintln!("OpenTypeless could not initialize console logging: {error}");
+    }
+    None
+}
 
 /// Cached registered hotkey roles to route global-shortcut events without disk I/O.
 pub struct HotkeyRoleCache(pub Arc<Mutex<hotkey::HotkeyRegistrationPlan>>);
@@ -627,12 +692,18 @@ fn record_hotkey_registration_result(
             supervisor.record_registration_success(generation);
             set_hotkey_registration_error_state(app, None);
             let _ = app.emit("hotkey:registration-recovered", ());
+            tracing::info!(generation, "Hotkey registration succeeded");
             Ok(())
         }
         Err(message) => {
             supervisor.record_registration_failure(generation, message.clone());
             set_hotkey_registration_error_state(app, Some(message.clone()));
             let _ = app.emit("hotkey:registration-failed", message.clone());
+            tracing::warn!(
+                generation,
+                error = %message,
+                "Hotkey registration failed"
+            );
             Err(message)
         }
     }
@@ -653,6 +724,12 @@ fn spawn_hotkey_supervisor(app_handle: tauri::AppHandle) {
             let Some(generation) = supervisor.begin_retry_registration_attempt() else {
                 continue;
             };
+            let snapshot = supervisor.snapshot();
+            tracing::info!(
+                generation,
+                retry_attempt = snapshot.retry_attempts,
+                "Retrying hotkey registration"
+            );
 
             let config = match app_handle.state::<storage::ConfigManager>().load().await {
                 Ok(config) => config,
@@ -695,19 +772,6 @@ pub fn run() {
 
     apply_linux_workarounds();
 
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            EnvFilter::from_default_env().add_directive(
-                "opentypeless=debug"
-                    .parse()
-                    .expect("static directive is valid"),
-            ),
-        )
-        .init();
-
-    #[cfg(target_os = "linux")]
-    log_linux_launch_diagnostics(xinitthreads_status);
-
     #[cfg(target_os = "linux")]
     match xinitthreads_status {
         linux_x11::XInitThreadsStatus::Enabled => {
@@ -738,7 +802,13 @@ pub fn run() {
             restore_main_window(app);
         }))
         .plugin(tauri_plugin_deep_link::init())
-        .setup(|app| {
+        .setup(move |app| {
+            let log_guard = init_tracing(app);
+            app.manage(LogWorkerGuard(Mutex::new(log_guard)));
+
+            #[cfg(target_os = "linux")]
+            log_linux_launch_diagnostics(xinitthreads_status);
+
             // Open devtools only when the "devtools" feature is explicitly enabled
             #[cfg(feature = "devtools")]
             {

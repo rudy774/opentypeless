@@ -453,6 +453,7 @@ export interface TranscriptionTimeStats {
   dayMs: number
   weekMs: number
   monthMs: number
+  excludedCount: number
 }
 
 export async function getTranscriptionTimeStats(): Promise<TranscriptionTimeStats> {

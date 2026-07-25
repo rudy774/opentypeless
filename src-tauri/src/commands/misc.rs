@@ -171,6 +171,11 @@ fn register_configured_shortcuts_guarded(
     let hotkeys = effective_hotkey_config(config);
     let plan =
         crate::hotkey::hotkey_registration_plan_from_config(&hotkeys).map_err(|e| e.to_string())?;
+    tracing::info!(
+        global_bindings = plan.global.len(),
+        native_bindings = plan.native.len(),
+        "Registering configured hotkeys"
+    );
 
     app.global_shortcut()
         .unregister_all()
@@ -211,6 +216,7 @@ fn register_configured_shortcuts_guarded(
         *role_cache.0.lock().unwrap_or_else(|e| e.into_inner()) = plan;
     }
 
+    tracing::info!("Configured hotkeys registered successfully");
     Ok(())
 }
 
