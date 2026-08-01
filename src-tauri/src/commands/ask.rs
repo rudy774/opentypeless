@@ -992,9 +992,14 @@ pub(crate) async fn start_reserved_ask_dictation(
 ) -> Result<AskDictationStartResult, String> {
     let result = async {
         let config = config_state.load().await.map_err(|e| e.to_string())?;
-        let recording_context = app
+        let focus_target = app
+            .state::<crate::pipeline::PipelineHandle>()
+            .capture_current_focus_target()
+            .await;
+        let mut recording_context = app
             .state::<crate::app_detector::ContextDetectorHandle>()
             .snapshot_for_recording_enabled(config.context_adaptation_enabled);
+        recording_context.focus_target = focus_target;
         let selected_text = if include_selected_text && config.selected_text_enabled {
             tokio::task::block_in_place(crate::selection::capture_selected_text)
         } else {

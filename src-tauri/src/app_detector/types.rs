@@ -150,6 +150,10 @@ impl From<&ContextSignals> for TargetAppGuard {
 pub struct RecordingContext {
     pub profile: ContextProfile,
     pub target_guard: TargetAppGuard,
+    /// Opaque handle to the exact control that had keyboard focus when the
+    /// recording began. Native accessibility objects remain on their owning
+    /// platform thread and never cross this boundary.
+    pub focus_target: Option<crate::focus_target::FocusTargetToken>,
     pub mapped_scene_id: Option<String>,
     pub browser_access_status: BrowserAccessStatus,
     pub browser_target: Option<BrowserTarget>,

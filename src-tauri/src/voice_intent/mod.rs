@@ -22,7 +22,7 @@ pub struct VoiceProviderWorkPlan {
 }
 
 pub fn plan_voice_provider_work(
-    mode: VoiceMode,
+    _mode: VoiceMode,
     utterance: &str,
     intent: &VoiceIntent,
 ) -> VoiceProviderWorkPlan {
@@ -35,10 +35,16 @@ pub fn plan_voice_provider_work(
     VoiceProviderWorkPlan {
         provider_call_limit: u8::from(provider_input.is_some()),
         provider_input,
-        allow_streaming: mode == VoiceMode::Dictate
-            && intent.kind == VoiceIntentKind::DictateInsert,
-        restore_target_before_insert: mode == VoiceMode::Ask
-            && intent.kind == VoiceIntentKind::DraftInsert,
+        // Streaming directly into the currently focused control cannot safely
+        // survive a focus change. Keep provider streaming for the capsule UI,
+        // then insert the completed result into the captured start target.
+        allow_streaming: false,
+        restore_target_before_insert: matches!(
+            intent.kind,
+            VoiceIntentKind::DictateInsert
+                | VoiceIntentKind::DraftInsert
+                | VoiceIntentKind::TranslateInsert
+        ),
     }
 }
 
@@ -591,8 +597,8 @@ mod tests {
                 kind: VoiceIntentKind::DictateInsert,
                 provider_calls: 1,
                 provider_input: Some("ordinary dictated text"),
-                allow_streaming: true,
-                restore_target: false,
+                allow_streaming: false,
+                restore_target: true,
             },
             Case {
                 mode: VoiceMode::Dictate,
@@ -602,7 +608,7 @@ mod tests {
                 provider_calls: 1,
                 provider_input: Some("a concise launch email"),
                 allow_streaming: false,
-                restore_target: false,
+                restore_target: true,
             },
             Case {
                 mode: VoiceMode::Dictate,
@@ -652,7 +658,7 @@ mod tests {
                 provider_calls: 1,
                 provider_input: Some("See you tomorrow"),
                 allow_streaming: false,
-                restore_target: false,
+                restore_target: true,
             },
             Case {
                 mode: VoiceMode::Translate,

@@ -332,6 +332,9 @@ mod tests {
 
         async fn restore_target(&mut self, _guard: &TargetAppGuard) -> Result<bool, String> {
             self.actions.push("restore_target");
+            if self.restore_succeeds {
+                self.target_matches = true;
+            }
             Ok(self.restore_succeeds)
         }
 
@@ -492,24 +495,38 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn voice_intent_executor_restores_ask_target_then_revalidates_before_insert() {
-        let draft = intent(VoiceIntentKind::DraftInsert);
-        let mut restored = FakeBackend {
-            target_matches: true,
-            restore_succeeds: true,
-            ..Default::default()
-        };
-        let result = execute_voice_intent(
-            request(&draft, "draft", false, true, VoiceRoutingFlags::default()),
-            &mut restored,
-        )
-        .await;
-        assert_eq!(result.status, VoiceExecutionStatus::Completed);
-        assert_eq!(
-            restored.actions,
-            ["restore_target", "target_matches", "insert_at_cursor"]
-        );
+    async fn voice_intent_executor_restores_every_insert_target_then_revalidates() {
+        for kind in [
+            VoiceIntentKind::DictateInsert,
+            VoiceIntentKind::DraftInsert,
+            VoiceIntentKind::TranslateInsert,
+        ] {
+            let insert = intent(kind);
+            let mut restored = FakeBackend {
+                target_matches: false,
+                restore_succeeds: true,
+                ..Default::default()
+            };
+            let result = execute_voice_intent(
+                request(
+                    &insert,
+                    "generated text",
+                    false,
+                    true,
+                    VoiceRoutingFlags::default(),
+                ),
+                &mut restored,
+            )
+            .await;
+            assert_eq!(result.status, VoiceExecutionStatus::Completed, "{kind:?}");
+            assert_eq!(
+                restored.actions,
+                ["restore_target", "target_matches", "insert_at_cursor"],
+                "{kind:?}"
+            );
+        }
 
+        let draft = intent(VoiceIntentKind::DraftInsert);
         let mut failed = FakeBackend {
             restore_succeeds: false,
             ..Default::default()

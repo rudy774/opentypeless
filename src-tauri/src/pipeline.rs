@@ -11,6 +11,7 @@ use crate::audio::{AudioCaptureHandle, AudioConfig};
 use crate::credentials::{
     resolve_llm_config_secret, resolve_stt_config_secret, SystemCredentialVault,
 };
+use crate::focus_target::{FocusTargetManager, FocusTargetToken};
 use crate::llm::{self, LlmConfig, PolishRequest};
 use crate::output;
 use crate::storage;
@@ -681,6 +682,7 @@ fn apply_pipeline_start_options(
 pub struct PipelineHandle {
     app_handle: tauri::AppHandle,
     context_detector: app_detector::ContextDetectorHandle,
+    focus_target_manager: FocusTargetManager,
     state: Arc<AtomicU8>,
     audio_handle: Arc<Mutex<Option<AudioCaptureHandle>>>,
     audio_volume: Arc<Mutex<f32>>,
@@ -763,12 +765,64 @@ struct HistoryOutputMetadata {
     error: Option<String>,
 }
 
+fn voice_execution_fallback_message(
+    reason: Option<crate::voice_intent::executor::VoiceExecutionFallbackReason>,
+) -> &'static str {
+    use crate::voice_intent::executor::VoiceExecutionFallbackReason;
+
+    match reason {
+        Some(VoiceExecutionFallbackReason::FocusRestoreFailed) => {
+            "The original text field could not be restored; the result was copied to the clipboard."
+        }
+        Some(VoiceExecutionFallbackReason::TargetChanged) => {
+            "The original text field could not be verified; the result was copied to the clipboard."
+        }
+        Some(VoiceExecutionFallbackReason::SelectionLost) => {
+            "The original selection is no longer active, so no text was replaced."
+        }
+        Some(VoiceExecutionFallbackReason::OutputFailed) => {
+            "Automatic insertion failed; the result was copied to the clipboard."
+        }
+        Some(VoiceExecutionFallbackReason::FeatureDisabled) => {
+            "This voice action is disabled in settings."
+        }
+        Some(VoiceExecutionFallbackReason::EmptyOutput) => {
+            "The voice action produced no text to insert."
+        }
+        None => "Voice output could not be completed.",
+    }
+}
+
+fn voice_execution_history_metadata(
+    execution: &crate::voice_intent::executor::VoiceExecutionResult,
+) -> HistoryOutputMetadata {
+    use crate::voice_intent::executor::VoiceExecutionStatus;
+
+    match execution.status {
+        VoiceExecutionStatus::Completed => HistoryOutputMetadata {
+            status: None,
+            error: None,
+        },
+        VoiceExecutionStatus::CopiedFallback => HistoryOutputMetadata {
+            status: Some("clipboard_fallback".to_string()),
+            error: Some(voice_execution_fallback_message(execution.fallback_reason).to_string()),
+        },
+        VoiceExecutionStatus::PopupFallback
+        | VoiceExecutionStatus::Prevented
+        | VoiceExecutionStatus::Failed => HistoryOutputMetadata {
+            status: Some("fallback".to_string()),
+            error: Some(voice_execution_fallback_message(execution.fallback_reason).to_string()),
+        },
+    }
+}
+
 struct PipelineVoiceExecutionBackend<'a> {
     pipeline: &'a PipelineHandle,
     app_name: &'a str,
     question: &'a str,
     intent_kind: crate::voice_intent::VoiceIntentKind,
     target_guard: &'a TargetAppGuard,
+    focus_target: Option<FocusTargetToken>,
     config: &'a storage::AppConfig,
     already_copied: bool,
     popup_fallback_enabled: bool,
@@ -777,9 +831,13 @@ struct PipelineVoiceExecutionBackend<'a> {
 #[async_trait::async_trait]
 impl crate::voice_intent::executor::VoiceExecutionBackend for PipelineVoiceExecutionBackend<'_> {
     fn target_matches(&mut self, guard: &TargetAppGuard) -> bool {
-        self.pipeline
-            .context_detector
-            .target_still_matches_now(guard)
+        if let Some(target) = self.focus_target {
+            self.pipeline.focus_target_manager.is_focused(target)
+        } else {
+            self.pipeline
+                .context_detector
+                .target_still_matches_now(guard)
+        }
     }
 
     async fn restore_target(
@@ -788,6 +846,24 @@ impl crate::voice_intent::executor::VoiceExecutionBackend for PipelineVoiceExecu
     ) -> std::result::Result<bool, String> {
         if let Some(window) = self.pipeline.app_handle.get_webview_window("ask") {
             let _ = window.hide();
+        }
+        if let Some(target) = self.focus_target {
+            let manager = self.pipeline.focus_target_manager.clone();
+            let outcome = tokio::task::spawn_blocking(move || manager.restore(target))
+                .await
+                .map_err(|error| error.to_string())?;
+            tracing::info!(
+                target_generation = target.generation(),
+                ?outcome,
+                "Pipeline requested exact dictation target restoration"
+            );
+            return Ok(outcome.is_success());
+        }
+        if self.pipeline.focus_target_manager.supports_exact_targets() {
+            tracing::warn!(
+                "Refusing to guess a Windows text field because exact-focus capture was unavailable"
+            );
+            return Ok(false);
         }
         let detector = self.pipeline.context_detector.clone();
         let guard = guard.clone();
@@ -799,7 +875,13 @@ impl crate::voice_intent::executor::VoiceExecutionBackend for PipelineVoiceExecu
     async fn insert_at_cursor(&mut self, text: &str) -> std::result::Result<(), String> {
         let result = self
             .pipeline
-            .output_text(text, self.app_name, self.target_guard, self.config)
+            .output_text(
+                text,
+                self.app_name,
+                self.target_guard,
+                self.focus_target,
+                self.config,
+            )
             .await
             .map_err(|error| error.to_string())?;
         if result.status == output::InsertStatus::Inserted {
@@ -817,7 +899,13 @@ impl crate::voice_intent::executor::VoiceExecutionBackend for PipelineVoiceExecu
     }
 
     async fn popup_answer(&mut self, text: &str) -> std::result::Result<(), String> {
-        if !self.popup_fallback_enabled {
+        if !self.popup_fallback_enabled
+            || matches!(
+                self.intent_kind,
+                crate::voice_intent::VoiceIntentKind::DictateInsert
+                    | crate::voice_intent::VoiceIntentKind::TranslateInsert
+            )
+        {
             return Err("popup fallback is owned by the Ask caller".to_string());
         }
         crate::commands::ask::show_answer_window_with_metadata(
@@ -842,6 +930,7 @@ impl crate::voice_intent::executor::VoiceExecutionBackend for PipelineVoiceExecu
                 text,
                 self.app_name,
                 &TargetAppGuard::default(),
+                None,
                 &copy_config,
             )
             .await
@@ -914,6 +1003,7 @@ impl PipelineHandle {
         Self {
             app_handle,
             context_detector,
+            focus_target_manager: FocusTargetManager::new(),
             state: Arc::new(AtomicU8::new(PipelineState::Idle.as_u8())),
             audio_handle: Arc::new(Mutex::new(None)),
             audio_volume: Arc::new(Mutex::new(0.0)),
@@ -980,6 +1070,65 @@ impl PipelineHandle {
         PipelineState::from_u8(self.state.load(Ordering::SeqCst))
     }
 
+    pub(crate) async fn capture_current_focus_target(&self) -> Option<FocusTargetToken> {
+        let manager = self.focus_target_manager.clone();
+        tokio::task::spawn_blocking(move || manager.capture())
+            .await
+            .unwrap_or_else(|error| {
+                tracing::warn!(%error, "Exact-focus capture task failed");
+                None
+            })
+    }
+
+    fn recording_target_is_focused(&self, app_ctx: &RecordingContext) -> bool {
+        if let Some(target) = app_ctx.focus_target {
+            self.focus_target_manager.is_focused(target)
+        } else if self.focus_target_manager.supports_exact_targets() {
+            false
+        } else {
+            self.context_detector
+                .target_still_matches_now(&app_ctx.target_guard)
+        }
+    }
+
+    async fn execute_recording_voice_output(
+        &self,
+        app_ctx: &RecordingContext,
+        config: &storage::AppConfig,
+        question: &str,
+        intent: &crate::voice_intent::VoiceIntent,
+        generated_output: &str,
+        selected_text_available: bool,
+        restore_target_before_insert: bool,
+        popup_fallback_enabled: bool,
+    ) -> crate::voice_intent::executor::VoiceExecutionResult {
+        let mut backend = PipelineVoiceExecutionBackend {
+            pipeline: self,
+            app_name: &app_ctx.profile.app_label,
+            question,
+            intent_kind: intent.kind,
+            target_guard: &app_ctx.target_guard,
+            focus_target: app_ctx.focus_target,
+            config,
+            already_copied: false,
+            popup_fallback_enabled,
+        };
+        let execution = crate::voice_intent::executor::execute_voice_intent(
+            crate::voice_intent::executor::VoiceExecutionRequest {
+                intent,
+                generated_output,
+                target_guard: &app_ctx.target_guard,
+                selected_text_available,
+                restore_target_before_insert,
+                flags: config.voice_routing_flags,
+            },
+            &mut backend,
+        )
+        .await;
+        let _ = self.app_handle.emit("pipeline:voice_execution", &execution);
+        execution
+    }
+
     pub(crate) fn switch_active_translation_target(
         &self,
         target: String,
@@ -1035,6 +1184,7 @@ impl PipelineHandle {
             .unwrap_or_else(|e| e.into_inner())
             .clear();
         *self.stt_error.lock().unwrap_or_else(|e| e.into_inner()) = None;
+
         *self
             .cloud_operation_id
             .lock()
@@ -1127,6 +1277,11 @@ impl PipelineHandle {
         *self.stt_error.lock().unwrap_or_else(|e| e.into_inner()) = None;
 
         // P0-2: Load config BEFORE starting audio capture — fail fast on missing API key
+        // Capture the exact text control before any network/configuration work
+        // gives the user time to move focus elsewhere. The retained Windows UI
+        // Automation element stays on its dedicated COM worker thread.
+        let focus_target = self.capture_current_focus_target().await;
+
         let config_data = apply_pipeline_start_options(self.load_config().await, options);
         let voice_mode = if options.force_translate {
             crate::voice_intent::VoiceMode::Translate
@@ -1141,13 +1296,14 @@ impl PipelineHandle {
             .preloaded_config
             .lock()
             .unwrap_or_else(|e| e.into_inner()) = Some(config_data.clone());
+        let mut recording_context = self
+            .context_detector
+            .snapshot_for_recording_enabled(config_data.context_adaptation_enabled);
+        recording_context.focus_target = focus_target;
         *self
             .preloaded_app_ctx
             .lock()
-            .unwrap_or_else(|e| e.into_inner()) = Some(
-            self.context_detector
-                .snapshot_for_recording_enabled(config_data.context_adaptation_enabled),
-        );
+            .unwrap_or_else(|e| e.into_inner()) = Some(recording_context);
         let dictionary_store = self.app_handle.state::<storage::DictionaryStore>();
         let dict_words = dictionary_store.words().await;
         let correction_rules = dictionary_store
@@ -1724,13 +1880,26 @@ impl PipelineHandle {
             .unwrap_or_else(|e| e.into_inner())
             .clone()
             .unwrap_or_default();
-        let selected_text = if config_data.selected_text_enabled {
+        let selection_context = self
+            .preloaded_app_ctx
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .clone();
+        let selection_target_is_focused = selection_context
+            .as_ref()
+            .is_some_and(|context| self.recording_target_is_focused(context));
+        let selected_text = if config_data.selected_text_enabled && selection_target_is_focused {
             tokio::time::sleep(std::time::Duration::from_millis(
                 SELECTED_TEXT_CAPTURE_DELAY_MS,
             ))
             .await;
             tokio::task::block_in_place(|| self.capture_selected_text())
         } else {
+            if config_data.selected_text_enabled && !selection_target_is_focused {
+                tracing::info!(
+                    "Skipped selected-text capture because focus moved away from the recording target"
+                );
+            }
             None
         };
         tracing::info!(
@@ -2050,21 +2219,26 @@ impl PipelineHandle {
             }
 
             // No polishing — output raw text directly
-            if let Err(e) = self
-                .output_text(
-                    provider_text,
-                    &app_ctx.profile.app_label,
-                    &app_ctx.target_guard,
+            let execution = self
+                .execute_recording_voice_output(
+                    app_ctx,
                     config,
+                    raw_text,
+                    &voice_intent,
+                    provider_text,
+                    selected_text_has_content(selected_text.as_deref()),
+                    provider_plan.restore_target_before_insert,
+                    popup_fallback_enabled,
                 )
-                .await
-            {
-                tracing::error!("Output failed: {}", e);
-                let _ = self
-                    .app_handle
-                    .emit("pipeline:error", output_user_error(&e));
-            }
-            return PolishTextOutcome::normal(provider_text.to_string(), std::time::Duration::ZERO);
+                .await;
+            let history = voice_execution_history_metadata(&execution);
+            return PolishTextOutcome::with_execution(
+                provider_text.to_string(),
+                std::time::Duration::ZERO,
+                execution,
+                history.status,
+                history.error,
+            );
         }
 
         self.set_state(PipelineState::Polishing);
@@ -2324,64 +2498,35 @@ impl PipelineHandle {
                 let selected_text_available = if voice_intent.placement
                     == crate::voice_intent::VoiceOutputPlacement::ReplaceSelection
                 {
-                    selected_text_for_execution
-                        .as_deref()
-                        .is_some_and(|original| {
-                            tokio::task::block_in_place(crate::selection::capture_selected_text)
-                                .is_some_and(|current| current.trim() == original.trim())
-                        })
+                    self.recording_target_is_focused(app_ctx)
+                        && selected_text_for_execution
+                            .as_deref()
+                            .is_some_and(|original| {
+                                tokio::task::block_in_place(crate::selection::capture_selected_text)
+                                    .is_some_and(|current| current.trim() == original.trim())
+                            })
                 } else {
                     selected_text_has_content(selected_text_for_execution.as_deref())
                 };
-                let mut backend = PipelineVoiceExecutionBackend {
-                    pipeline: self,
-                    app_name: &app_ctx.profile.app_label,
-                    question: raw_text,
-                    intent_kind: voice_intent.kind,
-                    target_guard: &app_ctx.target_guard,
-                    config,
-                    already_copied: false,
-                    popup_fallback_enabled,
-                };
-                let execution = crate::voice_intent::executor::execute_voice_intent(
-                    crate::voice_intent::executor::VoiceExecutionRequest {
-                        intent: &voice_intent,
-                        generated_output: &response.polished_text,
-                        target_guard: &app_ctx.target_guard,
+                let execution = self
+                    .execute_recording_voice_output(
+                        app_ctx,
+                        config,
+                        raw_text,
+                        &voice_intent,
+                        &response.polished_text,
                         selected_text_available,
-                        restore_target_before_insert: provider_plan.restore_target_before_insert,
-                        flags: config.voice_routing_flags,
-                    },
-                    &mut backend,
-                )
-                .await;
-                let _ = self.app_handle.emit("pipeline:voice_execution", &execution);
-
-                let (history_status, history_error) = match execution.status {
-                    crate::voice_intent::executor::VoiceExecutionStatus::Completed => (None, None),
-                    crate::voice_intent::executor::VoiceExecutionStatus::CopiedFallback => (
-                        Some("clipboard_fallback".to_string()),
-                        Some(format!(
-                            "Voice output fallback: {:?}",
-                            execution.fallback_reason
-                        )),
-                    ),
-                    crate::voice_intent::executor::VoiceExecutionStatus::PopupFallback
-                    | crate::voice_intent::executor::VoiceExecutionStatus::Prevented
-                    | crate::voice_intent::executor::VoiceExecutionStatus::Failed => (
-                        Some("fallback".to_string()),
-                        Some(format!(
-                            "Voice output fallback: {:?}",
-                            execution.fallback_reason
-                        )),
-                    ),
-                };
+                        provider_plan.restore_target_before_insert,
+                        popup_fallback_enabled,
+                    )
+                    .await;
+                let history = voice_execution_history_metadata(&execution);
                 PolishTextOutcome::with_execution(
                     response.polished_text,
                     elapsed,
                     execution,
-                    history_status,
-                    history_error,
+                    history.status,
+                    history.error,
                 )
             }
             Err(e) => {
@@ -2440,25 +2585,33 @@ impl PipelineHandle {
                         "LLM generation failed; no application text was changed",
                     );
                 }
-                if let Err(e) = self
-                    .output_text(
-                        provider_text,
-                        &app_ctx.profile.app_label,
-                        &app_ctx.target_guard,
+                let execution = self
+                    .execute_recording_voice_output(
+                        app_ctx,
                         config,
+                        raw_text,
+                        &voice_intent,
+                        provider_text,
+                        false,
+                        provider_plan.restore_target_before_insert,
+                        popup_fallback_enabled,
                     )
-                    .await
-                {
-                    tracing::error!("Output failed: {}", e);
-                    let _ = self
-                        .app_handle
-                        .emit("pipeline:error", output_user_error(&e));
-                }
-                PolishTextOutcome::with_history_status(
+                    .await;
+                let output_history = voice_execution_history_metadata(&execution);
+                let output_error = output_history.error.map_or_else(
+                    || format!("AI polish failed; inserted the raw transcription: {e}"),
+                    |message| format!("AI polish failed; {message}"),
+                );
+                PolishTextOutcome::with_execution(
                     provider_text.to_string(),
                     elapsed,
-                    "fallback",
-                    format!("LLM polish failed; output raw text: {e}"),
+                    execution,
+                    Some(
+                        output_history
+                            .status
+                            .unwrap_or_else(|| "fallback".to_string()),
+                    ),
+                    Some(output_error),
                 )
             }
         };
@@ -2687,21 +2840,23 @@ impl PipelineHandle {
         text: &str,
         app_name: &str,
         target_guard: &TargetAppGuard,
+        focus_target: Option<FocusTargetToken>,
         config: &storage::AppConfig,
     ) -> Result<output::InsertResult> {
         self.set_state(PipelineState::Outputting);
 
-        let target_warning =
-            (!self.context_detector.target_still_matches_now(target_guard)).then(|| {
-                crate::error::UserError {
-                    code: "output_target_changed".to_string(),
-                    details: Some(
-                        "The target app changed before output; the full text was copied instead."
-                            .to_string(),
-                    ),
-                    retry_count: 0,
-                }
-            });
+        let target_matches = focus_target.map_or_else(
+            || self.context_detector.target_still_matches_now(target_guard),
+            |target| self.focus_target_manager.is_focused(target),
+        );
+        let target_warning = (!target_matches).then(|| crate::error::UserError {
+            code: "output_target_changed".to_string(),
+            details: Some(
+                "The original text field could not be verified; the full text was copied instead."
+                    .to_string(),
+            ),
+            retry_count: 0,
+        });
         let requested_strategy = if target_warning.is_some() {
             output::InsertionStrategy::ClipboardCopyOnly
         } else {
@@ -2906,6 +3061,31 @@ mod tests {
             user_error.details.as_deref(),
             Some("Both keyboard and clipboard output failed")
         );
+    }
+
+    #[test]
+    fn focus_fallback_history_message_is_human_readable() {
+        use crate::voice_intent::executor::{
+            VoiceExecutionFallbackReason, VoiceExecutionResult, VoiceExecutionStatus,
+        };
+
+        let execution = VoiceExecutionResult {
+            intent_kind: crate::voice_intent::VoiceIntentKind::DictateInsert,
+            requested_placement: crate::voice_intent::VoiceOutputPlacement::InsertAtCursor,
+            actual_placement: None,
+            status: VoiceExecutionStatus::CopiedFallback,
+            fallback_reason: Some(VoiceExecutionFallbackReason::FocusRestoreFailed),
+        };
+
+        let metadata = voice_execution_history_metadata(&execution);
+        assert_eq!(metadata.status.as_deref(), Some("clipboard_fallback"));
+        assert_eq!(
+            metadata.error.as_deref(),
+            Some(
+                "The original text field could not be restored; the result was copied to the clipboard."
+            )
+        );
+        assert!(!metadata.error.unwrap().contains("Some("));
     }
 
     #[test]

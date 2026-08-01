@@ -216,6 +216,7 @@ impl ContextDetectorHandle {
         RecordingContext {
             profile,
             target_guard,
+            focus_target: None,
             mapped_scene_id,
             browser_access_status,
             browser_target,

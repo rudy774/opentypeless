@@ -4,6 +4,7 @@ pub mod commands;
 pub mod credentials;
 pub mod dictionary_io;
 pub mod error;
+pub mod focus_target;
 pub mod hotkey;
 #[cfg(target_os = "linux")]
 mod linux_x11;
