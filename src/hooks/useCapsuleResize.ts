@@ -99,71 +99,83 @@ export function useCapsuleResize() {
       pipelineState,
     })
 
-    import('@tauri-apps/api/window')
-      .then(async ({ getCurrentWindow, LogicalSize, LogicalPosition, currentMonitor }) => {
-        const win = getCurrentWindow()
-        await win.setFocusable(getCapsuleFocusable()).catch(() => {})
+    Promise.all([import('@tauri-apps/api/window'), import('@tauri-apps/api/webview')])
+      .then(
+        async ([
+          { getCurrentWindow, LogicalSize, LogicalPosition, currentMonitor },
+          webviewApi,
+        ]) => {
+          const win = getCurrentWindow()
+          const webview = webviewApi.getCurrentWebview()
+          await win.setFocusable(getCapsuleFocusable()).catch(() => {})
+          // WebView2 can fill newly exposed pixels with its default black surface after
+          // a transparent window grows. Set the webview layer itself to fully transparent
+          // both before and after resizing so the rounded capsule has no rectangular halo.
+          await webview.setBackgroundColor([0, 0, 0, 0]).catch(() => {})
 
-        if (!initialized.current) {
-          // First mount: position at bottom-center of screen, then show
-          await win.setSize(new LogicalSize(windowWidth, windowHeight)).catch(() => {})
-          try {
-            const monitor = await currentMonitor()
-            if (monitor) {
-              const sw = monitor.size.width / monitor.scaleFactor
-              const sh = monitor.size.height / monitor.scaleFactor
-              const x = Math.round(sw / 2 - windowWidth / 2)
-              const y = Math.round(sh - windowHeight - 80)
-              await win.setPosition(new LogicalPosition(x, y)).catch(() => {})
+          if (!initialized.current) {
+            // First mount: position at bottom-center of screen, then show
+            await win.setSize(new LogicalSize(windowWidth, windowHeight)).catch(() => {})
+            await webview.setBackgroundColor([0, 0, 0, 0]).catch(() => {})
+            try {
+              const monitor = await currentMonitor()
+              if (monitor) {
+                const sw = monitor.size.width / monitor.scaleFactor
+                const sh = monitor.size.height / monitor.scaleFactor
+                const x = Math.round(sw / 2 - windowWidth / 2)
+                const y = Math.round(sh - windowHeight - 80)
+                await win.setPosition(new LogicalPosition(x, y)).catch(() => {})
+              }
+            } catch {
+              /* ignore – monitor info unavailable */
             }
-          } catch {
-            /* ignore – monitor info unavailable */
+            if (shouldShow) {
+              await win.show().catch(() => {})
+            } else {
+              await win.hide().catch(() => {})
+            }
+            initialized.current = true
+            prevWindowSize.current = { width: windowWidth, height: windowHeight }
+            return
           }
+
+          // Subsequent resizes: left edge + vertical center stay fixed.
+          // Since content is always padded 12px each side, the capsule at x=12
+          // is identical to a centered capsule — so the mic icon never moves.
+          const prev = prevWindowSize.current
+          if (prev) {
+            const pos = await win.outerPosition().catch(() => null)
+            if (pos) {
+              const monitor = await currentMonitor()
+              const scale = monitor?.scaleFactor ?? 1
+              const oldLeftX = pos.x / scale
+              const oldCenterY = pos.y / scale + prev.height / 2
+              const newX = Math.round(oldLeftX)
+              const newY = Math.round(oldCenterY - windowHeight / 2)
+              await win.setPosition(new LogicalPosition(newX, newY)).catch(() => {})
+              await win.setSize(new LogicalSize(windowWidth, windowHeight)).catch(() => {})
+            } else {
+              await win.setSize(new LogicalSize(windowWidth, windowHeight)).catch(() => {})
+            }
+          } else {
+            await win.setSize(new LogicalSize(windowWidth, windowHeight)).catch(() => {})
+          }
+
+          prevWindowSize.current = { width: windowWidth, height: windowHeight }
+          await webview.setBackgroundColor([0, 0, 0, 0]).catch(() => {})
+
+          // Signal that the window has finished resizing for context menu
+          if (contextMenuOpen) {
+            setContextMenuReady(true)
+          }
+
           if (shouldShow) {
             await win.show().catch(() => {})
           } else {
             await win.hide().catch(() => {})
           }
-          initialized.current = true
-          prevWindowSize.current = { width: windowWidth, height: windowHeight }
-          return
-        }
-
-        // Subsequent resizes: left edge + vertical center stay fixed.
-        // Since content is always padded 12px each side, the capsule at x=12
-        // is identical to a centered capsule — so the mic icon never moves.
-        const prev = prevWindowSize.current
-        if (prev) {
-          const pos = await win.outerPosition().catch(() => null)
-          if (pos) {
-            const monitor = await currentMonitor()
-            const scale = monitor?.scaleFactor ?? 1
-            const oldLeftX = pos.x / scale
-            const oldCenterY = pos.y / scale + prev.height / 2
-            const newX = Math.round(oldLeftX)
-            const newY = Math.round(oldCenterY - windowHeight / 2)
-            await win.setPosition(new LogicalPosition(newX, newY)).catch(() => {})
-            await win.setSize(new LogicalSize(windowWidth, windowHeight)).catch(() => {})
-          } else {
-            await win.setSize(new LogicalSize(windowWidth, windowHeight)).catch(() => {})
-          }
-        } else {
-          await win.setSize(new LogicalSize(windowWidth, windowHeight)).catch(() => {})
-        }
-
-        prevWindowSize.current = { width: windowWidth, height: windowHeight }
-
-        // Signal that the window has finished resizing for context menu
-        if (contextMenuOpen) {
-          setContextMenuReady(true)
-        }
-
-        if (shouldShow) {
-          await win.show().catch(() => {})
-        } else {
-          await win.hide().catch(() => {})
-        }
-      })
+        },
+      )
       .catch(() => {})
   }, [
     pipelineState,
