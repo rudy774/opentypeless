@@ -36,15 +36,21 @@
   If OpenTypeless helps your workflow, a GitHub star helps more people discover the project.
 </p>
 
-## What This Fork Adds
+## What Makes the Rudy774 Fork Different
 
-This fork keeps the OpenTypeless desktop workflow and adds a BYOK setup aimed at accurate, pause-friendly Windows dictation:
+This repository is a Windows-focused fork of the upstream [OpenTypeless project](https://github.com/tover0314-w/opentypeless). It keeps the original cross-platform desktop workflow while adding the following fork-specific changes:
 
-- **ElevenLabs Scribe v2** is available as a Speech Recognition provider. Enter your own ElevenLabs API key in the app; no key is included in this repository.
-- **Manual toggle recording** lets one shortcut press start recording and the next press stop and transcribe. In **Settings > General**, set Dictation mode to **Press to start/stop** and turn **Automatic stop** off. Quiet pauses will not end the recording.
-- **Live microphone feedback** animates the recording capsule from the captured audio level, so you can see that the selected microphone is receiving sound.
-- **Dictation-time statistics** on the Home page can be filtered by day, week, or month.
-- **Optional AI cleanup** can send the transcription to your configured LLM, including Google Gemini, before inserting the polished text into the active app.
+| Fork change                                    | What it adds                                                                                                                                                                                                                                        |
+| ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **ElevenLabs Scribe v2 BYOK**                  | ElevenLabs is available as a Speech Recognition provider. Audio is recorded until you stop, then submitted for transcription using your own ElevenLabs API key.                                                                                     |
+| **Gemini cleanup workflow**                    | The raw transcript can be sent through a separately configured Google Gemini model, such as a Flash model, before the result is inserted. ElevenLabs and Gemini credentials remain independent.                                                     |
+| **Pause-friendly manual recording**            | One shortcut press starts recording and the next stops it. Automatic stop can be disabled, so quiet pauses do not end dictation and you do not need to predict a recording duration.                                                                |
+| **Original text-field restoration on Windows** | The app remembers the exact field focused when dictation starts. You can click elsewhere while it processes; OpenTypeless restores and verifies the original field before insertion, with a safe clipboard fallback if that field no longer exists. |
+| **Live microphone and capsule feedback**       | The capsule responds to captured microphone levels, displays elapsed recording time, and uses transparent native-window styling without an unwanted black frame.                                                                                    |
+| **Accurate dictation-time dashboard**          | Home-page totals can be filtered by day, week, or month. Only actual recording time is counted; provider processing time and implausible duration outliers are excluded.                                                                            |
+| **Hotkey recovery and diagnostics**            | Recording-state recovery, persistent diagnostic logs, clearer output-failure reporting, and an in-app diagnostics panel make failed hotkeys and abnormal timing easier to investigate.                                                              |
+
+These additions currently live in the public [`rudy774/opentypeless`](https://github.com/rudy774/opentypeless) repository. Upstream documentation and cross-platform features still apply unless this section says otherwise.
 
 For a Logitech mouse or another programmable device, assign a keyboard shortcut in OpenTypeless and map a mouse button to that same shortcut. OpenTypeless handles the recording; the mouse software only needs to send the key combination.
 
@@ -57,7 +63,7 @@ For a Logitech mouse or another programmable device, assign a keyboard shortcut 
 
 ### API-key safety
 
-Provider keys are entered at runtime and stored locally using the operating-system credential vault where supported. They are not hard-coded in the source tree, committed to Git, or sent to an OpenTypeless server in BYOK mode. Local environment files (`.env` and `.env.*`) and common test credential files are excluded by `.gitignore`.
+Provider keys are entered at runtime and stored locally using the operating-system credential vault where supported. The ElevenLabs and Gemini keys used by the maintainer are not hard-coded in the source tree or committed to Git, and BYOK requests go directly to the provider you configure. Local environment files (`.env` and `.env.*`), logs, databases, build output, and common test credential files are excluded by `.gitignore`.
 
 Before publishing changes, scan both the working tree and Git history for secrets. If a real key is ever committed, revoke it with the provider first; deleting it in a later commit does not remove it from Git history.
 
@@ -90,11 +96,11 @@ It is designed for quick answers with no chat history, no input box, and no extr
 
 Default shortcuts now follow the Typeless-style flow:
 
-| Platform | Dictation | Ask Anything | Translate selected text |
-| -------- | --------- | ------------ | ----------------------- |
-| macOS    | `Fn`      | `Fn+Space`   | `Fn+LeftShift`          |
-| Windows  | `Right Alt` | `Right Alt+Space` | `Right Alt+LeftShift` |
-| Linux    | `Ctrl+/`  | `Ctrl+.`     | configurable            |
+| Platform | Dictation   | Ask Anything      | Translate selected text |
+| -------- | ----------- | ----------------- | ----------------------- |
+| macOS    | `Fn`        | `Fn+Space`        | `Fn+LeftShift`          |
+| Windows  | `Right Alt` | `Right Alt+Space` | `Right Alt+LeftShift`   |
+| Linux    | `Ctrl+/`    | `Ctrl+.`          | configurable            |
 
 Linux keeps conservative Ctrl-based defaults because global Right Alt handling is less reliable across desktop environments, especially on Wayland.
 
@@ -108,8 +114,8 @@ Linux keeps conservative Ctrl-based defaults because global Right Alt handling i
   <img src="docs/images/voice-flow-demo.gif" width="760" alt="OpenTypeless voice workflow demo" />
 </p>
 
-| App-aware AI polish                                                                                                  | Local dictionary and corrections                                                                                     |
-| -------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| App-aware AI polish                                                                                               | Local dictionary and corrections                                                                                   |
+| ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
 | <img src="docs/images/v1.1.49-app-aware-polish.jpg" width="420" alt="OpenTypeless v1.1.49 app-aware AI polish" /> | <img src="docs/images/v1.1.49-dictionary.jpg" width="420" alt="OpenTypeless v1.1.49 dictionary and corrections" /> |
 
 <details>
@@ -167,7 +173,7 @@ Most desktop dictation tools stop at transcription. OpenTypeless adds the AI rew
 | Translation mode       | ✅                                                                   | ❌              | ❌                   | ❌              |
 | Selected-text rewrite  | ✅                                                                   | ❌              | ❌                   | ❌              |
 | App-aware writing      | ✅ Local detection and mappings                                      | ❌              | ❌                   | ❌              |
-| Multiple shortcuts     | ✅ Per voice workflow                                                 | ❌              | ❌                   | ❌              |
+| Multiple shortcuts     | ✅ Per voice workflow                                                | ❌              | ❌                   | ❌              |
 | Open source            | ✅ MIT                                                               | ❌              | ❌                   | ✅              |
 | Cross-platform         | ✅ Win/Mac/Linux                                                     | ❌ Mac only     | ❌ Windows only      | ✅              |
 | Custom dictionary      | ✅                                                                   | ❌              | ❌                   | ❌              |
@@ -175,21 +181,21 @@ Most desktop dictation tools stop at transcription. OpenTypeless adds the AI rew
 
 ## Features
 
-| Area              | Highlights                                                                                                                                  |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| Voice capture     | Native Fn / Right Alt hotkeys on macOS/Windows, Linux Ctrl defaults, multiple bindings per workflow, hold or toggle mode, floating capsule states, idle auto-hide |
-| AI rewriting      | App-aware writing, local per-app style mappings, polish styles, streaming polish, selected-text context, and custom instructions             |
-| Ask Anything      | One-shot voice question flow: record in the capsule, think, then show a small answer note with copy support                                 |
-| Voice actions     | Deterministic English, Simplified Chinese, and Traditional Chinese routing for editing, translation, Ask, and supported actions              |
+| Area              | Highlights                                                                                                                                                            |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Voice capture     | Native Fn / Right Alt hotkeys on macOS/Windows, Linux Ctrl defaults, multiple bindings per workflow, hold or toggle mode, floating capsule states, idle auto-hide     |
+| AI rewriting      | App-aware writing, local per-app style mappings, polish styles, streaming polish, selected-text context, and custom instructions                                      |
+| Ask Anything      | One-shot voice question flow: record in the capsule, think, then show a small answer note with copy support                                                           |
+| Voice actions     | Deterministic English, Simplified Chinese, and Traditional Chinese routing for editing, translation, Ask, and supported actions                                       |
 | STT providers     | Cloud STT, Apple Speech on macOS, ElevenLabs Scribe v2, Deepgram, AssemblyAI, GLM-ASR, OpenAI Whisper, Groq Whisper, SiliconFlow, Volcengine Doubao, custom endpoints |
-| LLM providers     | Cloud LLM or OpenAI-compatible APIs including OpenAI, DeepSeek, Claude via OpenRouter, Gemini, Groq, Qwen, Moonshot, Ollama, and more       |
-| Output            | Keyboard simulation, clipboard paste/copy-only, Windows SendInput, clipboard restore, and output-failure diagnostics                       |
-| Language          | Auto-detect speech, dedicated translation shortcut, switchable target languages, and 20+ translation targets                                |
-| Dictionary        | Custom terms, import/export, and local correction rules for recurring transcription mistakes                                                 |
-| Scenes            | Built-in scenes, local custom scenes, active scene metadata, import/export for reusable writing styles                                      |
-| Privacy           | Local app detection and mappings, provider keys in the OS credential vault where available, plus BYOK and local/self-hosted paths            |
-| Account and quota | Optional Pro and Lifetime Starter plans with shared cloud words for voice and AI                                                            |
-| Desktop polish    | Dark/light/system theme, onboarding, local history search, auto-start, auto-update, cross-platform Tauri app                                |
+| LLM providers     | Cloud LLM or OpenAI-compatible APIs including OpenAI, DeepSeek, Claude via OpenRouter, Gemini, Groq, Qwen, Moonshot, Ollama, and more                                 |
+| Output            | Keyboard simulation, clipboard paste/copy-only, Windows SendInput, clipboard restore, and output-failure diagnostics                                                  |
+| Language          | Auto-detect speech, dedicated translation shortcut, switchable target languages, and 20+ translation targets                                                          |
+| Dictionary        | Custom terms, import/export, and local correction rules for recurring transcription mistakes                                                                          |
+| Scenes            | Built-in scenes, local custom scenes, active scene metadata, import/export for reusable writing styles                                                                |
+| Privacy           | Local app detection and mappings, provider keys in the OS credential vault where available, plus BYOK and local/self-hosted paths                                     |
+| Account and quota | Optional Pro and Lifetime Starter plans with shared cloud words for voice and AI                                                                                      |
+| Desktop polish    | Dark/light/system theme, onboarding, local history search, auto-start, auto-update, cross-platform Tauri app                                                          |
 
 UI localization currently ships with complete English and Chinese copy, plus additional locale files that may still fall back to English for newer advanced features.
 
