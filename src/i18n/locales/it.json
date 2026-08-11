@@ -63,6 +63,8 @@
     "week": "Settimana",
     "month": "Mese",
     "savedRecordingTime": "Basato sulle registrazioni salvate",
+    "durationOutliersExcluded_one": "{{count}} registrazione di durata non plausibile è stata esclusa da questo totale. I dettagli restano nella cronologia e nei registri diagnostici.",
+    "durationOutliersExcluded_other": "{{count}} registrazioni di durata non plausibile sono state escluse da questo totale. I dettagli restano nella cronologia e nei registri diagnostici.",
     "proPlan": "Piano Pro",
     "freePlan": "Piano Gratuito",
     "upgradeToPro": "Aggiorna a Pro",
@@ -242,6 +244,11 @@
     "done": "Fatto",
     "errorOccurred": "Si è verificato un errore",
     "accessibilityRequired": "Accessibilità necessaria — apri Impostazioni",
+    "moveGuide": {
+      "title": "Prova a spostare la capsula",
+      "description": "Trascinala dove vuoi. Ricorderemo la posizione.",
+      "dismiss": "Chiudi il suggerimento"
+    },
     "errors": {
       "stt_timeout": "Timeout STT",
       "stt_invalid_key": "Controlla STT",
@@ -391,6 +398,11 @@
     "moveTranslationTargetUp": "Sposta la lingua di destinazione in alto",
     "moveTranslationTargetDown": "Sposta la lingua di destinazione in basso",
     "aboutDescription": "Strumento open-source di input vocale IA. Parla per scrivere — trasforma la tua voce in testo rifinito in tempo reale.",
+    "diagnosticsTitle": "Diagnostica",
+    "diagnosticsDescription": "Controlla microfono, registrazione dei tasti di scelta rapida, appunti e percorso di output. Apri i registri persistenti per analizzare gli errori intermittenti; vengono conservati i sette file di registro giornalieri più recenti.",
+    "runDiagnostics": "Esegui diagnostica",
+    "diagnosticsRunning": "Controllo…",
+    "openDiagnosticLogs": "Apri cartella dei registri",
     "openSource": "Open Source",
     "license": "Licenza",
     "mit": "MIT",

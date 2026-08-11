@@ -1,5 +1,10 @@
-import { describe, expect, it } from 'vitest'
-import { getCapsuleFocusable, getCapsuleVisibility } from '../useCapsuleResize'
+import { describe, expect, it, vi } from 'vitest'
+import {
+  getCapsuleContentSize,
+  getCapsuleFocusable,
+  getCapsuleVisibility,
+  keepCapsuleOnTop,
+} from '../useCapsuleResize'
 
 describe('getCapsuleVisibility', () => {
   it('hides idle capsule when auto-hide is enabled', () => {
@@ -76,5 +81,32 @@ describe('getCapsuleVisibility', () => {
 
   it('keeps the capsule overlay from stealing keyboard output focus', () => {
     expect(getCapsuleFocusable()).toBe(false)
+  })
+
+  it('re-enters the topmost window band when transcription is active', async () => {
+    const setAlwaysOnTop = vi.fn().mockResolvedValue(undefined)
+
+    await keepCapsuleOnTop({ setAlwaysOnTop }, true)
+
+    expect(setAlwaysOnTop.mock.calls).toEqual([[false], [true]])
+  })
+
+  it('keeps an idle visible capsule topmost without forcing a z-order jump', async () => {
+    const setAlwaysOnTop = vi.fn().mockResolvedValue(undefined)
+
+    await keepCapsuleOnTop({ setAlwaysOnTop }, false)
+
+    expect(setAlwaysOnTop.mock.calls).toEqual([[true]])
+  })
+
+  it('makes room for the in-context movement guide without changing menu sizes', () => {
+    expect(getCapsuleContentSize('recording', false, false, false, false, true)).toEqual({
+      width: 440,
+      height: 64,
+    })
+    expect(getCapsuleContentSize('recording', false, false, true, false, true)).toEqual({
+      width: 220,
+      height: 220,
+    })
   })
 })

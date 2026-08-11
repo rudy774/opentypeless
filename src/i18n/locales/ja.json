@@ -63,6 +63,8 @@
     "week": "週",
     "month": "月",
     "savedRecordingTime": "保存された録音から集計",
+    "durationOutliersExcluded_one": "不自然に長い録音 {{count}} 件を合計から除外しました。詳細は履歴と診断ログに残っています。",
+    "durationOutliersExcluded_other": "不自然に長い録音 {{count}} 件を合計から除外しました。詳細は履歴と診断ログに残っています。",
     "proPlan": "Proプラン",
     "freePlan": "無料プラン",
     "upgradeToPro": "Proにアップグレード",
@@ -242,6 +244,11 @@
     "done": "完了",
     "errorOccurred": "エラーが発生しました",
     "accessibilityRequired": "アクセシビリティが必要です — 設定を開いてください",
+    "moveGuide": {
+      "title": "カプセルを動かしてみましょう",
+      "description": "好きな場所へドラッグすると、その位置を記憶します。",
+      "dismiss": "移動のヒントを閉じる"
+    },
     "errors": {
       "stt_timeout": "STT タイムアウト",
       "stt_invalid_key": "STT キー確認",
@@ -391,6 +398,11 @@
     "moveTranslationTargetUp": "翻訳先を上へ移動",
     "moveTranslationTargetDown": "翻訳先を下へ移動",
     "aboutDescription": "オープンソースAI音声入力ツール。話して書く — 音声をリアルタイムで整形されたテキストに変換します。",
+    "diagnosticsTitle": "診断",
+    "diagnosticsDescription": "マイク、ホットキー登録、クリップボード、出力経路を確認します。断続的な障害の調査には永続ログを開いてください。直近7日分のログファイルが保持されます。",
+    "runDiagnostics": "診断を実行",
+    "diagnosticsRunning": "確認中…",
+    "openDiagnosticLogs": "ログフォルダーを開く",
     "openSource": "オープンソース",
     "license": "ライセンス",
     "mit": "MIT",

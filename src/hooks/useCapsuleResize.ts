@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useAppStore, type PipelineState } from '../stores/appStore'
+import { loadCapsuleAnchor } from '../lib/capsulePreferences'
 
 interface CapsuleSize {
   width: number
@@ -37,15 +38,35 @@ export function getCapsuleFocusable(): boolean {
   return false
 }
 
-function getSizeForState(
+interface CapsuleTopmostWindow {
+  setAlwaysOnTop(alwaysOnTop: boolean): Promise<void>
+}
+
+/**
+ * Keep only the capsule in the topmost window band. Re-entering that band while
+ * the pipeline is active moves it above other topmost windows without focusing it.
+ */
+export async function keepCapsuleOnTop(
+  window: CapsuleTopmostWindow,
+  refreshZOrder: boolean,
+): Promise<void> {
+  if (refreshZOrder) {
+    await window.setAlwaysOnTop(false).catch(() => {})
+  }
+  await window.setAlwaysOnTop(true).catch(() => {})
+}
+
+export function getCapsuleContentSize(
   state: PipelineState,
   expanded: boolean,
   hasError: boolean,
   contextMenuOpen: boolean,
   translationTargetMenuOpen = false,
+  moveGuideVisible = false,
 ): CapsuleSize {
   if (translationTargetMenuOpen) return { width: 360, height: 180 }
   if (contextMenuOpen) return { width: 220, height: 220 }
+  if (moveGuideVisible) return { width: 440, height: 64 }
   if (hasError) return { width: 200, height: 36 }
   if (expanded) return { width: 220, height: 90 }
   switch (state) {
@@ -67,7 +88,7 @@ function getSizeForState(
   }
 }
 
-export function useCapsuleResize() {
+export function useCapsuleResize(moveGuideVisible = false) {
   const pipelineState = useAppStore((s) => s.pipelineState)
   const capsuleExpanded = useAppStore((s) => s.capsuleExpanded)
   const pipelineError = useAppStore((s) => s.pipelineError)
@@ -81,12 +102,13 @@ export function useCapsuleResize() {
   const hasError = pipelineError !== null
 
   useEffect(() => {
-    const size = getSizeForState(
+    const size = getCapsuleContentSize(
       pipelineState,
       capsuleExpanded,
       hasError,
       contextMenuOpen,
       translationTargetMenuOpen,
+      moveGuideVisible,
     )
     const windowWidth = size.width + 24
     const windowHeight = size.height + 24
@@ -98,11 +120,19 @@ export function useCapsuleResize() {
       hasError,
       pipelineState,
     })
+    const shouldRefreshTopmost = pipelineState !== 'idle' || hasError
 
     Promise.all([import('@tauri-apps/api/window'), import('@tauri-apps/api/webview')])
       .then(
         async ([
-          { getCurrentWindow, LogicalSize, LogicalPosition, currentMonitor },
+          {
+            getCurrentWindow,
+            LogicalSize,
+            LogicalPosition,
+            PhysicalPosition,
+            currentMonitor,
+            monitorFromPoint,
+          },
           webviewApi,
         ]) => {
           const win = getCurrentWindow()
@@ -114,23 +144,51 @@ export function useCapsuleResize() {
           await webview.setBackgroundColor([0, 0, 0, 0]).catch(() => {})
 
           if (!initialized.current) {
-            // First mount: position at bottom-center of screen, then show
+            // First mount: restore the user's capsule anchor when possible.
             await win.setSize(new LogicalSize(windowWidth, windowHeight)).catch(() => {})
             await webview.setBackgroundColor([0, 0, 0, 0]).catch(() => {})
+            let restoredPosition = false
             try {
-              const monitor = await currentMonitor()
-              if (monitor) {
-                const sw = monitor.size.width / monitor.scaleFactor
-                const sh = monitor.size.height / monitor.scaleFactor
-                const x = Math.round(sw / 2 - windowWidth / 2)
-                const y = Math.round(sh - windowHeight - 80)
-                await win.setPosition(new LogicalPosition(x, y)).catch(() => {})
+              const anchor = await loadCapsuleAnchor()
+              if (anchor) {
+                const savedMonitor = await monitorFromPoint(anchor.left, anchor.centerY)
+                if (savedMonitor) {
+                  const physicalHeight = windowHeight * savedMonitor.scaleFactor
+                  await win
+                    .setPosition(
+                      new PhysicalPosition(
+                        Math.round(anchor.left),
+                        Math.round(anchor.centerY - physicalHeight / 2),
+                      ),
+                    )
+                    .catch(() => {})
+                  restoredPosition = true
+                }
+              }
+
+              if (!restoredPosition) {
+                const monitor = await currentMonitor()
+                if (monitor) {
+                  const physicalWidth = windowWidth * monitor.scaleFactor
+                  const physicalHeight = windowHeight * monitor.scaleFactor
+                  const x = Math.round(
+                    monitor.workArea.position.x + (monitor.workArea.size.width - physicalWidth) / 2,
+                  )
+                  const y = Math.round(
+                    monitor.workArea.position.y +
+                      monitor.workArea.size.height -
+                      physicalHeight -
+                      80 * monitor.scaleFactor,
+                  )
+                  await win.setPosition(new PhysicalPosition(x, y)).catch(() => {})
+                }
               }
             } catch {
               /* ignore – monitor info unavailable */
             }
             if (shouldShow) {
               await win.show().catch(() => {})
+              await keepCapsuleOnTop(win, shouldRefreshTopmost)
             } else {
               await win.hide().catch(() => {})
             }
@@ -171,6 +229,7 @@ export function useCapsuleResize() {
 
           if (shouldShow) {
             await win.show().catch(() => {})
+            await keepCapsuleOnTop(win, shouldRefreshTopmost)
           } else {
             await win.hide().catch(() => {})
           }
@@ -183,15 +242,17 @@ export function useCapsuleResize() {
     hasError,
     contextMenuOpen,
     translationTargetMenuOpen,
+    moveGuideVisible,
     capsuleAutoHide,
     setContextMenuReady,
   ])
 
-  return getSizeForState(
+  return getCapsuleContentSize(
     pipelineState,
     capsuleExpanded,
     hasError,
     contextMenuOpen,
     translationTargetMenuOpen,
+    moveGuideVisible,
   )
 }

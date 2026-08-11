@@ -63,6 +63,8 @@
     "week": "주",
     "month": "월",
     "savedRecordingTime": "저장된 녹음 기준",
+    "durationOutliersExcluded_one": "비정상적으로 긴 녹음 {{count}}건을 합계에서 제외했습니다. 자세한 내용은 기록과 진단 로그에 남아 있습니다.",
+    "durationOutliersExcluded_other": "비정상적으로 긴 녹음 {{count}}건을 합계에서 제외했습니다. 자세한 내용은 기록과 진단 로그에 남아 있습니다.",
     "proPlan": "Pro 플랜",
     "freePlan": "무료 플랜",
     "upgradeToPro": "Pro로 업그레이드",
@@ -242,6 +244,11 @@
     "done": "완료",
     "errorOccurred": "오류가 발생했습니다",
     "accessibilityRequired": "접근성 권한이 필요합니다 — 설정을 여세요",
+    "moveGuide": {
+      "title": "캡슐을 움직여 보세요",
+      "description": "원하는 곳으로 드래그하면 위치를 기억합니다.",
+      "dismiss": "이동 안내 닫기"
+    },
     "errors": {
       "stt_timeout": "STT 시간 초과",
       "stt_invalid_key": "STT 확인",
@@ -391,6 +398,11 @@
     "moveTranslationTargetUp": "번역 대상 위로 이동",
     "moveTranslationTargetDown": "번역 대상 아래로 이동",
     "aboutDescription": "오픈소스 AI 음성 입력 도구. 말해서 글 쓰기 — 음성을 실시간으로 다듬어진 텍스트로 변환합니다.",
+    "diagnosticsTitle": "진단",
+    "diagnosticsDescription": "마이크, 단축키 등록, 클립보드 및 출력 경로를 확인합니다. 간헐적인 오류를 조사하려면 영구 로그를 여세요. 최근 7개의 일일 로그 파일이 보관됩니다.",
+    "runDiagnostics": "진단 실행",
+    "diagnosticsRunning": "확인 중…",
+    "openDiagnosticLogs": "로그 폴더 열기",
     "openSource": "오픈소스",
     "license": "라이선스",
     "mit": "MIT",

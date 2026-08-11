@@ -63,6 +63,8 @@
     "week": "Woche",
     "month": "Monat",
     "savedRecordingTime": "Basierend auf gespeicherten Aufnahmen",
+    "durationOutliersExcluded_one": "{{count}} unplausibel lange Aufnahme wurde aus dieser Summe ausgeschlossen. Details bleiben im Verlauf und in den Diagnoseprotokollen erhalten.",
+    "durationOutliersExcluded_other": "{{count}} unplausibel lange Aufnahmen wurden aus dieser Summe ausgeschlossen. Details bleiben im Verlauf und in den Diagnoseprotokollen erhalten.",
     "proPlan": "Pro-Tarif",
     "freePlan": "Kostenloser Tarif",
     "upgradeToPro": "Auf Pro upgraden",
@@ -242,6 +244,11 @@
     "done": "Fertig",
     "errorOccurred": "Ein Fehler ist aufgetreten",
     "accessibilityRequired": "Bedienungshilfen erforderlich — Einstellungen öffnen",
+    "moveGuide": {
+      "title": "Bewege die Kapsel",
+      "description": "Ziehe sie an eine beliebige Stelle. Wir merken uns die Position.",
+      "dismiss": "Bewegungstipp schließen"
+    },
     "errors": {
       "stt_timeout": "STT-Timeout",
       "stt_invalid_key": "STT-Key prüfen",
@@ -391,6 +398,11 @@
     "moveTranslationTargetUp": "Übersetzungsziel nach oben verschieben",
     "moveTranslationTargetDown": "Übersetzungsziel nach unten verschieben",
     "aboutDescription": "Open-Source-AI-Spracheingabe-Tool. Sprechen Sie, um zu schreiben — verwandeln Sie Ihre Stimme in Echtzeit in geglätteten Text.",
+    "diagnosticsTitle": "Diagnose",
+    "diagnosticsDescription": "Überprüfen Sie Mikrofon, Hotkey-Registrierung, Zwischenablage und Textausgabe. Öffnen Sie die dauerhaften Protokolle, um zeitweilige Fehler zu untersuchen; die sieben neuesten täglichen Protokolldateien werden aufbewahrt.",
+    "runDiagnostics": "Diagnose ausführen",
+    "diagnosticsRunning": "Wird geprüft…",
+    "openDiagnosticLogs": "Protokollordner öffnen",
     "openSource": "Open Source",
     "license": "Lizenz",
     "mit": "MIT",

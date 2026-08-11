@@ -244,6 +244,11 @@
     "done": "Done",
     "errorOccurred": "An error occurred",
     "accessibilityRequired": "Accessibility needed — open Settings",
+    "moveGuide": {
+      "title": "Try moving the pill",
+      "description": "Drag it anywhere. We’ll remember the spot.",
+      "dismiss": "Dismiss movement tip"
+    },
     "errors": {
       "stt_timeout": "STT timeout",
       "stt_invalid_key": "Check STT key",

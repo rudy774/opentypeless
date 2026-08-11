@@ -143,6 +143,116 @@ fn generate_cloud_operation_id() -> String {
     )
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ConnectionPrewarmTarget {
+    label: &'static str,
+    url: String,
+    include_desktop_client_version: bool,
+}
+
+fn connection_prewarm_targets(
+    config: &storage::AppConfig,
+) -> (
+    Option<ConnectionPrewarmTarget>,
+    Option<ConnectionPrewarmTarget>,
+) {
+    let stt = if config.stt_provider == "cloud" {
+        Some(ConnectionPrewarmTarget {
+            label: "STT",
+            url: format!("{}/api/proxy/stt", crate::api_base_url()),
+            include_desktop_client_version: true,
+        })
+    } else if config.stt_provider == stt::config::CUSTOM_WHISPER_PROVIDER {
+        stt::config::normalize_custom_whisper_endpoint(&config.stt_custom_base_url)
+            .ok()
+            .map(|url| ConnectionPrewarmTarget {
+                label: "STT",
+                url,
+                include_desktop_client_version: false,
+            })
+    } else {
+        stt::config::get_whisper_config(&config.stt_provider).map(|provider| {
+            ConnectionPrewarmTarget {
+                label: "STT",
+                url: provider.endpoint.to_string(),
+                include_desktop_client_version: false,
+            }
+        })
+    };
+
+    let llm = config.polish_enabled.then(|| ConnectionPrewarmTarget {
+        label: "LLM",
+        url: if config.llm_provider == "cloud" {
+            format!("{}/api/proxy/llm", crate::api_base_url())
+        } else {
+            format!(
+                "{}/chat/completions",
+                config.llm_base_url.trim_end_matches('/')
+            )
+        },
+        include_desktop_client_version: config.llm_provider == "cloud",
+    });
+
+    (stt, llm)
+}
+
+async fn prewarm_connection(
+    client: reqwest::Client,
+    target: Option<ConnectionPrewarmTarget>,
+    source: &'static str,
+) {
+    let Some(target) = target else {
+        return;
+    };
+
+    let started = std::time::Instant::now();
+    tracing::debug!(
+        service = target.label,
+        source,
+        url = %target.url,
+        "Pre-warming HTTP connection"
+    );
+    let request = client.head(&target.url);
+    let request = if target.include_desktop_client_version {
+        crate::with_desktop_client_version(request)
+    } else {
+        request
+    };
+
+    match request
+        .timeout(std::time::Duration::from_secs(5))
+        .send()
+        .await
+    {
+        Ok(response) => tracing::debug!(
+            service = target.label,
+            source,
+            status = %response.status(),
+            elapsed_ms = started.elapsed().as_millis() as u64,
+            "HTTP connection pre-warm complete"
+        ),
+        Err(error) => tracing::debug!(
+            service = target.label,
+            source,
+            elapsed_ms = started.elapsed().as_millis() as u64,
+            error = %error,
+            "HTTP connection pre-warm did not complete"
+        ),
+    }
+}
+
+async fn prewarm_connections(
+    client: reqwest::Client,
+    config: storage::AppConfig,
+    source: &'static str,
+) {
+    let (stt_target, llm_target) = connection_prewarm_targets(&config);
+    tokio::join!(
+        prewarm_connection(client.clone(), stt_target, source),
+        prewarm_connection(client, llm_target, source),
+    );
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PipelineState {
@@ -1233,9 +1343,11 @@ impl PipelineHandle {
     }
 
     pub async fn start_with_options(&self, options: PipelineStartOptions) -> Result<()> {
+        let start_requested_at = std::time::Instant::now();
         // Hold pipeline_lock for the entire setup so stop() cannot read
         // partially-initialised state (preloaded_config, audio_handle, etc.).
         let _guard = self.pipeline_lock.lock().await;
+        let pipeline_lock_wait_ms = start_requested_at.elapsed().as_millis() as u64;
 
         // Record every attempt before reserving the state so ignored hotkeys
         // remain visible in diagnostics.
@@ -1615,9 +1727,20 @@ impl PipelineHandle {
             provider = %config_data.stt_provider,
             language = %config_data.stt_language,
             force_translate = options.force_translate,
+            ready_ms = start_requested_at.elapsed().as_millis() as u64,
+            pipeline_lock_wait_ms,
             "Audio recording started"
         );
         let _ = self.app_handle.emit("pipeline:voice_mode", voice_mode);
+
+        // Refresh remote connections only after the microphone is live. This runs
+        // in the background, so recording startup stays fast while the STT upload
+        // and subsequent LLM request can reuse a recent TLS connection.
+        let warm_client = self.shared_client.clone();
+        let warm_config = config_data.clone();
+        tokio::spawn(async move {
+            prewarm_connections(warm_client, warm_config, "recording").await;
+        });
 
         // Volume monitoring task
         let app_handle = self.app_handle.clone();
@@ -1888,6 +2011,22 @@ impl PipelineHandle {
         let selection_target_is_focused = selection_context
             .as_ref()
             .is_some_and(|context| self.recording_target_is_focused(context));
+        // End capture before the modifier-release delay below. File-based STT can
+        // begin its upload while selected text is collected instead of waiting an
+        // extra 60 ms on the critical path.
+        {
+            let mut handle = self.audio_handle.lock().unwrap_or_else(|e| e.into_inner());
+            if let Some(ref mut h) = *handle {
+                h.stop();
+            }
+            *handle = None;
+        }
+        let stt_control = self
+            .stt_session
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone();
+
         let selected_text = if config_data.selected_text_enabled && selection_target_is_focused {
             tokio::time::sleep(std::time::Duration::from_millis(
                 SELECTED_TEXT_CAPTURE_DELAY_MS,
@@ -1910,20 +2049,6 @@ impl PipelineHandle {
             .preloaded_selected_text
             .lock()
             .unwrap_or_else(|e| e.into_inner()) = selected_text;
-
-        // Stop audio capture (this drops the channel, signaling STT task to stop)
-        {
-            let mut handle = self.audio_handle.lock().unwrap_or_else(|e| e.into_inner());
-            if let Some(ref mut h) = *handle {
-                h.stop();
-            }
-            *handle = None;
-        }
-        let stt_control = self
-            .stt_session
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .clone();
 
         // P2-1: Pre-build LLM resources while waiting for STT
         let preloaded_config = self
@@ -2941,71 +3066,10 @@ impl PipelineHandle {
         Ok(insert_result)
     }
 
-    /// P1-2: Pre-warm HTTP connection pool by issuing a HEAD request to the STT endpoint.
-    /// Call once after app startup to avoid cold-start TLS handshake on first recording.
+    /// Pre-warm STT and LLM connections concurrently after app startup.
     pub async fn pre_warm(&self) {
         let config = self.load_config().await;
-
-        // Pre-warm STT endpoint
-        let stt_endpoint = match config.stt_provider.as_str() {
-            "cloud" => {
-                let base = crate::api_base_url();
-                format!("{}/api/proxy/stt", base)
-            }
-            "glm-asr" => "https://open.bigmodel.cn/api/paas/v4/audio/transcriptions".to_string(),
-            "openai-whisper" => "https://api.openai.com/v1/audio/transcriptions".to_string(),
-            "groq-whisper" => "https://api.groq.com/openai/v1/audio/transcriptions".to_string(),
-            "siliconflow" => "https://api.siliconflow.cn/v1/audio/transcriptions".to_string(),
-            "deepgram" => "https://api.deepgram.com/v1/listen".to_string(),
-            "assemblyai" => "https://api.assemblyai.com/v2/transcript".to_string(),
-            stt::config::ELEVENLABS_PROVIDER => {
-                "https://api.elevenlabs.io/v1/speech-to-text".to_string()
-            }
-            stt::volcengine::VOLCENGINE_DOUBAO_PROVIDER => {
-                "https://openspeech.bytedance.com/api/v3/sauc/bigmodel_async".to_string()
-            }
-            _ => {
-                tracing::debug!(
-                    "Unknown STT provider '{}', skipping pre-warm",
-                    config.stt_provider
-                );
-                return;
-            }
-        };
-        tracing::debug!("Pre-warming HTTP connection to {}", stt_endpoint);
-        let stt_prewarm = self.shared_client.head(&stt_endpoint);
-        let stt_prewarm = if config.stt_provider == "cloud" {
-            crate::with_desktop_client_version(stt_prewarm)
-        } else {
-            stt_prewarm
-        };
-        let _ = stt_prewarm
-            .timeout(std::time::Duration::from_secs(5))
-            .send()
-            .await;
-        tracing::debug!("STT connection pre-warm complete");
-
-        // Pre-warm LLM endpoint if polish is enabled
-        if config.polish_enabled {
-            let llm_url = if config.llm_provider == "cloud" {
-                let base = crate::api_base_url();
-                format!("{}/api/proxy/llm", base)
-            } else {
-                config.llm_base_url.clone()
-            };
-            tracing::debug!("Pre-warming LLM connection to {}", llm_url);
-            let llm_prewarm = self.shared_client.head(&llm_url);
-            let llm_prewarm = if config.llm_provider == "cloud" {
-                crate::with_desktop_client_version(llm_prewarm)
-            } else {
-                llm_prewarm
-            };
-            let _ = llm_prewarm
-                .timeout(std::time::Duration::from_secs(5))
-                .send()
-                .await;
-            tracing::debug!("LLM connection pre-warm complete");
-        }
+        prewarm_connections(self.shared_client.clone(), config, "startup").await;
     }
 }
 
@@ -3013,6 +3077,65 @@ impl PipelineHandle {
 mod tests {
     use super::*;
     use std::sync::atomic::{AtomicBool, AtomicU64};
+
+    #[test]
+    fn elevenlabs_and_gemini_use_exact_prewarm_endpoints() {
+        let config = storage::AppConfig {
+            stt_provider: stt::config::ELEVENLABS_PROVIDER.to_string(),
+            llm_provider: "google-gemini".to_string(),
+            llm_base_url: "https://generativelanguage.googleapis.com/v1beta/openai/".to_string(),
+            polish_enabled: true,
+            ..storage::AppConfig::default()
+        };
+
+        let (stt_target, llm_target) = connection_prewarm_targets(&config);
+        let stt_target = stt_target.expect("ElevenLabs should be pre-warmed");
+        let llm_target = llm_target.expect("Gemini should be pre-warmed");
+
+        assert_eq!(
+            stt_target.url,
+            "https://api.elevenlabs.io/v1/speech-to-text"
+        );
+        assert_eq!(
+            llm_target.url,
+            "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+        );
+        assert!(!stt_target.include_desktop_client_version);
+        assert!(!llm_target.include_desktop_client_version);
+    }
+
+    #[test]
+    fn prewarm_skips_llm_when_polish_is_disabled() {
+        let config = storage::AppConfig {
+            stt_provider: stt::config::ELEVENLABS_PROVIDER.to_string(),
+            polish_enabled: false,
+            ..storage::AppConfig::default()
+        };
+
+        let (stt_target, llm_target) = connection_prewarm_targets(&config);
+
+        assert!(stt_target.is_some());
+        assert!(llm_target.is_none());
+    }
+
+    #[test]
+    fn local_stt_does_not_prevent_llm_prewarm() {
+        let config = storage::AppConfig {
+            stt_provider: stt::config::APPLE_SPEECH_PROVIDER.to_string(),
+            llm_provider: "openrouter".to_string(),
+            llm_base_url: "https://openrouter.ai/api/v1".to_string(),
+            polish_enabled: true,
+            ..storage::AppConfig::default()
+        };
+
+        let (stt_target, llm_target) = connection_prewarm_targets(&config);
+
+        assert!(stt_target.is_none());
+        assert_eq!(
+            llm_target.expect("LLM should still be pre-warmed").url,
+            "https://openrouter.ai/api/v1/chat/completions"
+        );
+    }
 
     #[test]
     fn preparing_state_serializes_for_frontend() {

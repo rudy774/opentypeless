@@ -63,6 +63,8 @@
     "week": "周",
     "month": "月",
     "savedRecordingTime": "根据已保存的录音统计",
+    "durationOutliersExcluded_one": "已从总计中排除 {{count}} 条时长异常的录音。详细信息仍保留在历史记录和诊断日志中。",
+    "durationOutliersExcluded_other": "已从总计中排除 {{count}} 条时长异常的录音。详细信息仍保留在历史记录和诊断日志中。",
     "wordsRemaining": "剩余 words",
     "wordsReset": "{{date}} 重置",
     "proPlan": "Pro 计划",
@@ -242,6 +244,11 @@
     "done": "完成",
     "errorOccurred": "发生错误",
     "accessibilityRequired": "需要辅助功能权限 — 请打开设置",
+    "moveGuide": {
+      "title": "试着移动胶囊",
+      "description": "把它拖到任意位置，我们会记住这个位置。",
+      "dismiss": "关闭移动提示"
+    },
     "errors": {
       "stt_timeout": "STT 超时",
       "stt_invalid_key": "检查 STT",
@@ -392,6 +399,11 @@
     "moveTranslationTargetUp": "上移翻译目标",
     "moveTranslationTargetDown": "下移翻译目标",
     "aboutDescription": "开源 AI 语音输入工具。说话即写作 — 实时将语音转化为润色文本。",
+    "diagnosticsTitle": "诊断",
+    "diagnosticsDescription": "检查麦克风、快捷键注册、剪贴板和输出路径。打开持久日志以调查间歇性故障；系统会保留最近七个每日日志文件。",
+    "runDiagnostics": "运行诊断",
+    "diagnosticsRunning": "正在检查…",
+    "openDiagnosticLogs": "打开日志文件夹",
     "openSource": "开源",
     "license": "许可证",
     "mit": "MIT",

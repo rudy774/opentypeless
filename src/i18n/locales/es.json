@@ -63,6 +63,8 @@
     "week": "Semana",
     "month": "Mes",
     "savedRecordingTime": "Basado en grabaciones guardadas",
+    "durationOutliersExcluded_one": "Se excluyó {{count}} grabación de duración inverosímil de este total. Los detalles permanecen en el historial y en los registros de diagnóstico.",
+    "durationOutliersExcluded_other": "Se excluyeron {{count}} grabaciones de duración inverosímil de este total. Los detalles permanecen en el historial y en los registros de diagnóstico.",
     "proPlan": "Plan Pro",
     "freePlan": "Plan gratuito",
     "upgradeToPro": "Mejorar a Pro",
@@ -242,6 +244,11 @@
     "done": "Listo",
     "errorOccurred": "Ocurrió un error",
     "accessibilityRequired": "Se necesita accesibilidad — abre Configuración",
+    "moveGuide": {
+      "title": "Prueba a mover la cápsula",
+      "description": "Arrástrala donde quieras. Recordaremos la posición.",
+      "dismiss": "Cerrar consejo de movimiento"
+    },
     "errors": {
       "stt_timeout": "STT agotado",
       "stt_invalid_key": "Revisa STT",
@@ -391,6 +398,11 @@
     "moveTranslationTargetUp": "Subir idioma de destino",
     "moveTranslationTargetDown": "Bajar idioma de destino",
     "aboutDescription": "Herramienta de entrada de voz con IA de código abierto. Habla para escribir — convierte tu voz en texto pulido en tiempo real.",
+    "diagnosticsTitle": "Diagnóstico",
+    "diagnosticsDescription": "Comprueba el micrófono, el registro de teclas rápidas, el portapapeles y la ruta de salida. Abre los registros persistentes para investigar fallos intermitentes; se conservan los siete archivos de registro diarios más recientes.",
+    "runDiagnostics": "Ejecutar diagnóstico",
+    "diagnosticsRunning": "Comprobando…",
+    "openDiagnosticLogs": "Abrir carpeta de registros",
     "openSource": "Código abierto",
     "license": "Licencia",
     "mit": "MIT",
