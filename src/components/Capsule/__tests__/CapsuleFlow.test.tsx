@@ -4,6 +4,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { invoke } from '@tauri-apps/api/core'
 import { useAppStore } from '../../../stores/appStore'
 import { setActiveTranslationTarget, stopAskFlow } from '../../../lib/tauri'
+import {
+  completeCapsuleMoveGuide,
+  loadCapsuleMoveGuidePending,
+} from '../../../lib/capsulePreferences'
 import { Capsule } from '../index'
 
 vi.mock('framer-motion', () => ({
@@ -41,6 +45,12 @@ vi.mock('../../../lib/tauri', () => ({
   stopAskFlow: vi.fn().mockResolvedValue(undefined),
 }))
 
+vi.mock('../../../lib/capsulePreferences', () => ({
+  completeCapsuleMoveGuide: vi.fn().mockResolvedValue(undefined),
+  loadCapsuleMoveGuidePending: vi.fn().mockResolvedValue(false),
+  saveCurrentCapsuleAnchor: vi.fn().mockResolvedValue(undefined),
+}))
+
 vi.mock('@tauri-apps/api/core', () => ({
   invoke: vi.fn().mockResolvedValue(undefined),
 }))
@@ -54,6 +64,7 @@ afterEach(() => {
 
 describe('Capsule flow states', () => {
   beforeEach(() => {
+    vi.mocked(loadCapsuleMoveGuidePending).mockResolvedValue(false)
     useAppStore.setState({
       pipelineState: 'idle',
       pipelineError: null,
@@ -95,6 +106,19 @@ describe('Capsule flow states', () => {
     act(() => vi.advanceTimersByTime(65_000))
 
     expect(invoke).not.toHaveBeenCalledWith('stop_recording')
+  })
+
+  it('shows the first-use movement guide during recording and allows dismissal', async () => {
+    vi.mocked(loadCapsuleMoveGuidePending).mockResolvedValueOnce(true)
+    useAppStore.setState({ pipelineState: 'recording' })
+
+    render(<Capsule />)
+
+    expect(await screen.findByText('capsule.moveGuide.title')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'capsule.moveGuide.dismiss' }))
+
+    expect(completeCapsuleMoveGuide).toHaveBeenCalledTimes(1)
+    expect(screen.queryByText('capsule.moveGuide.title')).toBeNull()
   })
 
   it('stops recording when the configured recording limit is reached', () => {

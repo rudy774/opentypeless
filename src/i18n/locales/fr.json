@@ -63,6 +63,8 @@
     "week": "Semaine",
     "month": "Mois",
     "savedRecordingTime": "D'après les enregistrements sauvegardés",
+    "durationOutliersExcluded_one": "{{count}} enregistrement anormalement long a été exclu de ce total. Les détails restent disponibles dans l'historique et les journaux de diagnostic.",
+    "durationOutliersExcluded_other": "{{count}} enregistrements anormalement longs ont été exclus de ce total. Les détails restent disponibles dans l'historique et les journaux de diagnostic.",
     "proPlan": "Plan Pro",
     "freePlan": "Plan Gratuit",
     "upgradeToPro": "Passer à Pro",
@@ -242,6 +244,11 @@
     "done": "Terminé",
     "errorOccurred": "Une erreur s'est produite",
     "accessibilityRequired": "Accessibilité requise — ouvrez les Paramètres",
+    "moveGuide": {
+      "title": "Essayez de déplacer la capsule",
+      "description": "Faites-la glisser où vous voulez. Nous garderons sa position.",
+      "dismiss": "Fermer l’astuce de déplacement"
+    },
     "errors": {
       "stt_timeout": "Délai STT",
       "stt_invalid_key": "Vérifiez STT",
@@ -391,6 +398,11 @@
     "moveTranslationTargetUp": "Déplacer la langue cible vers le haut",
     "moveTranslationTargetDown": "Déplacer la langue cible vers le bas",
     "aboutDescription": "Outil de saisie vocale IA open source. Parlez pour écrire — transformez votre voix en texte amélioré en temps réel.",
+    "diagnosticsTitle": "Diagnostic",
+    "diagnosticsDescription": "Vérifiez le microphone, l'enregistrement des raccourcis, le presse-papiers et la sortie. Ouvrez les journaux persistants pour analyser les pannes intermittentes ; les sept fichiers journaux quotidiens les plus récents sont conservés.",
+    "runDiagnostics": "Lancer le diagnostic",
+    "diagnosticsRunning": "Vérification…",
+    "openDiagnosticLogs": "Ouvrir le dossier des journaux",
     "openSource": "Open Source",
     "license": "Licence",
     "mit": "MIT",

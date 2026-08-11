@@ -1,4 +1,4 @@
-import { useRef, useCallback, useEffect } from 'react'
+import { useRef, useCallback, useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useAppStore } from '../../stores/appStore'
 import { useRecording } from '../../hooks/useRecording'
@@ -15,6 +15,12 @@ import { CapsuleContextMenu } from './CapsuleContextMenu'
 import { CapsuleAskRecording } from './CapsuleAskRecording'
 import { CapsuleAskThinking } from './CapsuleAskThinking'
 import { TranslateTargetMenu } from './TranslateTargetChip'
+import { CapsuleMoveGuide } from './CapsuleMoveGuide'
+import {
+  completeCapsuleMoveGuide,
+  loadCapsuleMoveGuidePending,
+  saveCurrentCapsuleAnchor,
+} from '../../lib/capsulePreferences'
 
 const DRAG_THRESHOLD = 5
 
@@ -54,15 +60,39 @@ export function Capsule() {
   const translationTargetMenuOpen = useAppStore((s) => s.translationTargetMenuOpen)
   const setTranslationTargetMenuOpen = useAppStore((s) => s.setTranslationTargetMenuOpen)
   const { stopRecording, isRecording } = useRecording()
+  const [moveGuidePending, setMoveGuidePending] = useState(false)
 
   const dragStart = useRef<{ x: number; y: number } | null>(null)
   const isDragging = useRef(false)
 
-  useCapsuleResize()
-
   const hasError = pipelineError !== null
   const capsuleState = getCapsuleState(pipelineState, hasError)
   const capsuleShellSize = getCapsuleShellSize(capsuleState)
+  const moveGuideVisible =
+    moveGuidePending &&
+    capsuleState === 'recording' &&
+    !contextMenuOpen &&
+    !translationTargetMenuOpen
+
+  useCapsuleResize(moveGuideVisible)
+
+  useEffect(() => {
+    if (pipelineState !== 'recording') return
+
+    let active = true
+    void loadCapsuleMoveGuidePending().then((pending) => {
+      if (active) setMoveGuidePending(pending)
+    })
+
+    return () => {
+      active = false
+    }
+  }, [pipelineState])
+
+  const finishMoveGuide = useCallback(() => {
+    setMoveGuidePending(false)
+    void completeCapsuleMoveGuide()
+  }, [])
 
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
     if (e.button !== 0) return
@@ -70,22 +100,35 @@ export function Capsule() {
     isDragging.current = false
   }, [])
 
-  const handlePointerMove = useCallback((e: React.PointerEvent) => {
-    if (!dragStart.current || isDragging.current) return
-    const dx = e.clientX - dragStart.current.x
-    const dy = e.clientY - dragStart.current.y
-    if (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD) {
-      isDragging.current = true
-      dragStart.current = null
-      import('@tauri-apps/api/window')
-        .then(({ getCurrentWindow }) => {
-          getCurrentWindow()
-            .startDragging()
-            .catch(() => {})
-        })
-        .catch(() => {})
-    }
-  }, [])
+  const handlePointerMove = useCallback(
+    (e: React.PointerEvent) => {
+      if (!dragStart.current || isDragging.current) return
+      const dx = e.clientX - dragStart.current.x
+      const dy = e.clientY - dragStart.current.y
+      if (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD) {
+        const completesGuide = moveGuideVisible
+        isDragging.current = true
+        dragStart.current = null
+        import('@tauri-apps/api/window')
+          .then(async ({ getCurrentWindow }) => {
+            try {
+              await getCurrentWindow().startDragging()
+              await saveCurrentCapsuleAnchor()
+              if (completesGuide) finishMoveGuide()
+            } catch (error) {
+              console.error('Failed to move capsule:', error)
+            } finally {
+              isDragging.current = false
+            }
+          })
+          .catch((error) => {
+            isDragging.current = false
+            console.error('Failed to load capsule window controls:', error)
+          })
+      }
+    },
+    [finishMoveGuide, moveGuideVisible],
+  )
 
   const handlePointerUp = useCallback(
     (e: React.PointerEvent) => {
@@ -173,6 +216,10 @@ export function Capsule() {
           </motion.div>
         </AnimatePresence>
       </motion.div>
+
+      <AnimatePresence initial={false}>
+        {moveGuideVisible && <CapsuleMoveGuide onDismiss={finishMoveGuide} />}
+      </AnimatePresence>
 
       {/* Context menu appears to the right of capsule */}
       {contextMenuOpen && contextMenuReady && (

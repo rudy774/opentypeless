@@ -13,6 +13,7 @@ import { PermissionsStep } from './PermissionsStep'
 import { QuickTestStep } from './QuickTestStep'
 import { DoneStep } from './DoneStep'
 import { slideRight } from '../../lib/animations'
+import { queueCapsuleMoveGuide } from '../../lib/capsulePreferences'
 
 const TOTAL_STEPS = 8
 
@@ -91,6 +92,7 @@ export function Onboarding() {
     } else {
       await saveConfig(config)
       await saveOnboardingCompleted()
+      await queueCapsuleMoveGuide()
       setOnboardingCompleted(true)
     }
   }
@@ -135,6 +137,7 @@ export function Onboarding() {
     try {
       await saveConfig(config)
       await saveOnboardingCompleted()
+      await queueCapsuleMoveGuide()
     } catch {
       // Best-effort save — still let the user continue into the app.
     }

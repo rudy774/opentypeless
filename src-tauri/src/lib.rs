@@ -839,8 +839,12 @@ pub fn run() {
                 .map_err(|e| anyhow::anyhow!("Failed to init dictionary store: {}", e))?;
 
             let shared_client = reqwest::Client::builder()
-                .pool_max_idle_per_host(2)
-                .pool_idle_timeout(std::time::Duration::from_secs(30))
+                // Keep the startup/recording warm-up useful throughout a normal
+                // dictation session. The previous 30-second timeout discarded the
+                // TLS connection before longer recordings were uploaded.
+                .pool_max_idle_per_host(4)
+                .pool_idle_timeout(std::time::Duration::from_secs(15 * 60))
+                .tcp_keepalive(Some(std::time::Duration::from_secs(60)))
                 .timeout(std::time::Duration::from_secs(30))
                 .build()
                 .expect("Failed to create HTTP client");

@@ -63,6 +63,8 @@
     "week": "Semana",
     "month": "Mês",
     "savedRecordingTime": "Com base nas gravações salvas",
+    "durationOutliersExcluded_one": "{{count}} gravação de duração implausível foi excluída deste total. Os detalhes permanecem no histórico e nos registros de diagnóstico.",
+    "durationOutliersExcluded_other": "{{count}} gravações de duração implausível foram excluídas deste total. Os detalhes permanecem no histórico e nos registros de diagnóstico.",
     "proPlan": "Plano Pro",
     "freePlan": "Plano Gratuito",
     "upgradeToPro": "Atualizar para Pro",
@@ -242,6 +244,11 @@
     "done": "Pronto",
     "errorOccurred": "Ocorreu um erro",
     "accessibilityRequired": "Acessibilidade necessária — abra as Configurações",
+    "moveGuide": {
+      "title": "Experimente mover a cápsula",
+      "description": "Arraste-a para onde quiser. Vamos lembrar a posição.",
+      "dismiss": "Fechar dica de movimento"
+    },
     "errors": {
       "stt_timeout": "STT expirou",
       "stt_invalid_key": "Verifique STT",
@@ -391,6 +398,11 @@
     "moveTranslationTargetUp": "Mover idioma de destino para cima",
     "moveTranslationTargetDown": "Mover idioma de destino para baixo",
     "aboutDescription": "Ferramenta de código aberto para entrada de voz com IA. Fale para escrever — transforme sua voz em texto polido em tempo real.",
+    "diagnosticsTitle": "Diagnóstico",
+    "diagnosticsDescription": "Verifique o microfone, o registro das teclas de atalho, a área de transferência e o caminho de saída. Abra os registros persistentes para investigar falhas intermitentes; os sete arquivos de registro diários mais recentes são mantidos.",
+    "runDiagnostics": "Executar diagnóstico",
+    "diagnosticsRunning": "Verificando…",
+    "openDiagnosticLogs": "Abrir pasta de registros",
     "openSource": "Código Aberto",
     "license": "Licença",
     "mit": "MIT",
