@@ -374,6 +374,7 @@ export function createApp(dependencies: AppDependencies): express.Express {
     '/api/opentypeless/auth/set-password',
     requireAuth,
     asyncRoute(async (request, response) => {
+      await enforceRateLimit(store, 'set-password-user', request.user!.id, 5, 3600)
       requireRecentAuthentication(request)
       const body = parseBody(
         z.object({ newPassword: z.string().min(12).max(128) }).strict(),
@@ -652,6 +653,7 @@ export function createApp(dependencies: AppDependencies): express.Express {
     '/api/account',
     requireAuth,
     asyncRoute(async (request, response) => {
+      await enforceRateLimit(store, 'delete-account-user', request.user!.id, 3, 3600)
       requireRecentAuthentication(request)
       parseBody(deleteAccountSchema, request.body)
       await idempotentJson(request, response, store, '/api/account', async () => {

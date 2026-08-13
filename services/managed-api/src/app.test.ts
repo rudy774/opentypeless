@@ -503,6 +503,25 @@ describe('managed service HTTP application', () => {
     expect(response.body.error.code).toBe('RATE_LIMITED')
   })
 
+  it('rate-limits authenticated password changes and account deletion', async () => {
+    store.rateLimitAllowed = false
+
+    const passwordResponse = await request(app)
+      .post('/api/opentypeless/auth/set-password')
+      .set('Authorization', 'Bearer valid')
+      .send({ newPassword: 'a-secure-new-password' })
+      .expect(429)
+    expect(passwordResponse.body.error.code).toBe('RATE_LIMITED')
+
+    const deletionResponse = await request(app)
+      .delete('/api/account')
+      .set('Authorization', 'Bearer valid')
+      .set('Idempotency-Key', 'delete-rate-limit-123456')
+      .send({ confirmation: 'DELETE' })
+      .expect(429)
+    expect(deletionResponse.body.error.code).toBe('RATE_LIMITED')
+  })
+
   it('accepts only a recent authenticated destructive deletion and cancels billing first', async () => {
     await request(app)
       .delete('/api/account')
