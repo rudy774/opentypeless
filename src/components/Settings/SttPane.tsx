@@ -218,7 +218,7 @@ export function SttPane() {
               <button
                 type="button"
                 onClick={goUpgrade}
-                className="rounded-[8px] border border-accent bg-accent px-3 py-1.5 text-[12px] font-medium text-white hover:bg-accent-hover"
+                className="rounded-[8px] border border-accent bg-accent px-3 py-1.5 text-[12px] font-medium text-on-accent hover:bg-accent-hover"
               >
                 {t('nav.upgrade')}
               </button>
@@ -259,7 +259,7 @@ export function SttPane() {
             <button
               onClick={handleTest}
               disabled={!canTest || sttTestStatus === 'testing'}
-              className="px-4 py-2.5 bg-accent text-white rounded-[10px] text-[13px] border-none cursor-pointer hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
+              className="px-4 py-2.5 bg-accent text-on-accent rounded-[10px] text-[13px] border-none cursor-pointer hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
             >
               {sttTestStatus === 'testing' && <Loader2 size={14} className="animate-spin" />}
               {t('settings.test')}
@@ -338,12 +338,12 @@ export function SttPane() {
                   placeholder={t('settings.customSttModelPlaceholder')}
                   className="w-full px-3 py-2.5 bg-bg-secondary border border-border rounded-[10px] text-[13px] text-text-primary outline-none focus:border-border-focus transition-colors"
                 />
-                <p className="text-[11px] text-text-tertiary mt-1.5">
+                <p className="text-[12px] text-text-tertiary mt-1.5">
                   {t('settings.customSttSetupHint')}
                 </p>
                 {sttDiagnostics && (
                   <p
-                    className={`flex items-center gap-1.5 text-[11px] mt-1.5 min-w-0 ${
+                    className={`flex items-center gap-1.5 text-[12px] mt-1.5 min-w-0 ${
                       sttDiagnostics.ready ? 'text-success' : 'text-text-tertiary'
                     }`}
                   >
@@ -415,7 +415,7 @@ export function SttPane() {
               <button
                 onClick={handleTest}
                 disabled={!canTest || sttTestStatus === 'testing'}
-                className="px-4 py-2.5 bg-accent text-white rounded-[10px] text-[13px] border-none cursor-pointer hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
+                className="px-4 py-2.5 bg-accent text-on-accent rounded-[10px] text-[13px] border-none cursor-pointer hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
               >
                 {sttTestStatus === 'testing' && <Loader2 size={14} className="animate-spin" />}
                 {t('settings.test')}
@@ -434,14 +434,14 @@ export function SttPane() {
               </div>
             )}
             {credentialErrorMessage ? (
-              <p className="text-[11px] text-error mt-1.5">
+              <p className="text-[12px] text-error mt-1.5">
                 {t('settings.credentialSaveFailed', { details: credentialErrorMessage })}
               </p>
             ) : (
-              <p className="text-[11px] text-text-tertiary mt-1.5">{t('settings.storedLocally')}</p>
+              <p className="text-[12px] text-text-tertiary mt-1.5">{t('settings.storedLocally')}</p>
             )}
             {isVolcengineDoubao && (
-              <p className="text-[11px] text-text-tertiary mt-1.5">
+              <p className="text-[12px] text-text-tertiary mt-1.5">
                 {t('settings.volcengineSttKeyHint')}
               </p>
             )}

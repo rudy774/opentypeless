@@ -244,11 +244,11 @@ export function LlmPane() {
       )}
       {includeCredentialStatus &&
         (credentialErrorMessage ? (
-          <p className="text-[11px] text-error mt-1.5">
+          <p className="text-[12px] text-error mt-1.5">
             {t('settings.credentialSaveFailed', { details: credentialErrorMessage })}
           </p>
         ) : (
-          <p className="text-[11px] text-text-tertiary mt-1.5">{t('settings.storedLocally')}</p>
+          <p className="text-[12px] text-text-tertiary mt-1.5">{t('settings.storedLocally')}</p>
         ))}
     </>
   )
@@ -295,7 +295,7 @@ export function LlmPane() {
               <button
                 type="button"
                 onClick={goUpgrade}
-                className="rounded-[8px] border border-accent bg-accent px-3 py-1.5 text-[12px] font-medium text-white hover:bg-accent-hover"
+                className="rounded-[8px] border border-accent bg-accent px-3 py-1.5 text-[12px] font-medium text-on-accent hover:bg-accent-hover"
               >
                 {t('nav.upgrade')}
               </button>
@@ -329,7 +329,7 @@ export function LlmPane() {
                 <button
                   onClick={handleTest}
                   disabled={!llmApiKey || llmTestStatus === 'testing'}
-                  className="px-4 py-2.5 bg-accent text-white rounded-[10px] text-[13px] border-none cursor-pointer hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
+                  className="px-4 py-2.5 bg-accent text-on-accent rounded-[10px] text-[13px] border-none cursor-pointer hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
                 >
                   {llmTestStatus === 'testing' && <Loader2 size={14} className="animate-spin" />}
                   {t('settings.test')}
@@ -369,7 +369,7 @@ export function LlmPane() {
               </button>
             </div>
             {models.length > 0 && (
-              <p className="text-[11px] text-text-tertiary mt-1">
+              <p className="text-[12px] text-text-tertiary mt-1">
                 {t('settings.modelsAvailable', { count: models.length })}
               </p>
             )}
@@ -395,7 +395,7 @@ export function LlmPane() {
                   type="button"
                   onClick={handleTest}
                   disabled={!config.llm_base_url || llmTestStatus === 'testing'}
-                  className="px-4 py-2.5 bg-accent text-white rounded-[10px] text-[13px] border-none cursor-pointer hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
+                  className="px-4 py-2.5 bg-accent text-on-accent rounded-[10px] text-[13px] border-none cursor-pointer hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
                 >
                   {llmTestStatus === 'testing' && <Loader2 size={14} className="animate-spin" />}
                   {t('settings.test')}
@@ -427,7 +427,7 @@ export function LlmPane() {
           />
           {lastContext && (
             <div className="mt-2 ml-[52px] min-w-0">
-              <p className="text-[11px] leading-relaxed text-text-tertiary">
+              <p className="text-[12px] leading-relaxed text-text-tertiary">
                 {t('settings.lastDictationContext')}
               </p>
               <div className="mt-1 flex min-w-0 items-center gap-1.5 text-[12px] text-text-secondary">
@@ -485,7 +485,7 @@ export function LlmPane() {
                 )}
               </div>
               {showBrowserAccessHint && (
-                <p className="mt-1 text-[11px] leading-relaxed text-amber-600">
+                <p className="mt-1 text-[12px] leading-relaxed text-amber-600">
                   {t('settings.browserAccessHint')}
                 </p>
               )}
@@ -548,7 +548,7 @@ export function LlmPane() {
                 onChange={(checked) => updateConfig({ selected_text_enabled: checked })}
                 label={t('settings.selectedTextContext')}
               />
-              <p className="mt-1 ml-[52px] text-[11px] leading-relaxed text-text-tertiary">
+              <p className="mt-1 ml-[52px] text-[12px] leading-relaxed text-text-tertiary">
                 {t('settings.selectedTextContextDesc')}
               </p>
             </div>
@@ -563,7 +563,7 @@ export function LlmPane() {
                   placeholder={t('settings.customPolishInstructionsPlaceholder')}
                   className="w-full resize-y px-3 py-2.5 bg-bg-secondary border border-border rounded-[10px] text-[13px] text-text-primary outline-none focus:border-border-focus transition-colors"
                 />
-                <p className="text-[11px] text-text-tertiary mt-1.5">
+                <p className="text-[12px] text-text-tertiary mt-1.5">
                   {t('settings.customPolishInstructionsCount', { count: polishPromptLength })}
                 </p>
               </FormField>

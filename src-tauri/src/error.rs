@@ -115,10 +115,10 @@ impl std::fmt::Display for AppError {
         match self {
             AppError::Network(msg) => write!(f, "Network error: {}", msg),
             AppError::Timeout(d) => write!(f, "Timeout after {:.1}s", d.as_secs_f64()),
-            AppError::Api { status, body } => write!(f, "API error {}: {}", status, body),
-            AppError::Auth(msg) => write!(f, "Auth error: {}", msg),
-            AppError::Quota(msg) => write!(f, "Quota error: {}", msg),
-            AppError::LlmQuota(msg) => write!(f, "LLM quota error: {}", msg),
+            AppError::Api { status, .. } => write!(f, "API error {}", status),
+            AppError::Auth(_) => write!(f, "Authentication failed"),
+            AppError::Quota(_) => write!(f, "Speech quota exceeded"),
+            AppError::LlmQuota(_) => write!(f, "LLM quota exceeded"),
             AppError::Output(msg) => write!(f, "Output error: {}", msg),
             AppError::Config(msg) => write!(f, "Config error: {}", msg),
             AppError::CloudSessionInvalid => write!(f, "Managed cloud session is invalid"),
@@ -389,5 +389,6 @@ mod tests {
             body: "rate limited".to_string(),
         };
         assert!(err.to_string().contains("429"));
+        assert!(!err.to_string().contains("rate limited"));
     }
 }

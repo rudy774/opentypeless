@@ -32,6 +32,12 @@ pub struct BackupHistoryEntry {
     #[serde(default)]
     duration_ms: Option<i64>,
     #[serde(default)]
+    stt_ms: Option<i64>,
+    #[serde(default)]
+    llm_ms: Option<i64>,
+    #[serde(default)]
+    total_ms: Option<i64>,
+    #[serde(default)]
     active_scene_id: Option<String>,
     #[serde(default)]
     active_scene_source: Option<String>,
@@ -100,6 +106,9 @@ impl BackupHistoryEntry {
             polished_text,
             language: optional_backup_string(self.language, 100, "backup_history_language")?,
             duration_ms: self.duration_ms.filter(|value| *value >= 0),
+            stt_ms: self.stt_ms.filter(|value| *value >= 0),
+            llm_ms: self.llm_ms.filter(|value| *value >= 0),
+            total_ms: self.total_ms.filter(|value| *value >= 0),
             active_scene_id: optional_backup_string(
                 self.active_scene_id,
                 200,
@@ -184,6 +193,49 @@ pub struct RestoreBackupResult {
     history: Vec<HistoryEntry>,
     dictionary: Vec<DictionaryEntry>,
     correction_rules: Vec<CorrectionRule>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct BackupDictionarySnapshot {
+    entries: Vec<DictionaryEntry>,
+    correction_rules: Vec<CorrectionRule>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ExportBackupDataResult {
+    history: Vec<HistoryEntry>,
+    dictionary: BackupDictionarySnapshot,
+}
+
+impl From<storage::BackupSnapshot> for ExportBackupDataResult {
+    fn from(snapshot: storage::BackupSnapshot) -> Self {
+        Self {
+            history: snapshot.history,
+            dictionary: BackupDictionarySnapshot {
+                entries: snapshot.dictionary,
+                correction_rules: snapshot.correction_rules,
+            },
+        }
+    }
+}
+
+#[tauri::command]
+pub async fn export_backup_data(
+    history_state: tauri::State<'_, storage::HistoryStore>,
+) -> Result<ExportBackupDataResult, String> {
+    let result = ExportBackupDataResult::from(
+        history_state
+            .export_backup_snapshot()
+            .await
+            .map_err(|error| error.to_string())?,
+    );
+    tracing::debug!(
+        history_entries = result.history.len(),
+        dictionary_entries = result.dictionary.entries.len(),
+        correction_rules = result.dictionary.correction_rules.len(),
+        "Prepared consistent local backup snapshot"
+    );
+    Ok(result)
 }
 
 #[tauri::command]
@@ -320,6 +372,27 @@ mod tests {
         assert_eq!(restored.context_label, "Mail");
         assert_eq!(restored.context_family, ContextFamily::General);
         assert_eq!(restored.polished_text, "hello");
+        assert!(restored.stt_ms.is_none());
+        assert!(restored.llm_ms.is_none());
+        assert!(restored.total_ms.is_none());
+    }
+
+    #[test]
+    fn current_history_backup_preserves_non_negative_pipeline_timings() {
+        let entry: BackupHistoryEntry = serde_json::from_value(serde_json::json!({
+            "created_at": "2026-07-12T08:30:00",
+            "raw_text": "hello",
+            "stt_ms": 120,
+            "llm_ms": 80,
+            "total_ms": 240
+        }))
+        .unwrap();
+
+        let restored = entry.into_storage("2026-07-13T00:00:00").unwrap();
+
+        assert_eq!(restored.stt_ms, Some(120));
+        assert_eq!(restored.llm_ms, Some(80));
+        assert_eq!(restored.total_ms, Some(240));
     }
 
     #[test]

@@ -131,7 +131,7 @@ export function AppStyleMappingDialog({
             <AppLogo iconKey={iconKey} family={family} />
             <div className="min-w-0">
               {matcherType && (
-                <p className="text-[11px] text-text-tertiary">
+                <p className="text-[12px] text-text-tertiary">
                   {t(
                     matcherType === 'exact_web_host'
                       ? 'settings.mappingMatcherWeb'
@@ -143,7 +143,7 @@ export function AppStyleMappingDialog({
             </div>
           </div>
 
-          <label className="block text-[11px] text-text-secondary">
+          <label className="block text-[12px] text-text-secondary">
             {t('settings.mappingLabel')}
             <input
               ref={labelRef}
@@ -153,7 +153,7 @@ export function AppStyleMappingDialog({
             />
           </label>
 
-          <label className="block text-[11px] text-text-secondary">
+          <label className="block text-[12px] text-text-secondary">
             {t('settings.mappingFamily')}
             <select
               value={family}
@@ -168,7 +168,7 @@ export function AppStyleMappingDialog({
             </select>
           </label>
 
-          <label className="block text-[11px] text-text-secondary">
+          <label className="block text-[12px] text-text-secondary">
             {t('settings.mappingScene')}
             <select
               value={sceneId}
@@ -184,7 +184,7 @@ export function AppStyleMappingDialog({
             </select>
           </label>
 
-          {error && <p className="text-[11px] text-error">{error}</p>}
+          {error && <p className="text-[12px] text-error">{error}</p>}
         </div>
 
         <div className="flex justify-end gap-2 border-t border-border px-4 py-3">
@@ -200,7 +200,7 @@ export function AppStyleMappingDialog({
             type="button"
             onClick={() => void save()}
             disabled={!canSave}
-            className="rounded-[8px] border-none bg-accent px-3 py-1.5 text-[12px] text-white hover:bg-accent-hover disabled:opacity-40"
+            className="rounded-[8px] border-none bg-accent px-3 py-1.5 text-[12px] text-on-accent hover:bg-accent-hover disabled:opacity-40"
           >
             {t('settings.mappingSave')}
           </button>

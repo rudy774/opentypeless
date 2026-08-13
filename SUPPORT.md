@@ -1,20 +1,22 @@
 # Support
 
-Looking for help with OpenTypeless? Here's where to go:
+Looking for help with the Rudy774 OpenTypeless fork? Use the public fork's GitHub channels so reports stay attached to the code you are running.
 
-## Community
+## Questions and community
 
-- **Discord**: [Join our server](https://discord.gg/V6rRpJ4RGD) for real-time chat and quick help
-- **GitHub Discussions**: [Q&A](https://github.com/tover0314-w/opentypeless/discussions/categories/q-a) for questions and troubleshooting
+- [GitHub Discussions](https://github.com/rudy774/opentypeless/discussions) for questions, setup help, and ideas
+- [GitHub Issues](https://github.com/rudy774/opentypeless/issues) for confirmed bugs and actionable feature requests
 
-## Bug Reports
+## Bug reports
 
-If you've found a bug, please [open an issue](https://github.com/tover0314-w/opentypeless/issues/new?template=bug_report.yml) with steps to reproduce.
+If you found a bug, [open an issue](https://github.com/rudy774/opentypeless/issues/new) with reproduction steps, your OpenTypeless version, operating system, and relevant redacted diagnostics. Never include API keys, account tokens, transcripts, or other sensitive content.
 
-## Feature Requests
+## Feature requests
 
-Have an idea? Start a [discussion](https://github.com/tover0314-w/opentypeless/discussions/categories/ideas) first, or [open a feature request](https://github.com/tover0314-w/opentypeless/issues/new?template=feature_request.yml).
+Start a [discussion](https://github.com/rudy774/opentypeless/discussions) or [open a feature request](https://github.com/rudy774/opentypeless/issues/new).
 
 ## Security
 
-Found a security vulnerability? Please report it privately via [GitHub Security Advisories](https://github.com/tover0314-w/opentypeless/security/advisories/new). See [SECURITY.md](SECURITY.md) for details.
+Report vulnerabilities privately through [GitHub Security Advisories](https://github.com/rudy774/opentypeless/security/advisories/new). Do not post vulnerability details in a public issue. See [SECURITY.md](SECURITY.md) for the security model and response guidance.
+
+For the original project's support channels, visit the [upstream OpenTypeless repository](https://github.com/tover0314-w/opentypeless).

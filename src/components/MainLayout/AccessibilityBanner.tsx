@@ -105,7 +105,7 @@ export function AccessibilityBanner() {
             <button
               onClick={showAccessibility ? handleGrant : handleBrowserGrant}
               disabled={requestingBrowserAccess}
-              className="px-3 py-1 text-[11px] font-medium text-white bg-accent rounded-full border-none cursor-pointer hover:bg-accent-hover transition-colors shrink-0"
+              className="px-3 py-1 text-[11px] font-medium text-on-accent bg-accent rounded-full border-none cursor-pointer hover:bg-accent-hover transition-colors shrink-0"
             >
               {requestingBrowserAccess && !showAccessibility && (
                 <Loader2 size={11} className="mr-1 inline animate-spin" />

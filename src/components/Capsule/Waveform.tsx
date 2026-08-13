@@ -5,7 +5,7 @@ import { useAppStore } from '../../stores/appStore'
 import { normalizeAudioLevel, smoothAudioLevel } from '../../lib/audio-level'
 
 const BAR_COUNT = 7
-const MIN_HEIGHT = 3
+const MIN_SCALE = 3 / 16
 const MAX_HEIGHT = 16
 const BAR_SHAPES = [0.48, 0.72, 0.94, 0.68, 1, 0.76, 0.52]
 
@@ -29,9 +29,10 @@ export function Waveform() {
           !reduced && smoothed > 0.03 ? 0.86 + Math.sin(Date.now() / 95 + i * 1.15) * 0.14 : 1
         const normalized = Math.max(0, Math.min(1, smoothed * BAR_SHAPES[i] * flutter))
         const visualMax = reduced ? 11 : MAX_HEIGHT
-        const height = MIN_HEIGHT + (visualMax - MIN_HEIGHT) * normalized
+        const height = 3 + (visualMax - 3) * normalized
+        const scale = height / MAX_HEIGHT
         const opacity = 0.45 + normalized * 0.55
-        bar.style.height = `${height}px`
+        bar.style.transform = `scaleY(${scale})`
         bar.style.opacity = `${opacity}`
       })
       rafRef.current = requestAnimationFrame(animate)
@@ -59,9 +60,11 @@ export function Waveform() {
           }}
           className="w-[2px] rounded-full bg-white/80"
           style={{
-            height: `${MIN_HEIGHT}px`,
+            height: `${MAX_HEIGHT}px`,
             opacity: 0.5,
-            transition: reduced ? 'none' : 'height 75ms ease-out, opacity 75ms ease-out',
+            transform: `scaleY(${MIN_SCALE})`,
+            transformOrigin: 'center',
+            transition: reduced ? 'none' : 'transform 75ms ease-out, opacity 75ms ease-out',
           }}
         />
       ))}

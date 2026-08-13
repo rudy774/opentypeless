@@ -157,4 +157,18 @@ describe('useTauriEvents', () => {
     })
     expect(useAppStore.getState().activeVoiceMode).toBeNull()
   })
+  it('signals visible activity views without reloading history in the always-on hook', async () => {
+    render(<HookHarness />)
+
+    await waitFor(() => {
+      expect(eventListeners.has('pipeline:state')).toBe(true)
+    })
+
+    const before = useAppStore.getState().activityRevision
+    act(() => {
+      eventListeners.get('pipeline:state')?.({ payload: 'idle' })
+    })
+
+    expect(useAppStore.getState().activityRevision).toBe(before + 1)
+  })
 })

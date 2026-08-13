@@ -83,10 +83,10 @@ export function DirtyBar() {
 
   const bgClass =
     saveResult === 'success'
-      ? 'bg-success/10 border-t border-success/20'
+      ? 'border-success/25'
       : saveResult === 'error'
-        ? 'bg-error/10 border-t border-error/20'
-        : 'bg-warning/10 border-t border-warning/20'
+        ? 'border-error/25'
+        : 'border-border'
 
   const labelText =
     saveResult === 'success'
@@ -104,26 +104,33 @@ export function DirtyBar() {
 
   return (
     <motion.div
-      className={`flex items-center justify-between px-5 py-3 ${bgClass}`}
+      className={`flex items-center justify-between border-t bg-bg-elevated px-5 py-3 shadow-[0_-8px_28px_rgba(17,42,36,0.06)] ${bgClass}`}
       initial={{ y: 20, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       exit={{ y: 20, opacity: 0 }}
       transition={{ type: 'spring', stiffness: 400, damping: 30 }}
     >
-      <span className={`${labelColor} text-[13px] truncate mr-3`}>{labelText}</span>
+      <span
+        className={`${labelColor} mr-3 flex items-center gap-2 truncate text-[12px] font-medium`}
+      >
+        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-current" aria-hidden="true" />
+        {labelText}
+      </span>
       {saveResult !== 'success' && (
         <div className="flex items-center gap-2 flex-shrink-0">
           <button
+            type="button"
             onClick={handleReset}
             disabled={saving}
-            className="px-3 py-1.5 text-[12px] text-text-secondary hover:text-text-primary bg-transparent border-none cursor-pointer rounded-[10px] hover:bg-bg-tertiary transition-colors disabled:opacity-50"
+            className="rounded-[8px] border border-transparent bg-transparent px-3 py-1.5 text-[12px] text-text-secondary transition-colors hover:border-border hover:bg-bg-secondary hover:text-text-primary disabled:opacity-50"
           >
             {t('common.reset')}
           </button>
           <button
+            type="button"
             onClick={handleSave}
             disabled={saving}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] text-white bg-accent rounded-[10px] border-none cursor-pointer hover:opacity-90 transition-opacity disabled:opacity-70"
+            className="flex items-center gap-1.5 rounded-[8px] bg-accent px-3.5 py-1.5 text-[12px] font-medium text-on-accent transition-colors hover:bg-accent-hover disabled:opacity-70"
           >
             {saving && (
               <motion.div

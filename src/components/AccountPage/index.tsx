@@ -18,6 +18,7 @@ import { API_BASE_URL } from '../../lib/constants'
 import { uploadBackup, downloadBackup, createPortalSession } from '../../lib/api'
 import { createBackupSettings, mergeBackupSettings } from '../../lib/backup-settings'
 import {
+  exportBackupData,
   getConfig,
   restoreBackupData,
   setAutoStart,
@@ -167,7 +168,7 @@ function AuthForm() {
               }
             }}
             disabled={loading}
-            className="px-4 py-2 rounded-[8px] bg-accent text-white text-[13px] font-medium cursor-pointer border-none hover:opacity-90 transition-opacity disabled:opacity-50"
+            className="px-4 py-2 rounded-[8px] bg-accent text-on-accent text-[13px] font-medium cursor-pointer border-none hover:opacity-90 transition-opacity disabled:opacity-50"
           >
             {loading
               ? t('account.sending', 'Sending...')
@@ -469,7 +470,7 @@ function AuthForm() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full py-2 rounded-[8px] bg-accent text-white text-[13px] font-medium cursor-pointer border-none hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
+          className="w-full py-2 rounded-[8px] bg-accent text-on-accent text-[13px] font-medium cursor-pointer border-none hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
         >
           {loading && <Loader2 size={14} className="animate-spin" />}
           {forgotMode
@@ -569,9 +570,6 @@ function AccountDetails() {
     signOut,
   } = useAuthStore()
   const config = useAppStore((s) => s.config)
-  const history = useAppStore((s) => s.history)
-  const dictionary = useAppStore((s) => s.dictionary)
-  const correctionRules = useAppStore((s) => s.correctionRules)
   const setConfig = useAppStore((s) => s.setConfig)
   const setSavedConfig = useAppStore((s) => s.setSavedConfig)
   const setHistory = useAppStore((s) => s.setHistory)
@@ -610,10 +608,11 @@ function AccountDetails() {
     setBackupLoading(true)
     setBackupMsg(null)
     try {
+      const snapshot = await exportBackupData()
       const safeConfig = createBackupSettings(config)
       await uploadBackup({
-        history,
-        dictionary: { entries: dictionary, correction_rules: correctionRules },
+        history: snapshot.history,
+        dictionary: snapshot.dictionary,
         settings: safeConfig,
       })
       setBackupMsg(t('account.toast.backupOk'))

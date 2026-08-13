@@ -359,7 +359,7 @@ export function AskPanel({ embedded = false, showHeader = true, title = 'Ask' }:
       disabled={loading && dictationState !== 'recording'}
       className={`h-11 rounded-full border px-4 text-[13px] font-medium cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 flex items-center gap-2 transition-colors ${
         capsuleActive
-          ? 'bg-accent text-white border-accent shadow-sm'
+          ? 'bg-accent text-on-accent border-accent shadow-sm'
           : 'bg-bg-secondary text-text-primary border-border hover:border-border-focus'
       }`}
     >

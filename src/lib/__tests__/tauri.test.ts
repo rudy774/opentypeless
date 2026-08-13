@@ -4,9 +4,12 @@ import {
   addCorrectionRule,
   clearCredential,
   commitDictionaryImport,
+  exportBackupData,
   exportDictionaryCsv,
   exportDictionaryJson,
   getCorrectionRules,
+  getHistoryCount,
+  getLocalActivityMetrics,
   migrateLegacyCredentials,
   previewDictionaryImport,
   removeCorrectionRule,
@@ -180,5 +183,73 @@ describe('dictionary correction commands', () => {
     })
     expect(invoke).toHaveBeenNthCalledWith(3, 'export_dictionary_json')
     expect(invoke).toHaveBeenNthCalledWith(4, 'export_dictionary_csv')
+  })
+})
+
+describe('backup commands', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('requests a fresh persisted backup snapshot from Tauri', async () => {
+    const snapshot = {
+      history: [],
+      dictionary: {
+        entries: [{ id: 7, word: 'OpenTypeless', pronunciation: null }],
+        correction_rules: [
+          {
+            id: 9,
+            pattern: 'open type less',
+            replacement: 'OpenTypeless',
+            enabled: true,
+          },
+        ],
+      },
+    }
+    vi.mocked(invoke).mockResolvedValueOnce(snapshot)
+
+    await expect(exportBackupData()).resolves.toEqual(snapshot)
+
+    expect(invoke).toHaveBeenCalledWith('export_backup_data')
+  })
+})
+
+describe('history commands', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('reads the exact history count without a page limit', async () => {
+    vi.mocked(invoke).mockResolvedValueOnce(347)
+
+    await expect(getHistoryCount()).resolves.toBe(347)
+
+    expect(invoke).toHaveBeenCalledWith('get_history_count')
+  })
+
+  it('reads the local activity summary from the backend command', async () => {
+    const range = {
+      recordingMs: 12_000,
+      savedTranscriptions: 3,
+      outputChars: 420,
+      activeDays: 1,
+      recordedFallbacks: 1,
+      transformedOutputs: 2,
+      excludedDurationCount: 1,
+      averageTotalMs: 850,
+      timingSampleCount: 2,
+    }
+    const summary = {
+      day: range,
+      week: range,
+      month: range,
+      totalRecordings: 17,
+      excludedDurationCount: 1,
+    }
+    vi.mocked(invoke).mockResolvedValueOnce(summary)
+
+    await expect(getLocalActivityMetrics()).resolves.toEqual(summary)
+
+    expect(invoke).toHaveBeenCalledWith('get_local_activity_metrics')
   })
 })

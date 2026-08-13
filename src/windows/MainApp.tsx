@@ -8,7 +8,6 @@ import { useRoute } from '../lib/router'
 import {
   loadOnboardingCompleted,
   getConfig,
-  getHistory,
   getDictionary,
   getCorrectionRules,
   checkAccessibilityPermission,
@@ -56,7 +55,6 @@ export default function MainApp() {
   const setOnboardingCompleted = useAppStore((state) => state.setOnboardingCompleted)
   const setConfig = useAppStore((state) => state.setConfig)
   const setSavedConfig = useAppStore((state) => state.setSavedConfig)
-  const setHistory = useAppStore((state) => state.setHistory)
   const setDictionary = useAppStore((state) => state.setDictionary)
   const setCorrectionRules = useAppStore((state) => state.setCorrectionRules)
   const setAccessibilityTrusted = useAppStore((state) => state.setAccessibilityTrusted)
@@ -67,56 +65,70 @@ export default function MainApp() {
   const { route } = useRoute()
 
   useEffect(() => {
-    loadOnboardingCompleted().then(async (done) => {
-      setOnboardingCompleted(done)
-      if (done) {
-        try {
-          const [
-            config,
-            history,
-            dictionary,
-            correctionRules,
-            platformCapabilities,
-            hotkeyRegistrationError,
-          ] = await Promise.all([
-            getConfig(),
-            getHistory(200, 0),
-            getDictionary(),
-            getCorrectionRules(),
-            getPlatformCapabilities(),
-            getHotkeyRegistrationError(),
-          ])
-          setConfig(config)
-          setSavedConfig(config)
-          setHistory(history)
-          setDictionary(dictionary)
-          setCorrectionRules(correctionRules)
-          setPlatformCapabilities(platformCapabilities)
-          setHotkeyRegistrationError(hotkeyRegistrationError)
-          if (navigator.platform.toUpperCase().indexOf('MAC') >= 0) {
-            checkAccessibilityPermission().then((trusted) => {
-              setAccessibilityTrusted(trusted)
-            })
-          }
-          if (config.ui_language && config.ui_language !== i18n.language) {
-            i18n.changeLanguage(config.ui_language)
-            localStorage.setItem('ui_language', config.ui_language)
-          }
-        } catch (error) {
-          console.error('Failed to load initial data:', error)
-          setLoadError(true)
+    let cancelled = false
+
+    const loadInitialData = async () => {
+      try {
+        const done = await loadOnboardingCompleted()
+        if (cancelled) return
+        setOnboardingCompleted(done)
+        if (!done) {
+          setLoaded(true)
+          return
         }
+
+        // Configuration is the only data the first useful paint depends on.
+        // Heavy collections hydrate after the app is already usable.
+        const config = await getConfig()
+        if (cancelled) return
+        setConfig(config)
+        setSavedConfig(config)
+        if (config.ui_language && config.ui_language !== i18n.language) {
+          void i18n.changeLanguage(config.ui_language)
+          localStorage.setItem('ui_language', config.ui_language)
+        }
+        setLoaded(true)
+
+        const hydrate = <T,>(label: string, request: Promise<T>, apply: (value: T) => void) => {
+          void request
+            .then((value) => {
+              if (!cancelled) apply(value)
+            })
+            .catch((error) => console.warn(`Failed to hydrate ${label}:`, error))
+        }
+
+        hydrate('dictionary', getDictionary(), setDictionary)
+        hydrate('correction rules', getCorrectionRules(), setCorrectionRules)
+        hydrate('platform capabilities', getPlatformCapabilities(), setPlatformCapabilities)
+        hydrate('hotkey health', getHotkeyRegistrationError(), setHotkeyRegistrationError)
+
+        if (navigator.platform.toUpperCase().includes('MAC')) {
+          hydrate(
+            'accessibility permission',
+            checkAccessibilityPermission(),
+            setAccessibilityTrusted,
+          )
+        }
+      } catch (error) {
+        if (cancelled) return
+        console.error('Failed to load required application data:', error)
+        setLoadError(true)
+        setLoaded(true)
       }
-      setLoaded(true)
-    })
+    }
+
+    void loadInitialData()
 
     useAuthStore.getState().initialize()
     initDeepLinkListener()
+
+    return () => {
+      cancelled = true
+    }
   }, [
     setOnboardingCompleted,
     setConfig,
     setSavedConfig,
-    setHistory,
     setDictionary,
     setCorrectionRules,
     setAccessibilityTrusted,
@@ -160,7 +172,7 @@ export default function MainApp() {
         <span className="text-error text-[13px]">Failed to load application data.</span>
         <button
           onClick={() => window.location.reload()}
-          className="px-4 py-2 bg-accent text-white rounded-[10px] text-[13px] border-none cursor-pointer hover:bg-accent-hover transition-colors"
+          className="px-4 py-2 bg-accent text-on-accent rounded-[10px] text-[13px] border-none cursor-pointer hover:bg-accent-hover transition-colors"
         >
           Retry
         </button>

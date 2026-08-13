@@ -1044,6 +1044,10 @@ pub(crate) async fn start_reserved_ask_dictation(
 
         let (handle, mut audio_rx) = AudioCaptureHandle::start(AudioConfig::default())
             .map_err(|e| map_audio_capture_error(&e.to_string()))?;
+        let microphone_ready_ms = handle
+            .wait_until_ready(std::time::Duration::from_secs(2))
+            .await
+            .map_err(|error| map_audio_capture_error(&error.to_string()))?;
         let mut handle = Some(handle);
         let transcript = Arc::new(Mutex::new(String::new()));
         let error = Arc::new(Mutex::new(None::<String>));
@@ -1081,6 +1085,7 @@ pub(crate) async fn start_reserved_ask_dictation(
 
         emit_capsule_state(&app, PipelineState::AskRecording);
         let state_inner = state.0.clone();
+        tracing::info!(microphone_ready_ms, "Ask microphone stream ready");
 
         tauri::async_runtime::spawn(async move {
             loop {

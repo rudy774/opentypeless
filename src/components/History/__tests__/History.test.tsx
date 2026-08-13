@@ -2,7 +2,7 @@ import React from 'react'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useAppStore, type HistoryEntry } from '../../../stores/appStore'
-import { addCorrectionRule, clearHistory, getCorrectionRules } from '../../../lib/tauri'
+import { addCorrectionRule, clearHistory, getCorrectionRules, getHistory } from '../../../lib/tauri'
 import { History } from '../index'
 
 vi.mock('framer-motion', () => ({
@@ -26,6 +26,8 @@ vi.mock('../../../lib/tauri', () => ({
   addCorrectionRule: vi.fn().mockResolvedValue(undefined),
   clearHistory: vi.fn().mockResolvedValue(undefined),
   getCorrectionRules: vi.fn().mockResolvedValue([]),
+  getHistoryCount: vi.fn().mockResolvedValue(1),
+  getHistory: vi.fn(),
 }))
 
 const entry: HistoryEntry = {
@@ -55,6 +57,7 @@ describe('History correction creation', () => {
     useAppStore.setState({ history: [entry], correctionRules: [] })
     vi.clearAllMocks()
     vi.mocked(addCorrectionRule).mockResolvedValue(undefined)
+    vi.mocked(getHistory).mockResolvedValue([entry])
     vi.mocked(getCorrectionRules).mockResolvedValue([
       { id: 2, pattern: 'open type less', replacement: 'OpenTypeless', enabled: true },
     ])

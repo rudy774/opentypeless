@@ -103,12 +103,7 @@ export function parseCloudError(
 
 // Subscription
 export type SubscriptionPlan =
-  | 'free'
-  | 'pro'
-  | 'lifetime_starter'
-  | 'appsumo_tier1'
-  | 'appsumo_tier2'
-  | 'appsumo_tier3'
+  'free' | 'pro' | 'lifetime_starter' | 'appsumo_tier1' | 'appsumo_tier2' | 'appsumo_tier3'
 
 export type SubscriptionSource = 'free' | 'creem' | 'lifetime' | 'appsumo'
 export type LicenseStatus = 'pending' | 'active' | 'refunded' | 'deactivated'
