@@ -53,14 +53,14 @@ describe('release version wiring', () => {
   it('allows only the aggregate verification job to publish the draft', () => {
     const buildJob = workflowJob('build', 'verify-and-publish')
     const publishJob = workflowJob('verify-and-publish')
-    const publishCommands = releaseWorkflowSource.match(/--draft=false/g) ?? []
+    const publishCommands = releaseWorkflowSource.match(/-F draft=false/g) ?? []
 
     expect(publishCommands).toHaveLength(1)
-    expect(buildJob).not.toContain('--draft=false')
+    expect(buildJob).not.toContain('-F draft=false')
     expect(publishJob).toContain('needs: [resolve-source, create-draft-release, build]')
     expect(publishJob).toContain('Verify the complete draft and publish atomically')
     expect(publishJob).toContain(
-      'gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false',
+      'gh api --method PATCH "repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}"',
     )
   })
 })

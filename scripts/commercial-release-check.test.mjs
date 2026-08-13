@@ -31,7 +31,7 @@ function ownedSnapshot() {
       'owner: rudy774\nrepo: rudyproduct\nreleaseDraft: true\n' +
       'verify-and-publish:\n  needs: [resolve-source, build]\n' +
       "  unsafe_asset_pattern='unsigned-test'\n  Get-AuthenticodeSignature artifact\n" +
-      '  gh release edit "$RELEASE_TAG" --draft=false',
+      '  gh api --method PATCH "repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}" -F draft=false',
     translatedDocumentCount: 1,
     publicDocumentation:
       '> [!IMPORTANT]\n> **Fork status:** Rudy fork; releases and support: https://github.com/rudy774/opentypeless',
@@ -108,6 +108,15 @@ test('requires draft-only platform uploads and a guarded final publication job',
   const missingGateErrors = auditCommercialStaticSnapshot(missingGate)
   assert.ok(missingGateErrors.some((error) => error.includes('final job')))
   assert.ok(missingGateErrors.some((error) => error.includes('reject unsigned or test-labeled')))
+
+  const tagBasedPublish = ownedSnapshot()
+  tagBasedPublish.releaseAutomation = tagBasedPublish.releaseAutomation.replace(
+    'releases/${RELEASE_ID}',
+    'releases/tags/${RELEASE_TAG}',
+  )
+  assert.ok(
+    auditCommercialStaticSnapshot(tagBasedPublish).some((error) => error.includes('final job')),
+  )
 })
 
 test('requires exactly one fork-status banner per translated README', () => {
