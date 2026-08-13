@@ -229,7 +229,7 @@ export function HotkeyRecorder({
         )}
       </div>
       {recording && pending && (
-        <p className="mt-1 text-[11px] text-text-tertiary">{t('settings.clickToConfirm')}</p>
+        <p className="mt-1 text-[12px] text-text-tertiary">{t('settings.clickToConfirm')}</p>
       )}
       {recording && specialOptions && specialOptions.length > 0 && (
         <div className="mt-1.5 flex flex-wrap gap-1.5">
@@ -238,14 +238,14 @@ export function HotkeyRecorder({
               key={option.value}
               type="button"
               onClick={() => confirmHotkey(option.value)}
-              className="rounded-[8px] border border-border bg-bg-secondary px-2 py-1 text-[11px] text-text-secondary hover:border-border-focus hover:text-text-primary"
+              className="rounded-[8px] border border-border bg-bg-secondary px-2 py-1 text-[12px] text-text-secondary hover:border-border-focus hover:text-text-primary"
             >
               {option.label}
             </button>
           ))}
         </div>
       )}
-      {error && <p className="mt-1 text-[11px] text-error">{error}</p>}
+      {error && <p className="mt-1 text-[12px] text-error">{error}</p>}
     </div>
   )
 }
@@ -366,7 +366,7 @@ export function ShortcutBindingList({
                 onSaved={(hotkey) => saveAt(index, hotkey)}
               />
               {bindings.length > 1 && index === 0 && (
-                <p className="mt-0.5 text-[10px] text-text-tertiary">
+                <p className="mt-0.5 text-[11px] text-text-tertiary">
                   {t('settings.shortcutPrimary')}
                 </p>
               )}
@@ -440,7 +440,7 @@ export function ShortcutBindingList({
       </div>
 
       {atLimit && (
-        <p className="mt-1 text-[10px] text-text-tertiary">{t('settings.shortcutMax')}</p>
+        <p className="mt-1 text-[11px] text-text-tertiary">{t('settings.shortcutMax')}</p>
       )}
     </div>
   )

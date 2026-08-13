@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use bytes::Bytes;
 
 use crate::error::AppError;
 
@@ -84,6 +85,13 @@ impl WhisperCompatProvider {
         wav.extend_from_slice(pcm);
         wav
     }
+
+    /// Transfer an owned WAV allocation into a cheaply cloneable upload body.
+    /// Retried multipart requests can share this allocation instead of copying
+    /// the complete recording for every attempt.
+    pub(super) fn into_reusable_upload(wav: Vec<u8>) -> Bytes {
+        Bytes::from(wav)
+    }
 }
 
 #[async_trait]
@@ -136,7 +144,8 @@ impl SttProvider for WhisperCompatProvider {
         }
 
         let audio_len_secs = self.audio_buffer.len() as f64 / (config.sample_rate as f64 * 2.0);
-        let wav_data = Self::build_wav(&self.audio_buffer, config.sample_rate);
+        let wav_data =
+            Self::into_reusable_upload(Self::build_wav(&self.audio_buffer, config.sample_rate));
         self.audio_buffer.clear();
         tracing::info!(
             "{}: sending {:.1}s of audio for transcription",
@@ -146,7 +155,7 @@ impl SttProvider for WhisperCompatProvider {
 
         let mut attempt = 0u32;
         loop {
-            let file_part = reqwest::multipart::Part::bytes(wav_data.clone())
+            let file_part = reqwest::multipart::Part::stream(wav_data.clone())
                 .file_name("audio.wav")
                 .mime_str("audio/wav")
                 .map_err(|e| AppError::Config(e.to_string()))?;
@@ -205,18 +214,11 @@ impl SttProvider for WhisperCompatProvider {
 
                         return Ok(if text.is_empty() { None } else { Some(text) });
                     } else if status.as_u16() >= 500 && attempt < 2 {
-                        let truncate_at = body
-                            .char_indices()
-                            .take_while(|&(i, _)| i < 200)
-                            .last()
-                            .map(|(i, c)| i + c.len_utf8())
-                            .unwrap_or(body.len());
                         tracing::warn!(
-                            "{} server error {} (attempt {}/3): {}",
+                            "{} server error {} (attempt {}/3)",
                             self.provider_config.provider_name,
                             status,
-                            attempt + 1,
-                            &body[..truncate_at]
+                            attempt + 1
                         );
                         attempt += 1;
                         tokio::time::sleep(std::time::Duration::from_millis(
@@ -225,23 +227,10 @@ impl SttProvider for WhisperCompatProvider {
                         .await;
                         continue;
                     } else {
-                        // Truncate at a valid UTF-8 char boundary to avoid panic on multi-byte chars
-                        let truncate_at = body
-                            .char_indices()
-                            .take_while(|&(i, _)| i < 200)
-                            .last()
-                            .map(|(i, c)| i + c.len_utf8())
-                            .unwrap_or(body.len());
-                        let sanitized = &body[..truncate_at];
-                        tracing::error!(
-                            "{} HTTP {}: {}",
-                            self.provider_config.provider_name,
-                            status,
-                            sanitized
-                        );
+                        tracing::error!("{} HTTP {}", self.provider_config.provider_name, status);
                         return Err(AppError::Api {
                             status: status.as_u16(),
-                            body: sanitized.to_string(),
+                            body,
                         });
                     }
                 }
@@ -271,6 +260,21 @@ impl SttProvider for WhisperCompatProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn retry_upload_clones_share_the_original_wav_allocation() {
+        let wav = WhisperCompatProvider::build_wav(&[0, 1, 2, 3], 16_000);
+        let wav_ptr = wav.as_ptr();
+        let wav_len = wav.len();
+
+        let upload = WhisperCompatProvider::into_reusable_upload(wav);
+        assert_eq!(upload.as_ptr(), wav_ptr);
+        assert_eq!(upload.len(), wav_len);
+
+        let retry = upload.clone();
+        assert_eq!(retry.as_ptr(), upload.as_ptr());
+        assert_eq!(retry.len(), upload.len());
+    }
 
     #[tokio::test]
     async fn connect_allows_empty_api_key_when_not_required() {

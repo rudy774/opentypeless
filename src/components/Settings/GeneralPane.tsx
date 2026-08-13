@@ -283,9 +283,7 @@ export function GeneralPane() {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <h3 className="text-[11px] font-medium text-text-tertiary uppercase tracking-wider mb-2.5">
-        {title}
-      </h3>
+      <h3 className="mb-2.5 text-[12px] font-semibold text-text-secondary">{title}</h3>
       {children}
     </div>
   )

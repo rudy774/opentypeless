@@ -11,7 +11,8 @@
     "account": "Account",
     "upgrade": "Upgrade",
     "pro": "Pro",
-    "mainNavigation": "Main navigation"
+    "mainNavigation": "Main navigation",
+    "skipToContent": "Skip to content"
   },
   "ask": {
     "title": "Ask",
@@ -63,6 +64,16 @@
     "week": "Week",
     "month": "Month",
     "savedRecordingTime": "Based on saved recordings",
+    "savedTranscriptions": "Saved transcriptions",
+    "charactersDrafted": "Characters drafted, including spaces",
+    "activeDays": "Active days",
+    "averageTurnaround": "Average turnaround",
+    "averageTurnaroundSamples": "Based on {{count}} of {{total}} saved transcriptions",
+    "durationOutliersSelected_one": "This period excludes {{count}} implausibly long recording from dictation time.",
+    "durationOutliersSelected_other": "This period excludes {{count}} implausibly long recordings from dictation time.",
+    "activityDetails": "{{transformed}} transformed outputs · {{fallbacks}} recorded fallbacks",
+    "localActivityDisclosure": "Local activity from retained History",
+    "lifetimeRetained": "{{formattedCount}} retained recordings · lifetime",
     "durationOutliersExcluded_one": "{{count}} implausibly long recording was excluded from this total. Details remain in History and the diagnostic logs.",
     "durationOutliersExcluded_other": "{{count}} implausibly long recordings were excluded from this total. Details remain in History and the diagnostic logs.",
     "wordsRemaining": "Words remaining",
@@ -76,7 +87,9 @@
     "aiPolish": "AI Polish",
     "enabled": "Enabled",
     "disabled": "Disabled",
-    "outputMode": "Text output"
+    "outputMode": "Text output",
+    "configured": "Configured",
+    "setupSummary": "Setup summary"
   },
   "onboarding": {
     "speakToWrite": "Speak to write — turn your voice into polished text in real time",
@@ -648,13 +661,16 @@
   },
   "history": {
     "title": "History",
-    "searchPlaceholder": "Search history...",
+    "searchPlaceholder": "Search history…",
     "noResults": "No matching results",
     "noHistory": "No history yet.",
     "noHistoryHint": "Press your hotkey to start recording and your transcriptions will appear here.",
     "today": "Today",
     "yesterday": "Yesterday",
     "copied": "Copied",
+    "showLess": "Show less",
+    "showMore": "Show more",
+    "copyText": "Copy transcription",
     "clearAll": "Clear All History",
     "clearConfirm": "Are you sure you want to clear all history? This cannot be undone.",
     "confirmClear": "Clear",

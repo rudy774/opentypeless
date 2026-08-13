@@ -39,26 +39,27 @@ export function Settings() {
   }, [activePane])
 
   return (
-    <div className="w-full h-full bg-bg-primary text-text-primary flex flex-col">
-      <div className="flex-1 flex min-h-0">
-        {/* Sidebar */}
+    <div className="flex h-full w-full flex-col bg-bg-primary font-sans text-text-primary">
+      <div className="flex min-h-0 flex-1">
         <SettingsSidebar activePane={activePane} onSelect={setActivePane} />
 
-        {/* Content */}
-        <div className="flex-1 flex flex-col min-w-0">
-          {/* Title bar */}
-          <div className="flex items-center justify-between px-6 pt-4 pb-3 border-b border-border bg-bg-primary/50">
-            <h2 className="text-[15px] font-medium">{t(paneTitleKeys[activePane])}</h2>
+        <div className="flex min-w-0 flex-1 flex-col">
+          <div className="border-b border-border bg-bg-elevated px-6 py-4 min-[900px]:px-8">
+            <h1 className="text-[19px] font-semibold tracking-[-0.025em]">
+              {t(paneTitleKeys[activePane])}
+            </h1>
           </div>
 
-          {/* Pane content */}
-          <div ref={contentRef} className="flex-1 overflow-y-auto overflow-x-hidden px-6 py-5">
+          <div
+            ref={contentRef}
+            className="flex-1 overflow-x-hidden overflow-y-auto px-5 py-6 min-[900px]:px-8"
+          >
             <motion.div
               key={activePane}
-              className="w-full"
+              className="mx-auto w-full max-w-[780px]"
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.1, ease: 'easeOut' }}
+              transition={{ duration: 0.12, ease: 'easeOut' }}
             >
               {activePane === 'general' && <GeneralPane />}
               {activePane === 'stt' && <SttPane />}
@@ -71,7 +72,6 @@ export function Settings() {
         </div>
       </div>
 
-      {/* Dirty bar */}
       <AnimatePresence>{isDirty && <DirtyBar />}</AnimatePresence>
     </div>
   )

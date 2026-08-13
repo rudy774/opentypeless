@@ -11,7 +11,8 @@
     "account": "账户",
     "upgrade": "升级",
     "pro": "Pro",
-    "mainNavigation": "主导航"
+    "mainNavigation": "主导航",
+    "skipToContent": "跳到主要内容"
   },
   "ask": {
     "title": "问答",
@@ -63,6 +64,16 @@
     "week": "周",
     "month": "月",
     "savedRecordingTime": "根据已保存的录音统计",
+    "savedTranscriptions": "已保存的转录",
+    "charactersDrafted": "已生成字符数（含空格）",
+    "activeDays": "活跃天数",
+    "averageTurnaround": "平均处理时间",
+    "averageTurnaroundSamples": "基于 {{total}} 条已保存转录中的 {{count}} 条",
+    "durationOutliersSelected_one": "此时间段的听写时长已排除 {{count}} 条时长异常的录音。",
+    "durationOutliersSelected_other": "此时间段的听写时长已排除 {{count}} 条时长异常的录音。",
+    "activityDetails": "转换输出 {{transformed}} 条 · 已记录回退 {{fallbacks}} 条",
+    "localActivityDisclosure": "根据本机保留的历史记录统计",
+    "lifetimeRetained": "已保留 {{formattedCount}} 条录音 · 全部时间",
     "durationOutliersExcluded_one": "已从总计中排除 {{count}} 条时长异常的录音。详细信息仍保留在历史记录和诊断日志中。",
     "durationOutliersExcluded_other": "已从总计中排除 {{count}} 条时长异常的录音。详细信息仍保留在历史记录和诊断日志中。",
     "wordsRemaining": "剩余 words",
@@ -76,7 +87,9 @@
     "aiPolish": "AI 润色",
     "enabled": "已启用",
     "disabled": "已禁用",
-    "outputMode": "文字写入"
+    "outputMode": "文字写入",
+    "configured": "已配置",
+    "setupSummary": "设置概览"
   },
   "onboarding": {
     "speakToWrite": "说话即写作 — 实时将语音转化为润色文本",
@@ -655,6 +668,9 @@
     "today": "今天",
     "yesterday": "昨天",
     "copied": "已复制",
+    "showLess": "收起",
+    "showMore": "显示更多",
+    "copyText": "复制转写文本",
     "clearAll": "清除所有历史记录",
     "clearConfirm": "确定要清除所有历史记录吗？此操作无法撤销。",
     "confirmClear": "清除",

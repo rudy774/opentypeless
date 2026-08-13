@@ -576,13 +576,13 @@ function AppWritingModes({
               </div>
               <div className="min-w-0">
                 <p className="truncate text-[13px] font-medium text-text-primary">{label}</p>
-                <p className="truncate text-[11px] text-text-tertiary">
+                <p className="truncate text-[12px] text-text-tertiary">
                   {t(`scenes.appModeDescriptions.${mode.family}`)}
                 </p>
               </div>
             </div>
 
-            <label className="block min-w-0 text-[11px] text-text-secondary">
+            <label className="block min-w-0 text-[12px] text-text-secondary">
               <span className="sr-only">{selectLabel}</span>
               <select
                 aria-label={selectLabel}
@@ -720,7 +720,7 @@ function LocalSceneCard({
           <span className="flex items-center gap-2">
             <span className="text-[13px] text-text-primary font-medium truncate">{name}</span>
             {active && (
-              <span className="text-[10px] text-accent bg-accent/10 px-1.5 py-0.5 rounded-full">
+              <span className="text-[11px] text-accent bg-accent/10 px-1.5 py-0.5 rounded-full">
                 {t('scenes.active')}
               </span>
             )}
@@ -738,7 +738,7 @@ function LocalSceneCard({
       </button>
       {expanded && (
         <div className="border-t border-border px-3 py-3 space-y-3">
-          <pre className="text-[12px] text-text-primary bg-bg-secondary rounded-[8px] px-3 py-2 whitespace-pre-wrap max-h-[140px] overflow-y-auto leading-relaxed">
+          <pre className="max-h-[140px] overflow-y-auto whitespace-pre-wrap rounded-[8px] bg-bg-secondary px-3 py-2 font-sans text-[12px] leading-relaxed text-text-primary">
             {promptTemplate}
           </pre>
           <div className="flex items-center gap-3 flex-wrap">
@@ -794,14 +794,14 @@ function LocalSceneCard({
                 <button
                   type="button"
                   onClick={onCancelDelete}
-                  className="rounded-[7px] border border-border bg-transparent px-2.5 py-1 text-[11px] text-text-secondary hover:text-text-primary"
+                  className="rounded-[7px] border border-border bg-transparent px-2.5 py-1 text-[12px] text-text-secondary hover:text-text-primary"
                 >
                   {t('common.cancel')}
                 </button>
                 <button
                   type="button"
                   onClick={onConfirmDelete}
-                  className="rounded-[7px] border border-error/30 bg-error/15 px-2.5 py-1 text-[11px] font-medium text-error hover:bg-error/20"
+                  className="rounded-[7px] border border-error/30 bg-error/15 px-2.5 py-1 text-[12px] font-medium text-error hover:bg-error/20"
                 >
                   {t('scenes.delete')}
                 </button>

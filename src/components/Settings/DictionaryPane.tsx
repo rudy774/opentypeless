@@ -378,7 +378,7 @@ export function DictionaryPane() {
               type="button"
               onClick={() => void handleAdd()}
               disabled={!word.trim()}
-              className="flex items-center justify-center gap-1.5 rounded-[8px] border-none bg-accent px-4 py-2.5 text-[13px] text-white hover:bg-accent-hover disabled:opacity-40"
+              className="flex items-center justify-center gap-1.5 rounded-[8px] border-none bg-accent px-4 py-2.5 text-[13px] text-on-accent hover:bg-accent-hover disabled:opacity-40"
             >
               <Plus size={14} />
               {t('dictionary.add')}
@@ -386,7 +386,7 @@ export function DictionaryPane() {
           </div>
 
           <div className="overflow-hidden rounded-[8px] border border-border">
-            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_64px] gap-2 bg-bg-secondary px-3 py-2.5 text-[11px] font-medium uppercase text-text-secondary">
+            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_64px] gap-2 bg-bg-secondary px-3 py-2.5 text-[12px] font-medium uppercase text-text-secondary">
               <span>{t('dictionary.word')}</span>
               <span>{t('dictionary.pronunciation')}</span>
               <span />
@@ -501,7 +501,7 @@ export function DictionaryPane() {
               onClick={() => void handleAddCorrection()}
               disabled={!pattern.trim() || !replacement.trim()}
               aria-label={t('dictionary.addCorrection')}
-              className="flex items-center justify-center gap-1.5 rounded-[8px] border-none bg-accent px-4 py-2.5 text-[13px] text-white hover:bg-accent-hover disabled:opacity-40"
+              className="flex items-center justify-center gap-1.5 rounded-[8px] border-none bg-accent px-4 py-2.5 text-[13px] text-on-accent hover:bg-accent-hover disabled:opacity-40"
             >
               <Plus size={14} />
               {t('dictionary.add')}

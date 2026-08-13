@@ -3393,6 +3393,7 @@ dependencies = [
  "arboard",
  "async-trait",
  "block2 0.5.1",
+ "bytes",
  "chrono",
  "cpal",
  "csv",

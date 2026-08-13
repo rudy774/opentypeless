@@ -126,7 +126,7 @@ export function ManageAppMappingsDialog({
                   <p className="truncate text-[12px] font-medium text-text-primary">
                     {mapping.label}
                   </p>
-                  <p className="truncate text-[11px] text-text-tertiary">{mapping.displayValue}</p>
+                  <p className="truncate text-[12px] text-text-tertiary">{mapping.displayValue}</p>
                 </div>
                 <button
                   type="button"
@@ -169,12 +169,12 @@ export function ManageAppMappingsDialog({
           )}
         </div>
 
-        {error && <p className="px-4 pb-2 text-[11px] text-error">{error}</p>}
+        {error && <p className="px-4 pb-2 text-[12px] text-error">{error}</p>}
 
         <div className="border-t border-border px-4 py-3">
           {resetConfirming ? (
             <div className="flex flex-wrap items-center justify-end gap-2">
-              <p className="mr-auto text-[11px] text-text-secondary">
+              <p className="mr-auto text-[12px] text-text-secondary">
                 {t('settings.mappingResetConfirm')}
               </p>
               <button

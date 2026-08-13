@@ -2,7 +2,7 @@
 
 ## Reporting a Vulnerability
 
-Please report security vulnerabilities through [GitHub Security Advisories](https://github.com/tover0314-w/opentypeless/security/advisories/new).
+Please report security vulnerabilities through [GitHub Security Advisories](https://github.com/rudy774/opentypeless/security/advisories/new).
 
 **Do not open a public issue for security vulnerabilities.**
 
@@ -18,14 +18,19 @@ We will acknowledge your report within 72 hours and aim to release a fix within 
 
 ## Security Model
 
-OpenTypeless follows a **Bring Your Own Key (BYOK)** model:
+This fork supports both local **Bring Your Own Key (BYOK)** operation and optional managed-cloud features:
 
-- All API keys are stored locally on the user's machine via `tauri-plugin-store`
-- No cloud account or server-side storage is required for the core product
-- Audio data is sent directly from the user's machine to the chosen STT/LLM provider
-- Cloud proxy mode requires authentication via session token
-- The application does not collect telemetry or usage data
-- CSP is enabled in the Tauri webview
+- Provider API keys are stored in the operating-system credential vault where supported. Legacy plaintext settings are migrated only after a verified vault write; they are not silently deleted if migration fails.
+- No cloud account is required for the core BYOK workflow.
+- BYOK audio and cleanup text are sent directly to the providers the user configures.
+- Managed-cloud features require an authenticated session and send the data required for the requested managed operation.
+- Transcription history and aggregate Day/Week/Month activity metrics are stored locally in SQLite. The app does not automatically upload analytics or diagnostic logs.
+- Rotating diagnostic logs are stored locally for troubleshooting. They record operational status, stable error information, and timings; provider response bodies, transcripts, prompts, selected text, tokens, and credentials must not be logged.
+- The Tauri webview uses a Content Security Policy.
+
+Cloud backup is an explicit user action and may upload history, dictionary, and allow-listed settings. BYOK credentials are excluded from backup payloads.
+
+The current commercial-readiness boundaries and launch blockers are documented in [docs/COMMERCIALIZATION.md](docs/COMMERCIALIZATION.md).
 
 ## Out of Scope
 

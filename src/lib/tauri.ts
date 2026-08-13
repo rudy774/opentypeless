@@ -186,12 +186,7 @@ export interface HotkeyBindingStatus {
 export type HotkeyAdapter = 'tauriGlobalShortcut' | 'nativeHook' | 'unavailable'
 export type HotkeyInstallState = 'starting' | 'installed' | 'failed' | 'disabled'
 export type HotkeyRole =
-  | 'dictation'
-  | 'ask'
-  | 'translate'
-  | 'editSelection'
-  | 'switchScene'
-  | 'openApp'
+  'dictation' | 'ask' | 'translate' | 'editSelection' | 'switchScene' | 'openApp'
 
 export interface HotkeyStatusError {
   code: string
@@ -386,10 +381,7 @@ export type VoiceIntentKind =
   | 'search'
 
 export type VoiceOutputPlacement =
-  | 'insert_at_cursor'
-  | 'replace_selection'
-  | 'popup_answer'
-  | 'open_url'
+  'insert_at_cursor' | 'replace_selection' | 'popup_answer' | 'open_url'
 
 export type VoiceExecutionFallbackReason =
   | 'feature_disabled'
@@ -449,6 +441,10 @@ export async function getHistory(limit: number, offset: number): Promise<History
   return invoke('get_history', { limit, offset })
 }
 
+export async function getHistoryCount(): Promise<number> {
+  return invoke('get_history_count')
+}
+
 export interface TranscriptionTimeStats {
   dayMs: number
   weekMs: number
@@ -460,8 +456,44 @@ export async function getTranscriptionTimeStats(): Promise<TranscriptionTimeStat
   return invoke('get_transcription_time_stats')
 }
 
+export interface ActivityRangeMetrics {
+  recordingMs: number
+  savedTranscriptions: number
+  outputChars: number
+  activeDays: number
+  recordedFallbacks: number
+  transformedOutputs: number
+  excludedDurationCount: number
+  averageTotalMs: number | null
+  timingSampleCount: number
+}
+
+export interface LocalActivityMetricsSummary {
+  day: ActivityRangeMetrics
+  week: ActivityRangeMetrics
+  month: ActivityRangeMetrics
+  totalRecordings: number
+  excludedDurationCount: number
+}
+
+export async function getLocalActivityMetrics(): Promise<LocalActivityMetricsSummary> {
+  return invoke('get_local_activity_metrics')
+}
+
 export async function clearHistory(): Promise<void> {
   return invoke('clear_history')
+}
+
+export interface BackupDataSnapshot {
+  history: HistoryEntry[]
+  dictionary: {
+    entries: DictionaryEntry[]
+    correction_rules: CorrectionRule[]
+  }
+}
+
+export async function exportBackupData(): Promise<BackupDataSnapshot> {
+  return invoke('export_backup_data')
 }
 
 export interface RestoreBackupResult {

@@ -22,7 +22,7 @@ export function RecordingLimitControl({ seconds, onChange }: RecordingLimitContr
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <p className="text-[13px] font-medium text-text-primary">{t('settings.automaticStop')}</p>
-          <p className="mt-0.5 text-[11px] leading-relaxed text-text-tertiary">
+          <p className="mt-0.5 text-[12px] leading-relaxed text-text-tertiary">
             {t('settings.automaticStopHint')}
           </p>
         </div>
@@ -55,7 +55,7 @@ export function RecordingLimitControl({ seconds, onChange }: RecordingLimitContr
         </label>
       )}
       {!enabled && (
-        <p className="mt-2 text-[11px] font-medium text-success">
+        <p className="mt-2 text-[12px] font-medium text-success">
           {t('settings.manualStopActive')}
         </p>
       )}

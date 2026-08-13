@@ -43,11 +43,7 @@ export type OutputMode = 'keyboard' | 'clipboard'
 export type PasteShortcut = 'ctrlV' | 'ctrlShiftV' | 'shiftInsert'
 export type WindowsSendInputNewlineMode = 'enter' | 'shiftEnter' | 'crlf'
 export type InsertionStrategy =
-  | 'auto'
-  | 'keyboard'
-  | 'clipboardPaste'
-  | 'clipboardCopyOnly'
-  | 'windowsSendInput'
+  'auto' | 'keyboard' | 'clipboardPaste' | 'clipboardCopyOnly' | 'windowsSendInput'
 export type InsertStatus = 'inserted' | 'copiedFallback' | 'failed' | 'partiallyInserted'
 export type HotkeyMode = 'hold' | 'toggle'
 export type Theme = 'light' | 'dark' | 'system'
@@ -114,6 +110,9 @@ export interface HistoryEntry {
   active_scene_prompt_truncated: boolean
   output_status: string | null
   output_error: string | null
+  stt_ms?: number | null
+  llm_ms?: number | null
+  total_ms?: number | null
 }
 
 export interface ContextProfileSummary {
@@ -272,6 +271,8 @@ interface AppState {
   // History
   history: HistoryEntry[]
   setHistory: (h: HistoryEntry[]) => void
+  activityRevision: number
+  markActivityChanged: () => void
 
   // Dictionary
   dictionary: DictionaryEntry[]
@@ -806,6 +807,8 @@ export const useAppStore = create<AppState>((set) => ({
 
   history: [],
   setHistory: (history) => set({ history }),
+  activityRevision: 0,
+  markActivityChanged: () => set((state) => ({ activityRevision: state.activityRevision + 1 })),
 
   dictionary: [],
   setDictionary: (dictionary) => set({ dictionary }),

@@ -144,7 +144,9 @@ impl SttProvider for CloudSttProvider {
         }
 
         let audio_len_secs = self.audio_buffer.len() as f64 / (config.sample_rate as f64 * 2.0);
-        let wav_data = WhisperCompatProvider::build_wav(&self.audio_buffer, config.sample_rate);
+        let wav_data = WhisperCompatProvider::into_reusable_upload(
+            WhisperCompatProvider::build_wav(&self.audio_buffer, config.sample_rate),
+        );
         self.audio_buffer.clear();
         tracing::info!(
             "Cloud STT: sending {:.1}s of audio for transcription",
@@ -153,7 +155,7 @@ impl SttProvider for CloudSttProvider {
 
         let mut attempt = 0u32;
         loop {
-            let file_part = reqwest::multipart::Part::bytes(wav_data.clone())
+            let file_part = reqwest::multipart::Part::stream(wav_data.clone())
                 .file_name("audio.wav")
                 .mime_str("audio/wav")
                 .map_err(|e| AppError::Config(e.to_string()))?;
@@ -199,17 +201,10 @@ impl SttProvider for CloudSttProvider {
                     } else if status.as_u16() == 403 {
                         return Err(cloud_stt_forbidden_error(&body));
                     } else if status.as_u16() >= 500 && attempt < 2 {
-                        let truncate_at = body
-                            .char_indices()
-                            .take_while(|&(i, _)| i < 200)
-                            .last()
-                            .map(|(i, c)| i + c.len_utf8())
-                            .unwrap_or(body.len());
                         tracing::warn!(
-                            "Cloud STT server error {} (attempt {}/3): {}",
+                            "Cloud STT server error {} (attempt {}/3)",
                             status,
-                            attempt + 1,
-                            &body[..truncate_at]
+                            attempt + 1
                         );
                         attempt += 1;
                         tokio::time::sleep(std::time::Duration::from_millis(
@@ -218,17 +213,10 @@ impl SttProvider for CloudSttProvider {
                         .await;
                         continue;
                     } else {
-                        let truncate_at = body
-                            .char_indices()
-                            .take_while(|&(i, _)| i < 200)
-                            .last()
-                            .map(|(i, c)| i + c.len_utf8())
-                            .unwrap_or(body.len());
-                        let sanitized = &body[..truncate_at];
-                        tracing::error!("Cloud STT HTTP {}: {}", status, sanitized);
+                        tracing::error!("Cloud STT HTTP {}", status);
                         return Err(AppError::Api {
                             status: status.as_u16(),
-                            body: sanitized.to_string(),
+                            body,
                         });
                     }
                 }

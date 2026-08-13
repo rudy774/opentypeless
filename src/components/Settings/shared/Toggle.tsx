@@ -1,5 +1,3 @@
-import { motion } from 'framer-motion'
-
 interface Props {
   checked: boolean
   onChange: (checked: boolean) => void
@@ -18,14 +16,15 @@ export function Toggle({ checked, onChange, label, disabled = false }: Props) {
         aria-checked={checked}
         disabled={disabled}
         onClick={() => onChange(!checked)}
-        className={`relative h-[26px] w-[44px] shrink-0 rounded-full border-none transition-colors duration-200 ${
+        className={`relative h-[24px] w-[42px] shrink-0 rounded-full border transition-colors duration-150 ${
           disabled ? 'cursor-not-allowed' : 'cursor-pointer'
-        } ${checked ? 'bg-text-secondary' : 'bg-bg-tertiary'}`}
+        } ${checked ? 'border-accent bg-accent' : 'border-border bg-bg-tertiary'}`}
       >
-        <motion.div
-          className="absolute top-[2px] w-[22px] h-[22px] rounded-full bg-white shadow-sm"
-          animate={{ left: checked ? 20 : 2 }}
-          transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+        <span
+          aria-hidden="true"
+          className={`absolute left-[2px] top-[2px] h-[18px] w-[18px] rounded-full bg-white shadow-sm transition-transform duration-150 ${
+            checked ? 'translate-x-[18px]' : 'translate-x-0'
+          }`}
         />
       </button>
       {label && <span className="text-[13px] text-text-primary">{label}</span>}

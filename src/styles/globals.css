@@ -1,36 +1,37 @@
 @import 'tailwindcss';
 
 @theme {
-  /* Clean neutral palette */
-  --color-bg-primary: #f5f5f5;
-  --color-bg-secondary: #ebebeb;
-  --color-bg-tertiary: #e0e0e0;
-  --color-bg-elevated: #fafafa;
+  /* Quiet voice-instrument palette */
+  --color-bg-primary: #f3f7f6;
+  --color-bg-secondary: #e9f0ee;
+  --color-bg-tertiary: #dbe5e2;
+  --color-bg-elevated: #ffffff;
 
-  --color-text-primary: #1a1a1a;
-  --color-text-secondary: #666666;
-  --color-text-tertiary: #999999;
+  --color-text-primary: #14211e;
+  --color-text-secondary: #50625d;
+  --color-text-tertiary: #556963;
 
-  --color-accent: #2abba7;
-  --color-accent-hover: #22a08e;
-  --color-accent-light: #e6f7f5;
+  --color-accent: #0f7465;
+  --color-accent-hover: #0a5e52;
+  --color-accent-light: #d9f3ed;
+  --color-on-accent: #ffffff;
 
-  --color-success: #34c759;
-  --color-warning: #ff9500;
-  --color-error: #ff3b30;
+  --color-success: #16875f;
+  --color-warning: #a96712;
+  --color-error: #c8473a;
 
-  --color-border: rgba(0, 0, 0, 0.08);
-  --color-border-focus: #2abba7;
+  --color-border: rgba(20, 50, 43, 0.13);
+  --color-border-focus: #0f7465;
 
   /* Jelly palette tokens */
-  --color-jelly-primary: rgba(42, 187, 167, 0.2);
-  --color-jelly-glow: rgba(42, 187, 167, 0.3);
+  --color-jelly-primary: rgba(22, 143, 125, 0.16);
+  --color-jelly-glow: rgba(22, 143, 125, 0.22);
 
   /* Font */
   --font-sans:
-    system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell,
-    'Open Sans', 'Helvetica Neue', sans-serif;
-  --font-mono: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
+    'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, Roboto,
+    sans-serif;
+  --font-mono: 'Cascadia Mono', 'SF Mono', 'Fira Code', monospace;
 
   /* Font sizes */
   --text-caption: 11px;
@@ -41,16 +42,16 @@
 
   /* Border radius */
   --radius-xs: 6px;
-  --radius-sm: 10px;
-  --radius-md: 14px;
-  --radius-lg: 22px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
   --radius-full: 9999px;
 
   /* Shadows - neutral */
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.04);
-  --shadow-lg: 0 8px 28px rgba(0, 0, 0, 0.1), 0 4px 8px rgba(0, 0, 0, 0.06);
-  --shadow-float: 0 16px 48px rgba(0, 0, 0, 0.12), 0 8px 16px rgba(0, 0, 0, 0.08);
+  --shadow-sm: 0 1px 2px rgba(17, 42, 36, 0.08);
+  --shadow-md: 0 8px 24px rgba(17, 42, 36, 0.1);
+  --shadow-lg: 0 14px 34px rgba(17, 42, 36, 0.14);
+  --shadow-float: 0 18px 48px rgba(10, 26, 22, 0.22);
 
   /* Easing */
   --ease-out: cubic-bezier(0.33, 1, 0.68, 1);
@@ -66,7 +67,7 @@ body,
   width: 100%;
   height: 100%;
   font-family: var(--font-sans);
-  font-weight: 450;
+  font-weight: 400;
   letter-spacing: -0.01em;
   background: transparent;
   color: var(--color-text-primary);
@@ -76,28 +77,78 @@ body,
   user-select: none;
 }
 
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button,
+[role='button'] {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button,
+[role='button'],
+input,
+select,
+textarea,
+a {
+  outline: none;
+}
+
+button:focus-visible,
+[role='button']:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+}
+
 /* ─── Dark Mode ─── */
 .dark {
-  --color-bg-primary: #1a1a1a;
-  --color-bg-secondary: #242424;
-  --color-bg-tertiary: #2e2e2e;
-  --color-bg-elevated: #2a2a2a;
+  color-scheme: dark;
+  --color-bg-primary: #111817;
+  --color-bg-secondary: #182220;
+  --color-bg-tertiary: #24312e;
+  --color-bg-elevated: #202c29;
 
-  --color-text-primary: #f0f0f0;
-  --color-text-secondary: #a0a0a0;
-  --color-text-tertiary: #707070;
+  --color-text-primary: #f0f6f4;
+  --color-text-secondary: #b3c1bd;
+  --color-text-tertiary: #8a9b96;
 
-  --color-accent-light: #1a3d37;
+  --color-accent: #4acdb5;
+  --color-accent-hover: #67dcc6;
+  --color-accent-light: #173e37;
+  --color-on-accent: #10221e;
 
-  --color-border: rgba(255, 255, 255, 0.08);
+  --color-success: #5bd29d;
+  --color-warning: #e5aa55;
+  --color-error: #f07b6e;
 
-  --color-jelly-primary: rgba(42, 187, 167, 0.25);
-  --color-jelly-glow: rgba(42, 187, 167, 0.35);
+  --color-border: rgba(210, 236, 229, 0.12);
+  --color-border-focus: #4acdb5;
+
+  --color-jelly-primary: rgba(74, 205, 181, 0.2);
+  --color-jelly-glow: rgba(74, 205, 181, 0.28);
 
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.2), 0 1px 2px rgba(0, 0, 0, 0.15);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.25), 0 2px 4px rgba(0, 0, 0, 0.15);
   --shadow-lg: 0 8px 28px rgba(0, 0, 0, 0.3), 0 4px 8px rgba(0, 0, 0, 0.2);
   --shadow-float: 0 16px 48px rgba(0, 0, 0, 0.35), 0 8px 16px rgba(0, 0, 0, 0.25);
+}
+
+:root:not(.dark) {
+  color-scheme: light;
+}
+
+.history-entry {
+  content-visibility: auto;
+  contain-intrinsic-size: 140px;
 }
 
 /* Drag region */
@@ -107,68 +158,44 @@ body,
 
 /* ─── Dark Jelly Overrides ─── */
 .dark .jelly-surface {
-  background: linear-gradient(145deg, #2a2a2a 0%, #222222 50%, #1c1c1c 100%);
-  box-shadow:
-    inset 0 2px 8px rgba(255, 255, 255, 0.04),
-    inset 0 -2px 6px rgba(0, 0, 0, 0.3);
+  background: var(--color-bg-elevated);
+  border-color: var(--color-border);
 }
 
 .dark .jelly-card {
-  background: linear-gradient(155deg, #2e2e2e 0%, #272727 50%, #212121 100%);
-  box-shadow:
-    inset 0 1.5px 4px rgba(255, 255, 255, 0.04),
-    0 4px 16px rgba(0, 0, 0, 0.3);
+  background: var(--color-bg-elevated);
+  border-color: var(--color-border);
+  box-shadow: none;
 }
 .dark .jelly-card::before {
-  background: radial-gradient(
-    ellipse at 30% 20%,
-    rgba(255, 255, 255, 0.04) 0%,
-    rgba(255, 255, 255, 0.01) 40%,
-    transparent 70%
-  );
+  display: none;
 }
 .dark .jelly-card:hover {
-  box-shadow:
-    inset 0 1.5px 4px rgba(255, 255, 255, 0.06),
-    0 6px 24px rgba(0, 0, 0, 0.35);
+  box-shadow: none;
 }
 
 .dark .jelly-btn {
-  background: linear-gradient(155deg, #333333 0%, #2a2a2a 50%, #222222 100%);
-  box-shadow:
-    inset 0 1.5px 3px rgba(255, 255, 255, 0.05),
-    0 3px 10px rgba(0, 0, 0, 0.25);
+  background: var(--color-bg-elevated);
+  border-color: var(--color-border);
+  box-shadow: none;
 }
 .dark .jelly-btn::before {
-  background: radial-gradient(
-    ellipse at 30% 20%,
-    rgba(255, 255, 255, 0.04) 0%,
-    rgba(255, 255, 255, 0.01) 40%,
-    transparent 70%
-  );
+  display: none;
 }
 .dark .jelly-btn:hover {
-  box-shadow:
-    inset 0 1.5px 3px rgba(255, 255, 255, 0.07),
-    0 6px 18px rgba(0, 0, 0, 0.3);
+  box-shadow: none;
 }
 
 .dark .jelly-btn-accent {
-  box-shadow:
-    inset 0 2px 3px rgba(255, 255, 255, 0.15),
-    0 3px 12px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--shadow-sm);
 }
 .dark .jelly-btn-accent:hover {
-  box-shadow:
-    inset 0 2px 3px rgba(255, 255, 255, 0.15),
-    0 6px 20px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--shadow-sm);
 }
 
 .dark .jelly-surface-flat {
-  background: linear-gradient(180deg, #262626 0%, #202020 50%, #1c1c1c 100%);
-  box-shadow:
-    inset 2px 0 8px rgba(255, 255, 255, 0.03),
-    inset -2px 0 8px rgba(0, 0, 0, 0.2);
+  background: var(--color-bg-secondary);
+  box-shadow: none;
 }
 
 .dark .jelly-capsule {
@@ -232,111 +259,62 @@ body,
 /* ─── Jelly Surface — rich gel with strong inner glow ─── */
 .jelly-surface {
   position: relative;
-  background: linear-gradient(145deg, #f6f6f6 0%, #eeeeee 50%, #e6e6e6 100%);
-  box-shadow:
-    inset 0 2px 8px rgba(255, 255, 255, 0.9),
-    inset 0 -2px 8px rgba(0, 0, 0, 0.06),
-    0 4px 20px rgba(0, 0, 0, 0.08),
-    0 10px 40px rgba(0, 0, 0, 0.04);
-  border: none;
-  border-radius: 22px;
-  transition:
-    transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
-    box-shadow 0.3s ease;
+  background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
   overflow: hidden;
 }
 
 /* ─── Jelly Card — 3D gel panel with specular highlight ─── */
 .jelly-card {
   position: relative;
-  background: linear-gradient(155deg, #ededed 0%, #e4e4e4 50%, #dadada 100%);
-  border: none;
-  border-radius: 20px;
-  box-shadow:
-    0 4px 20px rgba(0, 0, 0, 0.07),
-    0 10px 40px rgba(0, 0, 0, 0.03),
-    inset 0 2px 6px rgba(255, 255, 255, 0.8),
-    inset 0 -2px 6px rgba(0, 0, 0, 0.05);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  box-shadow: none;
   overflow: hidden;
-  transition:
-    transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
-    box-shadow 0.3s ease;
+  transition: border-color 160ms ease-out;
 }
 /* Card specular highlight band */
 .jelly-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 40%;
-  background: linear-gradient(
-    to bottom,
-    rgba(255, 255, 255, 0.5) 0%,
-    rgba(255, 255, 255, 0.1) 60%,
-    transparent 100%
-  );
-  border-radius: 20px 20px 0 0;
-  pointer-events: none;
-  z-index: 0;
+  display: none;
 }
 .jelly-card:hover {
-  transform: scale(1.02) translateY(-2px);
-  box-shadow:
-    0 8px 28px rgba(0, 0, 0, 0.1),
-    0 16px 50px rgba(0, 0, 0, 0.05),
-    inset 0 2px 6px rgba(255, 255, 255, 0.8),
-    inset 0 -2px 6px rgba(0, 0, 0, 0.05);
+  transform: none;
+  border-color: rgba(22, 143, 125, 0.28);
 }
 
 /* ─── Jelly Button — tactile 3D gel button ─── */
 .jelly-btn {
   position: relative;
-  background: linear-gradient(155deg, #ececec 0%, #e2e2e2 50%, #d8d8d8 100%);
-  box-shadow:
-    0 3px 12px rgba(0, 0, 0, 0.07),
-    0 6px 24px rgba(0, 0, 0, 0.03),
-    inset 0 2px 4px rgba(255, 255, 255, 0.8),
-    inset 0 -2px 4px rgba(0, 0, 0, 0.05);
-  border: none;
-  border-radius: 14px;
+  background: var(--color-bg-elevated);
+  box-shadow: none;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
   overflow: hidden;
   transition:
-    transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1),
-    box-shadow 0.25s ease;
+    background-color 160ms ease-out,
+    border-color 160ms ease-out;
 }
 .jelly-btn::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 50%;
-  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.45) 0%, transparent 100%);
-  border-radius: 14px 14px 0 0;
-  pointer-events: none;
+  display: none;
 }
 .jelly-btn:hover {
-  transform: scale(1.04);
-  box-shadow:
-    0 6px 20px rgba(0, 0, 0, 0.1),
-    0 10px 36px rgba(0, 0, 0, 0.04),
-    inset 0 2px 4px rgba(255, 255, 255, 0.8),
-    inset 0 -2px 4px rgba(0, 0, 0, 0.06);
+  transform: none;
+  background: var(--color-bg-secondary);
+  border-color: rgba(22, 143, 125, 0.3);
 }
 .jelly-btn:active {
-  transform: scaleX(1.06) scaleY(0.94);
+  transform: none;
 }
 
 /* ─── Jelly Nav Active — accent gel indicator ─── */
 .jelly-nav-active {
-  background: linear-gradient(145deg, #2abba7 0%, #22a08e 100%);
-  box-shadow:
-    inset 0 1px 4px rgba(255, 255, 255, 0.3),
-    inset 0 -1px 4px rgba(0, 0, 0, 0.15),
-    0 2px 10px rgba(42, 187, 167, 0.3);
-  border-radius: 12px;
-  color: white !important;
+  background: var(--color-accent-light);
+  box-shadow: none;
+  border-radius: 9px;
+  color: var(--color-accent) !important;
 }
 
 /* ─── Jelly Capsule — minimal white/grey gel orb ─── */
@@ -472,33 +450,24 @@ body,
 
 /* ─── Jelly Surface Flat — no border-radius, for sidebars ─── */
 .jelly-surface-flat {
-  background: linear-gradient(180deg, #f0f0f0 0%, #e8e8e8 50%, #e0e0e0 100%);
-  box-shadow:
-    inset 2px 0 8px rgba(255, 255, 255, 0.5),
-    inset -2px 0 8px rgba(0, 0, 0, 0.04);
+  background: var(--color-bg-secondary);
+  box-shadow: none;
   border: none;
-  transition: box-shadow 0.3s ease;
 }
 
 /* ─── Jelly Button Accent — for primary CTA buttons ─── */
 .jelly-btn-accent {
-  box-shadow:
-    inset 0 2px 3px rgba(255, 255, 255, 0.3),
-    0 3px 12px rgba(0, 0, 0, 0.12);
+  box-shadow: var(--shadow-sm);
   border: none;
-  border-radius: 9999px;
-  transition:
-    transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1),
-    box-shadow 0.25s ease;
+  border-radius: 10px;
+  transition: background-color 160ms ease-out;
 }
 .jelly-btn-accent:hover {
-  transform: scale(1.04);
-  box-shadow:
-    inset 0 2px 3px rgba(255, 255, 255, 0.3),
-    0 6px 20px rgba(0, 0, 0, 0.18);
+  transform: none;
+  box-shadow: var(--shadow-sm);
 }
 .jelly-btn-accent:active {
-  transform: scaleX(1.06) scaleY(0.94);
+  transform: none;
 }
 
 /* ─── Shimmer sweep — left-to-right loading bar ─── */
