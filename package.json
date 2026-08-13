@@ -59,6 +59,7 @@
     "ajv-formats": "3.0.1",
     "better-auth": "1.6.27",
     "express": "5.2.1",
+    "express-rate-limit": "8.6.2",
     "framer-motion": "^11.18",
     "i18next": "^24.2",
     "lucide-react": "^0.460",

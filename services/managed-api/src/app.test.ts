@@ -522,6 +522,25 @@ describe('managed service HTTP application', () => {
     expect(deletionResponse.body.error.code).toBe('RATE_LIMITED')
   })
 
+  it('applies in-process burst limits to both sensitive account routes', async () => {
+    const passwordRequest = () =>
+      request(app)
+        .post('/api/opentypeless/auth/set-password')
+        .set('Authorization', 'Bearer valid')
+        .send({ newPassword: 'a-secure-new-password' })
+    for (let attempt = 0; attempt < 5; attempt += 1) await passwordRequest().expect(204)
+    expect((await passwordRequest().expect(429)).body.error.code).toBe('RATE_LIMITED')
+
+    const deletionRequest = (attempt: number) =>
+      request(app)
+        .delete('/api/account')
+        .set('Authorization', 'Bearer valid')
+        .set('Idempotency-Key', 'delete-burst-' + attempt + '-123456')
+        .send({ confirmation: 'DELETE' })
+    for (let attempt = 0; attempt < 3; attempt += 1) await deletionRequest(attempt).expect(202)
+    expect((await deletionRequest(4).expect(429)).body.error.code).toBe('RATE_LIMITED')
+  })
+
   it('accepts only a recent authenticated destructive deletion and cancels billing first', async () => {
     await request(app)
       .delete('/api/account')

@@ -5,6 +5,7 @@ import express, {
   type RequestHandler,
   type Response,
 } from 'express'
+import { rateLimit } from 'express-rate-limit'
 import multer from 'multer'
 import { z } from 'zod'
 import type { AuthFacade } from './auth.js'
@@ -235,6 +236,24 @@ export function createApp(dependencies: AppDependencies): express.Express {
   const sendExport = dependencies.sendExport ?? sendAccountExportEmail
   const app = express()
   const requireAuth = requireAuthentication(auth)
+  const setPasswordLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000,
+    limit: 5,
+    standardHeaders: 'draft-8',
+    legacyHeaders: false,
+    keyGenerator: (request) => request.user!.id,
+    handler: (_request, _response, next) =>
+      next(new ServiceError(429, 'RATE_LIMITED', 'Too many requests', true, 60 * 60 * 1000)),
+  })
+  const deleteAccountLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000,
+    limit: 3,
+    standardHeaders: 'draft-8',
+    legacyHeaders: false,
+    keyGenerator: (request) => request.user!.id,
+    handler: (_request, _response, next) =>
+      next(new ServiceError(429, 'RATE_LIMITED', 'Too many requests', true, 60 * 60 * 1000)),
+  })
   const jsonParser = express.json({
     limit: JSON_LIMIT,
     strict: true,
@@ -373,6 +392,7 @@ export function createApp(dependencies: AppDependencies): express.Express {
   app.post(
     '/api/opentypeless/auth/set-password',
     requireAuth,
+    setPasswordLimiter,
     asyncRoute(async (request, response) => {
       await enforceRateLimit(store, 'set-password-user', request.user!.id, 5, 3600)
       requireRecentAuthentication(request)
@@ -652,6 +672,7 @@ export function createApp(dependencies: AppDependencies): express.Express {
   app.delete(
     '/api/account',
     requireAuth,
+    deleteAccountLimiter,
     asyncRoute(async (request, response) => {
       await enforceRateLimit(store, 'delete-account-user', request.user!.id, 3, 3600)
       requireRecentAuthentication(request)
