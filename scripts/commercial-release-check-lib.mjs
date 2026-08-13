@@ -164,7 +164,7 @@ export function auditCommercialStaticSnapshot(snapshot) {
 
   const hasDraftUpload = /releaseDraft:\s*true/i.test(releaseAutomation)
   const hasFinalPublishGate =
-    /verify-and-publish:[\s\S]*needs:\s*\[[^\]]*\bbuild\b[^\]]*\][\s\S]*gh\s+release\s+edit[^\n]*--draft=false/i.test(
+    /verify-and-publish:[\s\S]*needs:\s*\[[^\]]*\bbuild\b[^\]]*\][\s\S]*gh\s+api\s+--method\s+PATCH\s+["']?repos\/\$\{GITHUB_REPOSITORY\}\/releases\/\$\{RELEASE_ID\}["']?\s*\\?\s*-F\s+draft=false/i.test(
       releaseAutomation,
     )
   if (!hasDraftUpload || !hasFinalPublishGate) {
