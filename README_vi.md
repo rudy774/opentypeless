@@ -2,6 +2,9 @@
   <a href="README.md">English</a> | <a href="README_zh.md">中文</a> | <a href="README_ja.md">日本語</a> | <a href="README_ko.md">한국어</a> | <a href="README_es.md">Español</a> | <a href="README_fr.md">Français</a> | <a href="README_de.md">Deutsch</a> | <a href="README_pt.md">Português</a> | <a href="README_ru.md">Русский</a> | <a href="README_ar.md">العربية</a> | <a href="README_hi.md">हिन्दी</a> | <a href="README_it.md">Italiano</a> | <a href="README_tr.md">Türkçe</a> | <strong>Tiếng Việt</strong> | <a href="README_th.md">ภาษาไทย</a> | <a href="README_id.md">Bahasa Indonesia</a> | <a href="README_pl.md">Polski</a> | <a href="README_nl.md">Nederlands</a>
 </p>
 
+> [!IMPORTANT]
+> **Fork status:** This is the **Rudy774 fork**, which differs from the original OpenTypeless project. Source code, releases, and support are provided only through [github.com/rudy774/opentypeless](https://github.com/rudy774/opentypeless). This fork does **not** currently provide a hosted paid service, and automatic updates are disabled.
+
 <p align="center">
   <img src="src-tauri/icons/128x128@2x.png" width="128" height="128" alt="Logo OpenTypeless" />
 </p>
@@ -19,11 +22,10 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/tover0314-w/opentypeless/actions/workflows/ci.yml"><img src="https://github.com/tover0314-w/opentypeless/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
-  <a href="https://github.com/tover0314-w/opentypeless/releases"><img src="https://img.shields.io/github/v/release/tover0314-w/opentypeless?color=2ABBA7" alt="Phiên bản" /></a>
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/tover0314-w/opentypeless" alt="Giấy phép" /></a>
-  <a href="https://github.com/tover0314-w/opentypeless/stargazers"><img src="https://img.shields.io/github/stars/tover0314-w/opentypeless?style=social" alt="Sao" /></a>
-  <a href="https://discord.gg/V6rRpJ4RGD"><img src="https://img.shields.io/badge/Discord-Tham%20gia-5865F2?logo=discord&logoColor=white" alt="Discord" /></a>
+  <a href="https://github.com/rudy774/opentypeless/actions/workflows/ci.yml"><img src="https://github.com/rudy774/opentypeless/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="https://github.com/rudy774/opentypeless/releases"><img src="https://img.shields.io/github/v/release/rudy774/opentypeless?color=2ABBA7" alt="Phiên bản" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/rudy774/opentypeless" alt="Giấy phép" /></a>
+  <a href="https://github.com/rudy774/opentypeless/stargazers"><img src="https://img.shields.io/github/stars/rudy774/opentypeless?style=social" alt="Sao" /></a>
 </p>
 
 <p align="center">
@@ -34,7 +36,9 @@
   <img src="docs/images/voice-flow-demo.gif" width="720" alt="Demo OpenTypeless" />
 </p>
 
-## Điểm mới trong v1.1.49
+## Inherited upstream capabilities
+
+The capabilities below originated in the upstream project before this fork. This is historical attribution, not a release-version or support claim.
 
 - **Viết theo ngữ cảnh ứng dụng** nhận diện ứng dụng đang hoạt động ngay trên máy và điều chỉnh cấu trúc, giọng điệu cho email, trò chuyện, tài liệu, công cụ theo dõi vấn đề, công cụ lập trình và nhiều môi trường khác.
 - **Định tuyến ý định giọng nói** phân biệt đọc chính tả, chỉnh sửa văn bản đã chọn, dịch thuật, Ask Anything và các thao tác giọng nói được hỗ trợ bằng tiếng Anh, tiếng Trung giản thể và phồn thể.
@@ -47,7 +51,7 @@ Việc nhận diện ứng dụng, ánh xạ, mục từ điển và quy tắc s
 
 | Trau chuốt AI theo ứng dụng | Từ điển cục bộ và sửa lỗi |
 | --- | --- |
-| <img src="docs/images/v1.1.49-app-aware-polish.jpg" width="420" alt="Trau chuốt AI theo ứng dụng trong OpenTypeless v1.1.49" /> | <img src="docs/images/v1.1.49-dictionary.jpg" width="420" alt="Từ điển cục bộ và sửa lỗi trong OpenTypeless v1.1.49" /> |
+| <img src="docs/images/v1.1.49-app-aware-polish.jpg" width="420" alt="Trau chuốt AI theo ứng dụng trong OpenTypeless inherited upstream" /> | <img src="docs/images/v1.1.49-dictionary.jpg" width="420" alt="Từ điển cục bộ và sửa lỗi trong OpenTypeless inherited upstream" /> |
 
 <details>
 <summary>Xem thêm ảnh chụp màn hình</summary>
@@ -107,7 +111,7 @@ Việc nhận diện ứng dụng, ánh xạ, mục từ điển và quy tắc s
 
 Tải phiên bản mới nhất cho nền tảng của bạn:
 
-**[Tải từ Releases](https://github.com/tover0314-w/opentypeless/releases)**
+**[Tải từ Releases](https://github.com/rudy774/opentypeless/releases)**
 
 | Nền tảng | Tệp |
 |----------|------|
@@ -149,43 +153,11 @@ Tất cả cài đặt đều có thể truy cập từ bảng Cài đặt trong
 
 API key được lưu trữ cục bộ qua `tauri-plugin-store`. Không có key nào được gửi đến máy chủ OpenTypeless — tất cả yêu cầu STT/LLM đều đi trực tiếp đến nhà cung cấp bạn cấu hình.
 
-### Tùy chọn Cloud (Pro)
+### Managed service status for this fork
 
-OpenTypeless cũng cung cấp gói đăng ký Pro tùy chọn với hạn ngạch STT và LLM được quản lý để bạn không cần API key riêng. Điều này hoàn toàn tùy chọn — ứng dụng hoạt động đầy đủ với key của riêng bạn.
+This fork currently supports bring-your-own-key and local providers. It does not include a hosted paid service. Account, entitlement, checkout, backup, and managed transcription features remain disabled unless you build and operate a compatible backend yourself.
 
-[Tìm hiểu thêm về Pro](https://www.opentypeless.com)
-
-### BYOK (Mang Key Riêng) so với Cloud
-
-| | Chế độ BYOK | Chế độ Cloud (Pro) |
-|---|---|---|
-| STT | API key của bạn (Deepgram, AssemblyAI, v.v.) | Hạn ngạch được quản lý (10 giờ/tháng) |
-| LLM | API key của bạn (OpenAI, DeepSeek, v.v.) | Hạn ngạch được quản lý (~5M token/tháng) |
-| Phụ thuộc cloud | Không — tất cả yêu cầu đi trực tiếp đến nhà cung cấp của bạn | Cần kết nối đến www.opentypeless.com |
-| Chi phí | Thanh toán trực tiếp cho nhà cung cấp | Đăng ký $4.99/tháng |
-
-Tất cả tính năng cốt lõi — ghi âm, chuyển đổi giọng nói, AI polish, xuất bàn phím/clipboard, từ điển, lịch sử — hoạt động hoàn toàn độc lập với máy chủ OpenTypeless trong chế độ BYOK.
-
-### Tự lưu trữ / Không Cloud
-
-Để chạy OpenTypeless mà không phụ thuộc cloud:
-
-1. Chọn bất kỳ nhà cung cấp STT và LLM không phải Cloud nào trong Cài đặt
-2. Nhập API key của riêng bạn
-3. Vậy là xong — không cần tài khoản hay kết nối internet đến www.opentypeless.com
-
-Nếu bạn muốn chuyển hướng các tính năng cloud tùy chọn đến backend riêng, đặt các biến môi trường sau trước khi build:
-
-| Biến | Mặc định | Mô tả |
-|---|---|---|
-| `VITE_API_BASE_URL` | `https://www.opentypeless.com` | URL cơ sở API cloud cho frontend |
-| `API_BASE_URL` | `https://www.opentypeless.com` | URL cơ sở API cloud cho Rust backend |
-
-```bash
-# Ví dụ: build với backend tùy chỉnh
-VITE_API_BASE_URL=https://my-server.example.com API_BASE_URL=https://my-server.example.com npm run tauri build
-```
-
+A self-hosted managed backend must be configured explicitly at build time with both `VITE_MANAGED_API_BASE_URL` and `OPENTYPELESS_MANAGED_API_BASE_URL`. There is no production default. Both values must be the same owned HTTPS origin; see `docs/MANAGED_SERVICE_API.md` and `docs/COMMERCIALIZATION.md`.
 ## Kiến trúc
 
 **Luồng dữ liệu:**
@@ -237,9 +209,8 @@ Có. Ứng dụng hoạt động đầy đủ với API key của riêng bạn (
 
 ## Cộng đồng
 
-- 💬 [Discord](https://discord.gg/V6rRpJ4RGD) — Trò chuyện, nhận hỗ trợ, chia sẻ phản hồi
-- 🗣️ [GitHub Discussions](https://github.com/tover0314-w/opentypeless/discussions) — Đề xuất tính năng, Hỏi & Đáp
-- 🐛 [Issue Tracker](https://github.com/tover0314-w/opentypeless/issues) — Báo lỗi và yêu cầu tính năng
+- 🗣️ [GitHub Discussions](https://github.com/rudy774/opentypeless/discussions) — Đề xuất tính năng, Hỏi & Đáp
+- 🐛 [Issue Tracker](https://github.com/rudy774/opentypeless/issues) — Báo lỗi và yêu cầu tính năng
 - 📖 [Hướng dẫn đóng góp](CONTRIBUTING.md) — Thiết lập phát triển và hướng dẫn
 - 🔒 [Chính sách bảo mật](SECURITY.md) — Báo cáo lỗ hổng một cách có trách nhiệm
 - 🧭 [Tầm nhìn](VISION.md) — Nguyên tắc dự án và hướng đi lộ trình
@@ -248,15 +219,15 @@ Có. Ứng dụng hoạt động đầy đủ với API key của riêng bạn (
 
 Chúng tôi hoan nghênh mọi đóng góp! Xem [CONTRIBUTING.md](CONTRIBUTING.md) để biết hướng dẫn thiết lập phát triển.
 
-Đang tìm điểm bắt đầu? Hãy xem các issue được gắn nhãn [`good first issue`](https://github.com/tover0314-w/opentypeless/labels/good%20first%20issue).
+Đang tìm điểm bắt đầu? Hãy xem các issue được gắn nhãn [`good first issue`](https://github.com/rudy774/opentypeless/labels/good%20first%20issue).
 
 ## Lịch sử Star
 
-<a href="https://star-history.com/#tover0314-w/opentypeless&Date">
+<a href="https://star-history.com/#rudy774/opentypeless&Date">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=tover0314-w/opentypeless&type=Date&theme=dark" />
-    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=tover0314-w/opentypeless&type=Date" />
-    <img alt="Biểu đồ lịch sử Star" src="https://api.star-history.com/svg?repos=tover0314-w/opentypeless&type=Date" />
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=rudy774/opentypeless&type=Date&theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=rudy774/opentypeless&type=Date" />
+    <img alt="Biểu đồ lịch sử Star" src="https://api.star-history.com/svg?repos=rudy774/opentypeless&type=Date" />
   </picture>
 </a>
 

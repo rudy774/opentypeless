@@ -18,5 +18,3 @@ Start a [discussion](https://github.com/rudy774/opentypeless/discussions) or [op
 ## Security
 
 Report vulnerabilities privately through [GitHub Security Advisories](https://github.com/rudy774/opentypeless/security/advisories/new). Do not post vulnerability details in a public issue. See [SECURITY.md](SECURITY.md) for the security model and response guidance.
-
-For the original project's support channels, visit the [upstream OpenTypeless repository](https://github.com/tover0314-w/opentypeless).

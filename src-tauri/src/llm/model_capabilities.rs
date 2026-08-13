@@ -89,30 +89,16 @@ mod tests {
     use super::*;
     use crate::llm::prompt::CONTEXT_PROMPT_VERSION;
 
-    const MANAGED_BASE: &str = "https://www.opentypeless.com/api/proxy";
-
     #[test]
-    fn model_capabilities_requires_exact_certified_tuple() {
-        assert_eq!(
-            model_capability("cloud", MANAGED_BASE, "default", CONTEXT_PROMPT_VERSION),
-            ModelCapability::Certified
-        );
-    }
-
-    #[test]
-    fn model_capabilities_marks_same_provider_surface_as_best_effort() {
+    fn unconfigured_managed_model_is_not_certified() {
         assert_eq!(
             model_capability(
                 "cloud",
-                MANAGED_BASE,
-                "another-model",
-                CONTEXT_PROMPT_VERSION
+                "https://managed-service-unconfigured.invalid/api/proxy",
+                "default",
+                CONTEXT_PROMPT_VERSION,
             ),
-            ModelCapability::BestEffort
-        );
-        assert_eq!(
-            model_capability("cloud", MANAGED_BASE, "default", "context-v2"),
-            ModelCapability::BestEffort
+            ModelCapability::Unknown
         );
     }
 
@@ -128,7 +114,12 @@ mod tests {
             ModelCapability::Unknown
         );
         assert_eq!(
-            model_capability("cloud", MANAGED_BASE, "", CONTEXT_PROMPT_VERSION),
+            model_capability(
+                "cloud",
+                "https://api.rudy.example/api/proxy",
+                "",
+                CONTEXT_PROMPT_VERSION
+            ),
             ModelCapability::Unknown
         );
         assert_eq!(

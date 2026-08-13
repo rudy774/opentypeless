@@ -10,6 +10,7 @@ import {
   CUSTOM_STT_DEFAULTS,
   CUSTOM_STT_PRESETS,
   VOLCENGINE_STT_RESOURCES,
+  MANAGED_SERVICE_CONFIGURED,
 } from '../../lib/constants'
 import {
   benchSttConnection,
@@ -35,11 +36,14 @@ export function SttPane() {
   const [testErrorMessage, setTestErrorMessage] = useState<string | null>(null)
   const [credentialErrorMessage, setCredentialErrorMessage] = useState<string | null>(null)
 
-  const isCloud = config.stt_provider === 'cloud'
-  const isAppleSpeech = config.stt_provider === APPLE_SPEECH_PROVIDER
-  const isCustomWhisper = config.stt_provider === CUSTOM_WHISPER_PROVIDER
-  const isVolcengineDoubao = config.stt_provider === 'volcengine-doubao'
-  const credentialProvider = isCustomWhisper ? CUSTOM_WHISPER_PROVIDER : config.stt_provider
+  const sttProvider = (
+    !MANAGED_SERVICE_CONFIGURED && config.stt_provider === 'cloud' ? 'glm-asr' : config.stt_provider
+  ) as typeof config.stt_provider
+  const isCloud = MANAGED_SERVICE_CONFIGURED && sttProvider === 'cloud'
+  const isAppleSpeech = sttProvider === APPLE_SPEECH_PROVIDER
+  const isCustomWhisper = sttProvider === CUSTOM_WHISPER_PROVIDER
+  const isVolcengineDoubao = sttProvider === 'volcengine-doubao'
+  const credentialProvider = isCustomWhisper ? CUSTOM_WHISPER_PROVIDER : sttProvider
   const legacyApiKey = isCustomWhisper ? config.stt_custom_api_key : config.stt_api_key
   const volcengineResourceId =
     config.stt_volcengine_resource_id || VOLCENGINE_STT_RESOURCES[0].value
@@ -50,7 +54,9 @@ export function SttPane() {
     ? platformCapabilities.os === 'macos'
     : isMacPlatform()
   const visibleSttProviders = STT_PROVIDERS.filter(
-    (provider) => provider.value !== APPLE_SPEECH_PROVIDER || supportsAppleSpeech,
+    (provider) =>
+      (provider.value !== APPLE_SPEECH_PROVIDER || supportsAppleSpeech) &&
+      (provider.value !== 'cloud' || MANAGED_SERVICE_CONFIGURED),
   )
   const appleSpeechReady = sttDiagnostics?.ready === true
   const appleSpeechUnavailable = sttDiagnostics?.ready === false
@@ -62,6 +68,14 @@ export function SttPane() {
   const goUpgrade = () => {
     window.location.hash = '#/upgrade'
   }
+
+  useEffect(() => {
+    if (MANAGED_SERVICE_CONFIGURED || config.stt_provider !== 'cloud') return
+    updateConfig({ stt_provider: 'glm-asr' })
+    setSttTestStatus('idle')
+    setSttLatencyMs(null)
+    setTestErrorMessage(null)
+  }, [config.stt_provider, setSttLatencyMs, setSttTestStatus, updateConfig])
 
   useEffect(() => {
     if (isCloud || isAppleSpeech) {
@@ -93,7 +107,7 @@ export function SttPane() {
     let cancelled = false
     getSttProviderDiagnostics(
       isAppleSpeech ? '' : apiKeyDraft,
-      config.stt_provider,
+      sttProvider,
       isCustomWhisper ? config.stt_custom_base_url : undefined,
       isCustomWhisper ? config.stt_custom_model : undefined,
     )
@@ -112,7 +126,7 @@ export function SttPane() {
     apiKeyDraft,
     config.stt_custom_base_url,
     config.stt_custom_model,
-    config.stt_provider,
+    sttProvider,
     isAppleSpeech,
     isCustomWhisper,
   ])
@@ -144,20 +158,20 @@ export function SttPane() {
       if (isCustomWhisper) {
         ms = await benchSttConnection(
           apiKeyDraft,
-          config.stt_provider,
+          sttProvider,
           config.stt_custom_base_url,
           config.stt_custom_model,
         )
       } else if (isVolcengineDoubao) {
         ms = await benchSttConnection(
           apiKeyDraft,
-          config.stt_provider,
+          sttProvider,
           undefined,
           undefined,
           volcengineResourceId,
         )
       } else {
-        ms = await benchSttConnection(apiKeyDraft, config.stt_provider)
+        ms = await benchSttConnection(apiKeyDraft, sttProvider)
       }
       console.log('[STT Test] Received latency:', ms, 'type:', typeof ms)
       setSttLatencyMs(ms)
@@ -173,7 +187,7 @@ export function SttPane() {
     <div className="space-y-5">
       <FormField label={t('settings.provider')}>
         <select
-          value={config.stt_provider}
+          value={sttProvider}
           onChange={(e) => {
             const provider = e.target.value as typeof config.stt_provider
             updateConfig({
@@ -203,6 +217,15 @@ export function SttPane() {
           ))}
         </select>
       </FormField>
+
+      {!MANAGED_SERVICE_CONFIGURED && (
+        <div
+          role="note"
+          className="rounded-[10px] border border-border bg-bg-secondary/45 px-3 py-3 text-[12px] leading-5 text-text-secondary"
+        >
+          {t('settings.managedServiceUnavailableByok')}
+        </div>
+      )}
 
       {isCloud ? (
         <div className="border border-border rounded-[10px] px-3 py-3 space-y-2">

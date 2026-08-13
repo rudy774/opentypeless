@@ -2,6 +2,9 @@
   <a href="README.md">English</a> | <a href="README_zh.md">中文</a> | <a href="README_ja.md">日本語</a> | <a href="README_ko.md">한국어</a> | <a href="README_es.md">Español</a> | <a href="README_fr.md">Français</a> | <a href="README_de.md">Deutsch</a> | <a href="README_pt.md">Português</a> | <a href="README_ru.md">Русский</a> | <a href="README_ar.md">العربية</a> | <strong>हिन्दी</strong> | <a href="README_it.md">Italiano</a> | <a href="README_tr.md">Türkçe</a> | <a href="README_vi.md">Tiếng Việt</a> | <a href="README_th.md">ภาษาไทย</a> | <a href="README_id.md">Bahasa Indonesia</a> | <a href="README_pl.md">Polski</a> | <a href="README_nl.md">Nederlands</a>
 </p>
 
+> [!IMPORTANT]
+> **Fork status:** This is the **Rudy774 fork**, which differs from the original OpenTypeless project. Source code, releases, and support are provided only through [github.com/rudy774/opentypeless](https://github.com/rudy774/opentypeless). This fork does **not** currently provide a hosted paid service, and automatic updates are disabled.
+
 <p align="center">
   <img src="src-tauri/icons/128x128@2x.png" width="128" height="128" alt="OpenTypeless लोगो" />
 </p>
@@ -19,11 +22,10 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/tover0314-w/opentypeless/actions/workflows/ci.yml"><img src="https://github.com/tover0314-w/opentypeless/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
-  <a href="https://github.com/tover0314-w/opentypeless/releases"><img src="https://img.shields.io/github/v/release/tover0314-w/opentypeless?color=2ABBA7" alt="रिलीज़" /></a>
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/tover0314-w/opentypeless" alt="लाइसेंस" /></a>
-  <a href="https://github.com/tover0314-w/opentypeless/stargazers"><img src="https://img.shields.io/github/stars/tover0314-w/opentypeless?style=social" alt="Stars" /></a>
-  <a href="https://discord.gg/V6rRpJ4RGD"><img src="https://img.shields.io/badge/Discord-Join%20us-5865F2?logo=discord&logoColor=white" alt="Discord" /></a>
+  <a href="https://github.com/rudy774/opentypeless/actions/workflows/ci.yml"><img src="https://github.com/rudy774/opentypeless/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="https://github.com/rudy774/opentypeless/releases"><img src="https://img.shields.io/github/v/release/rudy774/opentypeless?color=2ABBA7" alt="रिलीज़" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/rudy774/opentypeless" alt="लाइसेंस" /></a>
+  <a href="https://github.com/rudy774/opentypeless/stargazers"><img src="https://img.shields.io/github/stars/rudy774/opentypeless?style=social" alt="Stars" /></a>
 </p>
 
 <p align="center">
@@ -34,7 +36,9 @@
   <img src="docs/images/voice-flow-demo.gif" width="720" alt="OpenTypeless डेमो" />
 </p>
 
-## v1.1.49 में नया
+## Inherited upstream capabilities
+
+The capabilities below originated in the upstream project before this fork. This is historical attribution, not a release-version or support claim.
 
 - **ऐप-जागरूक लेखन** सक्रिय ऐप को स्थानीय रूप से पहचानता है और ईमेल, चैट, दस्तावेज़, इश्यू ट्रैकर, डेवलपमेंट टूल तथा अन्य कार्यों के लिए संरचना और शैली बदलता है।
 - **वॉइस इंटेंट रूटिंग** अंग्रेज़ी, सरलीकृत चीनी और पारंपरिक चीनी में डिक्टेशन, चुने हुए टेक्स्ट का संपादन, अनुवाद, Ask Anything और समर्थित वॉइस कार्रवाइयों को अलग पहचानती है।
@@ -47,7 +51,7 @@
 
 | ऐप-जागरूक AI पॉलिश | स्थानीय डिक्शनरी और सुधार |
 | --- | --- |
-| <img src="docs/images/v1.1.49-app-aware-polish.jpg" width="420" alt="OpenTypeless v1.1.49 ऐप-जागरूक AI पॉलिश" /> | <img src="docs/images/v1.1.49-dictionary.jpg" width="420" alt="OpenTypeless v1.1.49 स्थानीय डिक्शनरी और सुधार" /> |
+| <img src="docs/images/v1.1.49-app-aware-polish.jpg" width="420" alt="OpenTypeless inherited upstream ऐप-जागरूक AI पॉलिश" /> | <img src="docs/images/v1.1.49-dictionary.jpg" width="420" alt="OpenTypeless inherited upstream स्थानीय डिक्शनरी और सुधार" /> |
 
 <details>
 <summary>और स्क्रीनशॉट</summary>
@@ -107,7 +111,7 @@
 
 अपने प्लेटफ़ॉर्म के लिए नवीनतम संस्करण डाउनलोड करें:
 
-**[Releases से डाउनलोड करें](https://github.com/tover0314-w/opentypeless/releases)**
+**[Releases से डाउनलोड करें](https://github.com/rudy774/opentypeless/releases)**
 
 | प्लेटफ़ॉर्म | फ़ाइल |
 |------------|-------|
@@ -149,43 +153,11 @@ npm run tauri build
 
 API कुंजियां `tauri-plugin-store` के माध्यम से स्थानीय रूप से संग्रहीत की जाती हैं। कोई भी कुंजी OpenTypeless सर्वर को नहीं भेजी जाती — सभी STT/LLM अनुरोध सीधे आपके द्वारा कॉन्फ़िगर किए गए प्रोवाइडर को जाते हैं।
 
-### Cloud (Pro) विकल्प
+### Managed service status for this fork
 
-OpenTypeless एक वैकल्पिक Pro सब्सक्रिप्शन भी प्रदान करता है जो प्रबंधित STT और LLM कोटा प्रदान करता है ताकि आपको अपनी API कुंजियों की आवश्यकता न हो। यह पूरी तरह से वैकल्पिक है — ऐप आपकी अपनी कुंजियों के साथ पूरी तरह कार्यात्मक है।
+This fork currently supports bring-your-own-key and local providers. It does not include a hosted paid service. Account, entitlement, checkout, backup, and managed transcription features remain disabled unless you build and operate a compatible backend yourself.
 
-[Pro के बारे में अधिक जानें](https://www.opentypeless.com)
-
-### BYOK (Bring Your Own Key) बनाम Cloud
-
-| | BYOK मोड | Cloud (Pro) मोड |
-|---|---|---|
-| STT | आपकी अपनी API कुंजी (Deepgram, AssemblyAI, आदि) | प्रबंधित कोटा (10 घंटे/माह) |
-| LLM | आपकी अपनी API कुंजी (OpenAI, DeepSeek, आदि) | प्रबंधित कोटा (~50 लाख टोकन/माह) |
-| क्लाउड निर्भरता | कोई नहीं — सभी अनुरोध सीधे आपके प्रोवाइडर को जाते हैं | www.opentypeless.com से कनेक्शन आवश्यक |
-| लागत | सीधे अपने प्रोवाइडर को भुगतान करें | $4.99/माह सब्सक्रिप्शन |
-
-सभी कोर विशेषताएं — रिकॉर्डिंग, ट्रांसक्रिप्शन, AI पॉलिश, कीबोर्ड/क्लिपबोर्ड आउटपुट, डिक्शनरी, हिस्ट्री — BYOK मोड में OpenTypeless सर्वर से पूरी तरह स्वतंत्र रूप से काम करती हैं।
-
-### सेल्फ-होस्टिंग / बिना क्लाउड
-
-बिना किसी क्लाउड निर्भरता के OpenTypeless चलाने के लिए:
-
-1. सेटिंग्स में कोई भी गैर-Cloud STT और LLM प्रोवाइडर चुनें
-2. अपनी API कुंजियां दर्ज करें
-3. बस — www.opentypeless.com पर कोई अकाउंट या इंटरनेट कनेक्शन की आवश्यकता नहीं
-
-यदि आप वैकल्पिक क्लाउड सुविधाओं को अपने बैकएंड पर इंगित करना चाहते हैं, तो बिल्ड से पहले ये पर्यावरण चर सेट करें:
-
-| चर | डिफ़ॉल्ट | विवरण |
-|---|---|---|
-| `VITE_API_BASE_URL` | `https://www.opentypeless.com` | फ्रंटएंड क्लाउड API बेस URL |
-| `API_BASE_URL` | `https://www.opentypeless.com` | Rust बैकएंड क्लाउड API बेस URL |
-
-```bash
-# उदाहरण: कस्टम बैकएंड के साथ बिल्ड
-VITE_API_BASE_URL=https://my-server.example.com API_BASE_URL=https://my-server.example.com npm run tauri build
-```
-
+A self-hosted managed backend must be configured explicitly at build time with both `VITE_MANAGED_API_BASE_URL` and `OPENTYPELESS_MANAGED_API_BASE_URL`. There is no production default. Both values must be the same owned HTTPS origin; see `docs/MANAGED_SERVICE_API.md` and `docs/COMMERCIALIZATION.md`.
 ## आर्किटेक्चर
 
 **डेटा फ्लो पाइपलाइन:**
@@ -237,9 +209,8 @@ STT प्रोवाइडर के आधार पर 99+ भाषाओ�
 
 ## समुदाय
 
-- 💬 [Discord](https://discord.gg/V6rRpJ4RGD) — चैट, मदद, फ़ीडबैक
-- 🗣️ [GitHub Discussions](https://github.com/tover0314-w/opentypeless/discussions) — फ़ीचर प्रस्ताव, प्रश्न और उत्तर
-- 🐛 [Issue Tracker](https://github.com/tover0314-w/opentypeless/issues) — बग रिपोर्ट और फ़ीचर अनुरोध
+- 🗣️ [GitHub Discussions](https://github.com/rudy774/opentypeless/discussions) — फ़ीचर प्रस्ताव, प्रश्न और उत्तर
+- 🐛 [Issue Tracker](https://github.com/rudy774/opentypeless/issues) — बग रिपोर्ट और फ़ीचर अनुरोध
 - 📖 [योगदान गाइड](CONTRIBUTING.md) — डेवलपमेंट सेटअप और दिशानिर्देश
 - 🔒 [सुरक्षा नीति](SECURITY.md) — जिम्मेदारी से कमज़ोरियों की रिपोर्ट करें
 - 🧭 [विज़न](VISION.md) — प्रोजेक्ट सिद्धांत और रोडमैप दिशा
@@ -248,15 +219,15 @@ STT प्रोवाइडर के आधार पर 99+ भाषाओ�
 
 योगदान का स्वागत है! डेवलपमेंट सेटअप और दिशानिर्देशों के लिए [CONTRIBUTING.md](CONTRIBUTING.md) देखें।
 
-शुरू करने की जगह खोज रहे हैं? [`good first issue`](https://github.com/tover0314-w/opentypeless/labels/good%20first%20issue) लेबल वाले issues देखें।
+शुरू करने की जगह खोज रहे हैं? [`good first issue`](https://github.com/rudy774/opentypeless/labels/good%20first%20issue) लेबल वाले issues देखें।
 
 ## Star History
 
-<a href="https://star-history.com/#tover0314-w/opentypeless&Date">
+<a href="https://star-history.com/#rudy774/opentypeless&Date">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=tover0314-w/opentypeless&type=Date&theme=dark" />
-    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=tover0314-w/opentypeless&type=Date" />
-    <img alt="Star History चार्ट" src="https://api.star-history.com/svg?repos=tover0314-w/opentypeless&type=Date" />
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=rudy774/opentypeless&type=Date&theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=rudy774/opentypeless&type=Date" />
+    <img alt="Star History चार्ट" src="https://api.star-history.com/svg?repos=rudy774/opentypeless&type=Date" />
   </picture>
 </a>
 

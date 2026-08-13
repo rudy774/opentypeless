@@ -2,6 +2,9 @@
   <a href="README.md">English</a> | <a href="README_zh.md">中文</a> | <a href="README_ja.md">日本語</a> | <a href="README_ko.md">한국어</a> | <a href="README_es.md">Español</a> | <a href="README_fr.md">Français</a> | <a href="README_de.md">Deutsch</a> | <a href="README_pt.md">Português</a> | <strong>Русский</strong> | <a href="README_ar.md">العربية</a> | <a href="README_hi.md">हिन्दी</a> | <a href="README_it.md">Italiano</a> | <a href="README_tr.md">Türkçe</a> | <a href="README_vi.md">Tiếng Việt</a> | <a href="README_th.md">ภาษาไทย</a> | <a href="README_id.md">Bahasa Indonesia</a> | <a href="README_pl.md">Polski</a> | <a href="README_nl.md">Nederlands</a>
 </p>
 
+> [!IMPORTANT]
+> **Fork status:** This is the **Rudy774 fork**, which differs from the original OpenTypeless project. Source code, releases, and support are provided only through [github.com/rudy774/opentypeless](https://github.com/rudy774/opentypeless). This fork does **not** currently provide a hosted paid service, and automatic updates are disabled.
+
 <p align="center">
   <img src="src-tauri/icons/128x128@2x.png" width="128" height="128" alt="Логотип OpenTypeless" />
 </p>
@@ -19,11 +22,10 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/tover0314-w/opentypeless/actions/workflows/ci.yml"><img src="https://github.com/tover0314-w/opentypeless/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
-  <a href="https://github.com/tover0314-w/opentypeless/releases"><img src="https://img.shields.io/github/v/release/tover0314-w/opentypeless?color=2ABBA7" alt="Релиз" /></a>
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/tover0314-w/opentypeless" alt="Лицензия" /></a>
-  <a href="https://github.com/tover0314-w/opentypeless/stargazers"><img src="https://img.shields.io/github/stars/tover0314-w/opentypeless?style=social" alt="Звёзды" /></a>
-  <a href="https://discord.gg/V6rRpJ4RGD"><img src="https://img.shields.io/badge/Discord-Join%20us-5865F2?logo=discord&logoColor=white" alt="Discord" /></a>
+  <a href="https://github.com/rudy774/opentypeless/actions/workflows/ci.yml"><img src="https://github.com/rudy774/opentypeless/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="https://github.com/rudy774/opentypeless/releases"><img src="https://img.shields.io/github/v/release/rudy774/opentypeless?color=2ABBA7" alt="Релиз" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/rudy774/opentypeless" alt="Лицензия" /></a>
+  <a href="https://github.com/rudy774/opentypeless/stargazers"><img src="https://img.shields.io/github/stars/rudy774/opentypeless?style=social" alt="Звёзды" /></a>
 </p>
 
 <p align="center">
@@ -34,7 +36,9 @@
   <img src="docs/images/voice-flow-demo.gif" width="720" alt="Демо OpenTypeless" />
 </p>
 
-## Новое в v1.1.49
+## Inherited upstream capabilities
+
+The capabilities below originated in the upstream project before this fork. This is historical attribution, not a release-version or support claim.
 
 - **Контекстное письмо с учётом приложения** локально определяет активную программу и адаптирует структуру и тон для почты, чатов, документов, трекеров задач, инструментов разработки и других сценариев.
 - **Маршрутизация голосовых намерений** различает диктовку, редактирование выделенного текста, перевод, Ask Anything и поддерживаемые голосовые действия на английском, упрощённом и традиционном китайском языках.
@@ -47,7 +51,7 @@
 
 | Контекстная обработка с ИИ | Локальный словарь и исправления |
 | --- | --- |
-| <img src="docs/images/v1.1.49-app-aware-polish.jpg" width="420" alt="Контекстная обработка с ИИ в OpenTypeless v1.1.49" /> | <img src="docs/images/v1.1.49-dictionary.jpg" width="420" alt="Локальный словарь и исправления в OpenTypeless v1.1.49" /> |
+| <img src="docs/images/v1.1.49-app-aware-polish.jpg" width="420" alt="Контекстная обработка с ИИ в OpenTypeless inherited upstream" /> | <img src="docs/images/v1.1.49-dictionary.jpg" width="420" alt="Локальный словарь и исправления в OpenTypeless inherited upstream" /> |
 
 <details>
 <summary>Ещё скриншоты</summary>
@@ -107,7 +111,7 @@
 
 Скачайте последнюю версию для вашей платформы:
 
-**[Скачать из Releases](https://github.com/tover0314-w/opentypeless/releases)**
+**[Скачать из Releases](https://github.com/rudy774/opentypeless/releases)**
 
 | Платформа | Файл |
 |-----------|------|
@@ -149,43 +153,11 @@ npm run tauri build
 
 API-ключи хранятся локально через `tauri-plugin-store`. Ключи не отправляются на серверы OpenTypeless — все STT/LLM-запросы идут напрямую к выбранному провайдеру.
 
-### Cloud (Pro) опция
+### Managed service status for this fork
 
-OpenTypeless также предлагает опциональную подписку Pro с управляемой квотой STT и LLM, чтобы вам не нужны были собственные API-ключи. Это полностью опционально — приложение полностью работает с вашими ключами.
+This fork currently supports bring-your-own-key and local providers. It does not include a hosted paid service. Account, entitlement, checkout, backup, and managed transcription features remain disabled unless you build and operate a compatible backend yourself.
 
-[Узнать больше о Pro](https://www.opentypeless.com)
-
-### BYOK (Bring Your Own Key) vs Cloud
-
-| | Режим BYOK | Режим Cloud (Pro) |
-|---|---|---|
-| STT | Ваш API-ключ (Deepgram, AssemblyAI и др.) | Управляемая квота (10 ч/месяц) |
-| LLM | Ваш API-ключ (OpenAI, DeepSeek и др.) | Управляемая квота (~5 млн токенов/месяц) |
-| Зависимость от облака | Нет — все запросы идут напрямую к вашему провайдеру | Требуется подключение к www.opentypeless.com |
-| Стоимость | Платите провайдеру напрямую | Подписка $4.99/месяц |
-
-Все основные функции — запись, транскрипция, ИИ-полировка, вывод через клавиатуру/буфер обмена, словарь, история — работают полностью без серверов OpenTypeless в режиме BYOK.
-
-### Самостоятельный хостинг / Без облака
-
-Чтобы запустить OpenTypeless без облачной зависимости:
-
-1. Выберите любого не-Cloud провайдера STT и LLM в настройках
-2. Введите свои API-ключи
-3. Готово — аккаунт или подключение к www.opentypeless.com не требуется
-
-Если вы хотите направить опциональные облачные функции на свой бэкенд, установите эти переменные окружения перед сборкой:
-
-| Переменная | По умолчанию | Описание |
-|---|---|---|
-| `VITE_API_BASE_URL` | `https://www.opentypeless.com` | Базовый URL облачного API фронтенда |
-| `API_BASE_URL` | `https://www.opentypeless.com` | Базовый URL облачного API Rust-бэкенда |
-
-```bash
-# Пример: сборка с пользовательским бэкендом
-VITE_API_BASE_URL=https://my-server.example.com API_BASE_URL=https://my-server.example.com npm run tauri build
-```
-
+A self-hosted managed backend must be configured explicitly at build time with both `VITE_MANAGED_API_BASE_URL` and `OPENTYPELESS_MANAGED_API_BASE_URL`. There is no production default. Both values must be the same owned HTTPS origin; see `docs/MANAGED_SERVICE_API.md` and `docs/COMMERCIALIZATION.md`.
 ## Архитектура
 
 **Конвейер обработки данных:**
@@ -237,9 +209,8 @@ STT поддерживает 99+ языков в зависимости от п�
 
 ## Сообщество
 
-- 💬 [Discord](https://discord.gg/V6rRpJ4RGD) — Общение, помощь, обратная связь
-- 🗣️ [GitHub Discussions](https://github.com/tover0314-w/opentypeless/discussions) — Предложения функций, вопросы и ответы
-- 🐛 [Issue Tracker](https://github.com/tover0314-w/opentypeless/issues) — Отчёты об ошибках и запросы функций
+- 🗣️ [GitHub Discussions](https://github.com/rudy774/opentypeless/discussions) — Предложения функций, вопросы и ответы
+- 🐛 [Issue Tracker](https://github.com/rudy774/opentypeless/issues) — Отчёты об ошибках и запросы функций
 - 📖 [Руководство по вкладу](CONTRIBUTING.md) — Настройка разработки и рекомендации
 - 🔒 [Политика безопасности](SECURITY.md) — Ответственно сообщить об уязвимостях
 - 🧭 [Видение](VISION.md) — Принципы проекта и направление развития
@@ -248,15 +219,15 @@ STT поддерживает 99+ языков в зависимости от п�
 
 Вклады приветствуются! См. [CONTRIBUTING.md](CONTRIBUTING.md) для настройки разработки и рекомендаций.
 
-Ищете с чего начать? Посмотрите задачи с меткой [`good first issue`](https://github.com/tover0314-w/opentypeless/labels/good%20first%20issue).
+Ищете с чего начать? Посмотрите задачи с меткой [`good first issue`](https://github.com/rudy774/opentypeless/labels/good%20first%20issue).
 
 ## Star History
 
-<a href="https://star-history.com/#tover0314-w/opentypeless&Date">
+<a href="https://star-history.com/#rudy774/opentypeless&Date">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=tover0314-w/opentypeless&type=Date&theme=dark" />
-    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=tover0314-w/opentypeless&type=Date" />
-    <img alt="График истории звёзд" src="https://api.star-history.com/svg?repos=tover0314-w/opentypeless&type=Date" />
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=rudy774/opentypeless&type=Date&theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=rudy774/opentypeless&type=Date" />
+    <img alt="График истории звёзд" src="https://api.star-history.com/svg?repos=rudy774/opentypeless&type=Date" />
   </picture>
 </a>
 

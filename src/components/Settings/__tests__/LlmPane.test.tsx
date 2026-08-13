@@ -3,6 +3,13 @@ import { render, screen, fireEvent, waitFor, cleanup, within } from '@testing-li
 import { LlmPane } from '../LlmPane'
 import * as tauri from '../../../lib/tauri'
 
+const managedService = vi.hoisted(() => ({ configured: true }))
+vi.mock('../../../lib/constants', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../lib/constants')>()),
+  get MANAGED_SERVICE_CONFIGURED() {
+    return managedService.configured
+  },
+}))
 // Mock Tauri
 vi.mock('../../../lib/tauri')
 
@@ -62,6 +69,8 @@ vi.mock('react-i18next', () => ({
         'settings.llmUpgradeHint':
           'Upgrade to Pro for cloud AI polish and monthly usage. No API key needed.',
         'settings.llmProActive': 'Pro active — cloud AI polish is ready. No API key needed.',
+        'settings.managedServiceUnavailableByok':
+          'Managed cloud is not configured. Choose a BYOK or local provider.',
         'settings.askAnything': 'Ask Anything',
         'settings.askAnythingDesc': 'Voice question, one-shot answer. No chat history.',
         'ask.ready': 'Ready to ask',
@@ -151,6 +160,7 @@ vi.mock('../../../stores/authStore', () => ({
 
 describe('LlmPane', () => {
   beforeEach(() => {
+    managedService.configured = true
     // Reset mock store state
     mockAppStore.config = {
       llm_provider: 'openai',
@@ -233,6 +243,27 @@ describe('LlmPane', () => {
   })
 
   describe('Cloud provider UI', () => {
+    it('removes cloud and migrates stale saved cloud config when the service is unconfigured', () => {
+      managedService.configured = false
+      mockAppStore.config.llm_provider = 'cloud'
+      mockAppStore.config.llm_base_url = 'https://managed-service-unconfigured.invalid/api/proxy'
+      mockAppStore.config.llm_model = 'default'
+
+      render(<LlmPane />)
+
+      const providerSelect = screen.getAllByRole('combobox')[0]
+      expect(providerSelect).toHaveValue('openrouter')
+      expect(providerSelect.querySelector('option[value="cloud"]')).toBeNull()
+      expect(mockAppStore.updateConfig).toHaveBeenCalledWith({
+        llm_provider: 'openrouter',
+        llm_base_url: 'https://openrouter.ai/api/v1',
+        llm_model: 'openai/gpt-4o-mini',
+      })
+      expect(
+        screen.getByText('Managed cloud is not configured. Choose a BYOK or local provider.'),
+      ).toBeInTheDocument()
+      expect(screen.queryByText('Cloud LLM (Pro)')).not.toBeInTheDocument()
+    })
     it('keeps Ask Anything out of AI Polish settings', () => {
       render(<LlmPane />)
 

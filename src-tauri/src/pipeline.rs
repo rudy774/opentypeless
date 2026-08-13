@@ -150,6 +150,17 @@ struct ConnectionPrewarmTarget {
     include_desktop_client_version: bool,
 }
 
+fn sanitized_prewarm_origin(raw_url: &str) -> Option<String> {
+    let parsed = reqwest::Url::parse(raw_url).ok()?;
+    match parsed.scheme() {
+        "http" | "https" => {}
+        _ => return None,
+    }
+
+    let origin = parsed.origin().ascii_serialization();
+    (origin != "null").then_some(origin)
+}
+
 fn connection_prewarm_targets(
     config: &storage::AppConfig,
 ) -> (
@@ -180,17 +191,20 @@ fn connection_prewarm_targets(
         })
     };
 
-    let llm = config.polish_enabled.then(|| ConnectionPrewarmTarget {
-        label: "LLM",
-        url: if config.llm_provider == "cloud" {
-            format!("{}/api/proxy/llm", crate::api_base_url())
-        } else {
-            format!(
-                "{}/chat/completions",
-                config.llm_base_url.trim_end_matches('/')
-            )
-        },
-        include_desktop_client_version: config.llm_provider == "cloud",
+    let llm = config.polish_enabled.then_some(()).and_then(|()| {
+        llm::validate_provider_base_url(&config.llm_provider, &config.llm_base_url).ok()?;
+        Some(ConnectionPrewarmTarget {
+            label: "LLM",
+            url: if config.llm_provider == "cloud" {
+                format!("{}/api/proxy/llm", crate::api_base_url())
+            } else {
+                format!(
+                    "{}/chat/completions",
+                    config.llm_base_url.trim_end_matches('/')
+                )
+            },
+            include_desktop_client_version: config.llm_provider == "cloud",
+        })
     });
 
     (stt, llm)
@@ -206,10 +220,11 @@ async fn prewarm_connection(
     };
 
     let started = std::time::Instant::now();
+    let origin = sanitized_prewarm_origin(&target.url).unwrap_or_else(|| "unavailable".to_string());
     tracing::debug!(
         service = target.label,
         source,
-        url = %target.url,
+        origin = %origin,
         "Pre-warming HTTP connection"
     );
     let request = client.head(&target.url);
@@ -234,8 +249,11 @@ async fn prewarm_connection(
         Err(error) => tracing::debug!(
             service = target.label,
             source,
+            origin = %origin,
             elapsed_ms = started.elapsed().as_millis() as u64,
-            error = %error,
+            is_timeout = error.is_timeout(),
+            is_connect = error.is_connect(),
+            status = ?error.status(),
             "HTTP connection pre-warm did not complete"
         ),
     }
@@ -875,6 +893,16 @@ struct HistoryOutputMetadata {
     error: Option<String>,
 }
 
+struct HistorySaveInput<'a> {
+    raw_text: &'a str,
+    final_text: &'a str,
+    app_ctx: &'a RecordingContext,
+    duration_ms: Option<i64>,
+    timing: HistoryTimingMetadata,
+    config: &'a storage::AppConfig,
+    output: HistoryOutputMetadata,
+}
+
 #[derive(Debug, Clone, Copy)]
 struct HistoryTimingMetadata {
     stt_ms: i64,
@@ -921,17 +949,23 @@ fn voice_execution_history_metadata(
 
     match execution.status {
         VoiceExecutionStatus::Completed => HistoryOutputMetadata {
-            status: None,
+            status: Some("inserted".to_string()),
             error: None,
         },
         VoiceExecutionStatus::CopiedFallback => HistoryOutputMetadata {
             status: Some("clipboard_fallback".to_string()),
             error: Some(voice_execution_fallback_message(execution.fallback_reason).to_string()),
         },
-        VoiceExecutionStatus::PopupFallback
-        | VoiceExecutionStatus::Prevented
-        | VoiceExecutionStatus::Failed => HistoryOutputMetadata {
-            status: Some("fallback".to_string()),
+        VoiceExecutionStatus::PopupFallback => HistoryOutputMetadata {
+            status: Some("popup_fallback".to_string()),
+            error: Some(voice_execution_fallback_message(execution.fallback_reason).to_string()),
+        },
+        VoiceExecutionStatus::Prevented => HistoryOutputMetadata {
+            status: Some("prevented".to_string()),
+            error: Some(voice_execution_fallback_message(execution.fallback_reason).to_string()),
+        },
+        VoiceExecutionStatus::Failed => HistoryOutputMetadata {
+            status: Some("failed".to_string()),
             error: Some(voice_execution_fallback_message(execution.fallback_reason).to_string()),
         },
     }
@@ -946,6 +980,17 @@ struct PipelineVoiceExecutionBackend<'a> {
     focus_target: Option<FocusTargetToken>,
     config: &'a storage::AppConfig,
     already_copied: bool,
+    popup_fallback_enabled: bool,
+}
+
+struct RecordingVoiceOutputInput<'a> {
+    app_ctx: &'a RecordingContext,
+    config: &'a storage::AppConfig,
+    question: &'a str,
+    intent: &'a crate::voice_intent::VoiceIntent,
+    generated_output: &'a str,
+    selected_text_available: bool,
+    restore_target_before_insert: bool,
     popup_fallback_enabled: bool,
 }
 
@@ -1073,11 +1118,11 @@ impl crate::voice_intent::executor::VoiceExecutionBackend for PipelineVoiceExecu
 }
 
 impl PolishTextOutcome {
-    fn normal(final_text: String, llm_elapsed: std::time::Duration) -> Self {
+    fn inserted(final_text: String, llm_elapsed: std::time::Duration) -> Self {
         Self {
             final_text,
             llm_elapsed,
-            history_output_status: None,
+            history_output_status: Some("inserted".to_string()),
             history_output_error: None,
             voice_execution: None,
         }
@@ -1214,34 +1259,27 @@ impl PipelineHandle {
 
     async fn execute_recording_voice_output(
         &self,
-        app_ctx: &RecordingContext,
-        config: &storage::AppConfig,
-        question: &str,
-        intent: &crate::voice_intent::VoiceIntent,
-        generated_output: &str,
-        selected_text_available: bool,
-        restore_target_before_insert: bool,
-        popup_fallback_enabled: bool,
+        input: RecordingVoiceOutputInput<'_>,
     ) -> crate::voice_intent::executor::VoiceExecutionResult {
         let mut backend = PipelineVoiceExecutionBackend {
             pipeline: self,
-            app_name: &app_ctx.profile.app_label,
-            question,
-            intent_kind: intent.kind,
-            target_guard: &app_ctx.target_guard,
-            focus_target: app_ctx.focus_target,
-            config,
+            app_name: &input.app_ctx.profile.app_label,
+            question: input.question,
+            intent_kind: input.intent.kind,
+            target_guard: &input.app_ctx.target_guard,
+            focus_target: input.app_ctx.focus_target,
+            config: input.config,
             already_copied: false,
-            popup_fallback_enabled,
+            popup_fallback_enabled: input.popup_fallback_enabled,
         };
         let execution = crate::voice_intent::executor::execute_voice_intent(
             crate::voice_intent::executor::VoiceExecutionRequest {
-                intent,
-                generated_output,
-                target_guard: &app_ctx.target_guard,
-                selected_text_available,
-                restore_target_before_insert,
-                flags: config.voice_routing_flags,
+                intent: input.intent,
+                generated_output: input.generated_output,
+                target_guard: &input.app_ctx.target_guard,
+                selected_text_available: input.selected_text_available,
+                restore_target_before_insert: input.restore_target_before_insert,
+                flags: input.config.voice_routing_flags,
             },
             &mut backend,
         )
@@ -2215,22 +2253,22 @@ impl PipelineHandle {
         let _ = self.app_handle.emit("pipeline:context", app_ctx.summary());
 
         // Save to history
-        self.save_history(
-            &raw_text,
-            &final_text,
-            &app_ctx,
+        self.save_history(HistorySaveInput {
+            raw_text: &raw_text,
+            final_text: &final_text,
+            app_ctx: &app_ctx,
             duration_ms,
-            HistoryTimingMetadata {
+            timing: HistoryTimingMetadata {
                 stt_ms: duration_millis_i64(stt_elapsed),
                 llm_ms: duration_millis_i64(llm_elapsed),
                 total_ms: duration_millis_i64(total_elapsed),
             },
-            &config,
-            HistoryOutputMetadata {
+            config: &config,
+            output: HistoryOutputMetadata {
                 status: polish_outcome.history_output_status,
                 error: polish_outcome.history_output_error,
             },
-        )
+        })
         .await;
 
         if let Some(control) = &stt_control {
@@ -2328,7 +2366,15 @@ impl PipelineHandle {
                 message,
             );
         };
-        let llm_api_key = if config.llm_provider == "cloud" {
+        let llm_endpoint_error = config
+            .polish_enabled
+            .then(|| {
+                llm::validate_provider_base_url(&config.llm_provider, &config.llm_base_url).err()
+            })
+            .flatten();
+        let llm_api_key = if llm_endpoint_error.is_some() {
+            String::new()
+        } else if config.llm_provider == "cloud" {
             session_token
         } else {
             match resolve_llm_config_secret(config, &SystemCredentialVault) {
@@ -2342,6 +2388,7 @@ impl PipelineHandle {
 
         // Check if polish is enabled and API key / token is available
         if !config.polish_enabled
+            || llm_endpoint_error.is_some()
             || (config.llm_provider != "cloud"
                 && !llm::has_usable_provider_credentials(&config.llm_provider, &llm_api_key))
         {
@@ -2350,6 +2397,8 @@ impl PipelineHandle {
             {
                 let message = if !config.polish_enabled {
                     "This voice command needs AI polish. Enable AI polish before drafting, translating, or editing."
+                } else if llm_endpoint_error.is_some() {
+                    "The LLM provider endpoint is invalid. Review the AI polish settings."
                 } else {
                     "This voice command needs a configured LLM provider or Cloud sign-in."
                 };
@@ -2376,16 +2425,16 @@ impl PipelineHandle {
 
             // No polishing — output raw text directly
             let execution = self
-                .execute_recording_voice_output(
+                .execute_recording_voice_output(RecordingVoiceOutputInput {
                     app_ctx,
                     config,
-                    raw_text,
-                    &voice_intent,
-                    provider_text,
-                    selected_text_has_content(selected_text.as_deref()),
-                    provider_plan.restore_target_before_insert,
+                    question: raw_text,
+                    intent: &voice_intent,
+                    generated_output: provider_text,
+                    selected_text_available: selected_text_has_content(selected_text.as_deref()),
+                    restore_target_before_insert: provider_plan.restore_target_before_insert,
                     popup_fallback_enabled,
-                )
+                })
                 .await;
             let history = voice_execution_history_metadata(&execution);
             return PolishTextOutcome::with_execution(
@@ -2618,7 +2667,7 @@ impl PipelineHandle {
                                 error,
                             );
                         }
-                        return PolishTextOutcome::normal(response.polished_text, elapsed);
+                        return PolishTextOutcome::inserted(response.polished_text, elapsed);
                     }
                     if report.target_lost {
                         let reason = report.error_message.clone().unwrap_or_else(|| {
@@ -2648,7 +2697,12 @@ impl PipelineHandle {
                 // Check abort after LLM returns — skip output if cancelled during polish.
                 if self.abort_flag.load(Ordering::SeqCst) {
                     tracing::info!("Pipeline aborted after LLM polish, skipping output");
-                    return PolishTextOutcome::normal(raw_text.to_string(), elapsed);
+                    return PolishTextOutcome::with_history_status(
+                        raw_text.to_string(),
+                        elapsed,
+                        "cancelled",
+                        "Dictation was cancelled before automatic output",
+                    );
                 }
 
                 let selected_text_available = if voice_intent.placement
@@ -2665,16 +2719,16 @@ impl PipelineHandle {
                     selected_text_has_content(selected_text_for_execution.as_deref())
                 };
                 let execution = self
-                    .execute_recording_voice_output(
+                    .execute_recording_voice_output(RecordingVoiceOutputInput {
                         app_ctx,
                         config,
-                        raw_text,
-                        &voice_intent,
-                        &response.polished_text,
+                        question: raw_text,
+                        intent: &voice_intent,
+                        generated_output: &response.polished_text,
                         selected_text_available,
-                        provider_plan.restore_target_before_insert,
+                        restore_target_before_insert: provider_plan.restore_target_before_insert,
                         popup_fallback_enabled,
-                    )
+                    })
                     .await;
                 let history = voice_execution_history_metadata(&execution);
                 PolishTextOutcome::with_execution(
@@ -2724,7 +2778,12 @@ impl PipelineHandle {
                 // Check abort after LLM error — skip fallback output if cancelled.
                 if self.abort_flag.load(Ordering::SeqCst) {
                     tracing::info!("Pipeline aborted after LLM error, skipping output");
-                    return PolishTextOutcome::normal(String::new(), elapsed);
+                    return PolishTextOutcome::with_history_status(
+                        String::new(),
+                        elapsed,
+                        "cancelled",
+                        "Dictation was cancelled before automatic output",
+                    );
                 }
                 tracing::error!("LLM polish failed: {}", e);
 
@@ -2742,16 +2801,16 @@ impl PipelineHandle {
                     );
                 }
                 let execution = self
-                    .execute_recording_voice_output(
+                    .execute_recording_voice_output(RecordingVoiceOutputInput {
                         app_ctx,
                         config,
-                        raw_text,
-                        &voice_intent,
-                        provider_text,
-                        false,
-                        provider_plan.restore_target_before_insert,
+                        question: raw_text,
+                        intent: &voice_intent,
+                        generated_output: provider_text,
+                        selected_text_available: false,
+                        restore_target_before_insert: provider_plan.restore_target_before_insert,
                         popup_fallback_enabled,
-                    )
+                    })
                     .await;
                 let output_history = voice_execution_history_metadata(&execution);
                 let output_error = output_history.error.map_or_else(
@@ -2850,47 +2909,39 @@ impl PipelineHandle {
     }
 
     /// Save the transcription to history.
-    async fn save_history(
-        &self,
-        raw_text: &str,
-        final_text: &str,
-        app_ctx: &RecordingContext,
-        duration_ms: Option<i64>,
-        timing: HistoryTimingMetadata,
-        config: &storage::AppConfig,
-        output: HistoryOutputMetadata,
-    ) {
-        let policy = config.history_retention_policy();
+    async fn save_history(&self, input: HistorySaveInput<'_>) {
+        let policy = input.config.history_retention_policy();
         if !policy.enabled {
             tracing::debug!("History save skipped because history is disabled");
             return;
         }
 
         let now = chrono::Local::now().format("%Y-%m-%dT%H:%M:%S").to_string();
-        let scene_diagnostics = active_scene_history_diagnostics(config.active_scene.as_ref());
+        let scene_diagnostics =
+            active_scene_history_diagnostics(input.config.active_scene.as_ref());
         let entry = storage::HistoryEntry {
             id: 0, // auto-increment
             created_at: now,
-            context_profile_id: app_ctx.profile.id.clone(),
-            context_label: app_ctx.profile.app_label.clone(),
-            context_icon_key: app_ctx.profile.icon_key.clone(),
-            context_family: app_ctx.profile.family,
-            browser_access_status: app_ctx.browser_access_status,
-            provider_kind: history_provider_kind(config),
-            raw_text: raw_text.to_string(),
-            polished_text: final_text.to_string(),
+            context_profile_id: input.app_ctx.profile.id.clone(),
+            context_label: input.app_ctx.profile.app_label.clone(),
+            context_icon_key: input.app_ctx.profile.icon_key.clone(),
+            context_family: input.app_ctx.profile.family,
+            browser_access_status: input.app_ctx.browser_access_status,
+            provider_kind: history_provider_kind(input.config),
+            raw_text: input.raw_text.to_string(),
+            polished_text: input.final_text.to_string(),
             language: None,
-            duration_ms,
-            stt_ms: Some(timing.stt_ms),
-            llm_ms: Some(timing.llm_ms),
-            total_ms: Some(timing.total_ms),
+            duration_ms: input.duration_ms,
+            stt_ms: Some(input.timing.stt_ms),
+            llm_ms: Some(input.timing.llm_ms),
+            total_ms: Some(input.timing.total_ms),
             active_scene_id: scene_diagnostics.id,
             active_scene_source: scene_diagnostics.source,
             active_scene_name: scene_diagnostics.name,
             active_scene_prompt_chars: scene_diagnostics.prompt_chars,
             active_scene_prompt_truncated: scene_diagnostics.prompt_truncated,
-            output_status: output.status,
-            output_error: output.error,
+            output_status: input.output.status,
+            output_error: input.output.error,
         };
         if let Err(e) = self
             .app_handle
@@ -3114,6 +3165,21 @@ mod tests {
     use std::sync::atomic::{AtomicBool, AtomicU64};
 
     #[test]
+    fn prewarm_log_origin_omits_credentials_path_query_and_fragment() {
+        assert_eq!(
+            sanitized_prewarm_origin(
+                "https://user:secret@example.com:8443/private/stt?api_key=do-not-log#token"
+            ),
+            Some("https://example.com:8443".to_string())
+        );
+        assert_eq!(
+            sanitized_prewarm_origin("file:///tmp/private-recording.wav"),
+            None
+        );
+        assert_eq!(sanitized_prewarm_origin("not a URL"), None);
+    }
+
+    #[test]
     fn elevenlabs_and_gemini_use_exact_prewarm_endpoints() {
         let config = storage::AppConfig {
             stt_provider: stt::config::ELEVENLABS_PROVIDER.to_string(),
@@ -3150,6 +3216,20 @@ mod tests {
         let (stt_target, llm_target) = connection_prewarm_targets(&config);
 
         assert!(stt_target.is_some());
+        assert!(llm_target.is_none());
+    }
+
+    #[test]
+    fn prewarm_skips_unsafe_llm_endpoint() {
+        let config = storage::AppConfig {
+            llm_provider: "gemini".to_string(),
+            llm_base_url: "http://attacker.example/v1beta/openai?key=stolen".to_string(),
+            polish_enabled: true,
+            ..storage::AppConfig::default()
+        };
+
+        let (_, llm_target) = connection_prewarm_targets(&config);
+
         assert!(llm_target.is_none());
     }
 
@@ -3244,6 +3324,55 @@ mod tests {
             )
         );
         assert!(!metadata.error.unwrap().contains("Some("));
+    }
+
+    #[test]
+    fn history_metadata_persists_explicit_success_and_failure_states() {
+        use crate::voice_intent::executor::{
+            VoiceExecutionFallbackReason, VoiceExecutionResult, VoiceExecutionStatus,
+        };
+
+        let cases = [
+            (VoiceExecutionStatus::Completed, None, "inserted", false),
+            (
+                VoiceExecutionStatus::PopupFallback,
+                Some(VoiceExecutionFallbackReason::OutputFailed),
+                "popup_fallback",
+                true,
+            ),
+            (
+                VoiceExecutionStatus::Prevented,
+                Some(VoiceExecutionFallbackReason::FeatureDisabled),
+                "prevented",
+                true,
+            ),
+            (
+                VoiceExecutionStatus::Failed,
+                Some(VoiceExecutionFallbackReason::OutputFailed),
+                "failed",
+                true,
+            ),
+        ];
+
+        for (status, fallback_reason, expected_status, expects_error) in cases {
+            let metadata = voice_execution_history_metadata(&VoiceExecutionResult {
+                intent_kind: crate::voice_intent::VoiceIntentKind::DictateInsert,
+                requested_placement: crate::voice_intent::VoiceOutputPlacement::InsertAtCursor,
+                actual_placement: None,
+                status,
+                fallback_reason,
+            });
+
+            assert_eq!(metadata.status.as_deref(), Some(expected_status));
+            assert_eq!(metadata.error.is_some(), expects_error);
+        }
+
+        let streamed = PolishTextOutcome::inserted(
+            "streamed text".to_string(),
+            std::time::Duration::from_millis(10),
+        );
+        assert_eq!(streamed.history_output_status.as_deref(), Some("inserted"));
+        assert!(streamed.history_output_error.is_none());
     }
 
     #[test]

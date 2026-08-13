@@ -1,0 +1,2190 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Rudy OpenTypeless Managed Service",
+    "version": "0.1.0",
+    "description": "Pre-launch contract for the optional paid service. The local/BYOK desktop remains fully usable without this API. No production service is implied."
+  },
+  "servers": [
+    {
+      "url": "https://api.example.invalid",
+      "description": "Replace only with a Rudy-owned HTTPS origin"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "Operations",
+      "description": "Readiness and public plan metadata"
+    },
+    {
+      "name": "Auth",
+      "description": "Better Auth-compatible desktop account surface"
+    },
+    {
+      "name": "Billing",
+      "description": "Authoritative entitlements and hosted billing"
+    },
+    {
+      "name": "Inference",
+      "description": "Server-credentialed, quota-metered managed AI"
+    },
+    {
+      "name": "Data",
+      "description": "Explicit backup, portability, and deletion"
+    }
+  ],
+  "paths": {
+    "/api/health/ready": {
+      "get": {
+        "tags": ["Operations"],
+        "operationId": "readiness",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Service and critical dependencies ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["ready"],
+                  "properties": {
+                    "ready": {
+                      "type": "boolean",
+                      "const": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/plans": {
+      "get": {
+        "tags": ["Operations"],
+        "operationId": "getPlans",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Server-owned current plan catalogue",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["plans"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "plans": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Plan"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/sign-in/email": {
+      "post": {
+        "tags": ["Auth"],
+        "operationId": "signInEmail",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailPassword"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Session"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/auth/sign-up/email": {
+      "post": {
+        "tags": ["Auth"],
+        "operationId": "signUpEmail",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/EmailPassword"
+                  },
+                  {
+                    "type": "object",
+                    "required": ["name"],
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 120
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Session"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/auth/send-verification-email": {
+      "post": {
+        "tags": ["Auth"],
+        "operationId": "sendVerification",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email"],
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  "callbackURL": {
+                    "type": "string",
+                    "format": "uri"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "$ref": "#/components/responses/Accepted"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/auth/desktop-oauth": {
+      "get": {
+        "tags": ["Auth"],
+        "operationId": "beginDesktopOauth",
+        "security": [],
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": ["google", "github"]
+            }
+          },
+          {
+            "name": "callbackURL",
+            "in": "query",
+            "required": true,
+            "description": "Desktop callback created by the client, shaped as https://\u003cconfigured-api-origin\u003e/auth/callback?desktop=\u003cclient-state\u003e\u0026code_challenge=\u003cbase64url-sha256\u003e\u0026code_challenge_method=S256. Never accept an arbitrary redirect origin or PKCE method.",
+            "schema": {
+              "type": "string",
+              "format": "uri",
+              "maxLength": 2048
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Redirect to the identity provider after validating callbackURL and persisting a short-lived, one-time OAuth transaction bound to the client state and S256 PKCE challenge. On success, redirect to the registered application deep link with only code and state; never put a bearer token in a URL."
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "description": "Starts browser OAuth for the desktop. The service must parse callbackURL as a URL, require the exact configured HTTPS API origin and /auth/callback path, reject credentials/fragments, require exactly desktop, code_challenge, and code_challenge_method=S256 query parameters, validate base64url state and challenge shapes, and bind them to a short-lived one-time OAuth transaction before redirecting."
+      }
+    },
+    "/api/auth/desktop/exchange": {
+      "post": {
+        "tags": ["Auth"],
+        "operationId": "exchangeDesktopAuthorizationCode",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["code", "codeVerifier"],
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9\\\\-._~]{16,2048}$"
+                  },
+                  "codeVerifier": {
+                    "type": "string",
+                    "minLength": 43,
+                    "maxLength": 128,
+                    "pattern": "^[A-Za-z0-9\\\\-._~]+$"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "A newly issued revocable desktop session bearer. Return only after atomically consuming the authorization code and verifying S256(codeVerifier) against its stored challenge.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["token"],
+                  "properties": {
+                    "token": {
+                      "type": "string",
+                      "minLength": 16,
+                      "maxLength": 4096
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "description": "Exchanges a short-lived, one-time desktop authorization code. The service must hash codeVerifier with SHA-256, compare it in constant time with the stored S256 challenge, atomically consume the code before issuing a session, rate-limit attempts, return Cache-Control: no-store, and never log the code, verifier, or token. Codes expire within five minutes and failed or replayed codes return a content-free stable error."
+      }
+    },
+    "/api/opentypeless/auth/request-password-reset": {
+      "post": {
+        "tags": ["Auth"],
+        "operationId": "requestPasswordReset",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email"],
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "$ref": "#/components/responses/Accepted"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/auth/get-session": {
+      "get": {
+        "tags": ["Auth"],
+        "operationId": "getSession",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Session"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/auth/sign-out": {
+      "post": {
+        "tags": ["Auth"],
+        "operationId": "signOut",
+        "responses": {
+          "204": {
+            "description": "Session revoked"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/auth/list-accounts": {
+      "get": {
+        "tags": ["Auth"],
+        "operationId": "listLinkedAccounts",
+        "responses": {
+          "200": {
+            "description": "Linked login methods",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": ["providerId"],
+                    "properties": {
+                      "providerId": {
+                        "type": "string"
+                      },
+                      "accountId": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/auth/change-password": {
+      "post": {
+        "tags": ["Auth"],
+        "operationId": "changePassword",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["currentPassword", "newPassword"],
+                "properties": {
+                  "currentPassword": {
+                    "type": "string",
+                    "minLength": 8
+                  },
+                  "newPassword": {
+                    "type": "string",
+                    "minLength": 12
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Password changed and other sessions revoked as configured"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/opentypeless/auth/set-password": {
+      "post": {
+        "tags": ["Auth"],
+        "operationId": "setPasswordForOauthAccount",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["newPassword"],
+                "properties": {
+                  "newPassword": {
+                    "type": "string",
+                    "minLength": 12
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Password credential created after recent authentication"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/subscription/status": {
+      "get": {
+        "tags": ["Billing"],
+        "operationId": "getSubscriptionStatus",
+        "responses": {
+          "200": {
+            "description": "Authoritative entitlement and usage",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubscriptionStatus"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/checkout/create": {
+      "post": {
+        "tags": ["Billing"],
+        "operationId": "createCheckout",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["origin", "product"],
+                "properties": {
+                  "origin": {
+                    "type": "string",
+                    "enum": ["desktop", "web"]
+                  },
+                  "product": {
+                    "type": "string",
+                    "enum": ["pro_monthly", "lifetime_starter"]
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Url"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/subscription/portal": {
+      "post": {
+        "tags": ["Billing"],
+        "operationId": "createBillingPortal",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Url"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/proxy/stt": {
+      "post": {
+        "tags": ["Inference"],
+        "operationId": "managedSpeechToText",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ClientVersion"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["audio", "operationId", "stageKey", "requestType"],
+                "properties": {
+                  "audio": {
+                    "type": "string",
+                    "contentEncoding": "binary",
+                    "contentMediaType": "audio/wav",
+                    "maxLength": 26214400
+                  },
+                  "language": {
+                    "type": "string",
+                    "maxLength": 32
+                  },
+                  "operationId": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 128
+                  },
+                  "stageKey": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 160
+                  },
+                  "requestType": {
+                    "type": "string",
+                    "enum": ["voice_pipeline"]
+                  },
+                  "clientVersion": {
+                    "type": "string",
+                    "maxLength": 40
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Transcript",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["text"],
+                  "properties": {
+                    "text": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/proxy/llm": {
+      "post": {
+        "tags": ["Inference"],
+        "operationId": "managedTextCleanup",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ClientVersion"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["messages", "context"],
+                "properties": {
+                  "messages": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 12,
+                    "items": {
+                      "type": "object",
+                      "required": ["role", "content"],
+                      "properties": {
+                        "role": {
+                          "type": "string",
+                          "enum": ["system", "user", "assistant"]
+                        },
+                        "content": {
+                          "type": "string",
+                          "maxLength": 100000
+                        }
+                      }
+                    }
+                  },
+                  "stream": {
+                    "type": "boolean",
+                    "default": false
+                  },
+                  "context": {
+                    "$ref": "#/components/schemas/OperationContext"
+                  },
+                  "contextMetadata": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "voiceIntentMetadata": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "stageKey": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 160
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "JSON text result or OpenAI-compatible server-sent event stream",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["text"],
+                  "properties": {
+                    "text": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/proxy/ask": {
+      "post": {
+        "tags": ["Inference"],
+        "operationId": "managedAsk",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ClientVersion"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["question", "context"],
+                "properties": {
+                  "question": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 6000
+                  },
+                  "context": {
+                    "$ref": "#/components/schemas/OperationContext"
+                  },
+                  "voiceIntentMetadata": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Answer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["answer"],
+                  "properties": {
+                    "answer": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/backup/upload": {
+      "post": {
+        "tags": ["Data"],
+        "operationId": "uploadBackup",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BackupSnapshot"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Validated snapshot stored",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["success"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 10
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "description": "Enforces the BackupSnapshot schema and x-backup-policy limits before any snapshot is stored. Rejected bodies and payload content are never logged.",
+        "x-enforce-backup-policy-before-storage": true
+      }
+    },
+    "/api/backup/download": {
+      "get": {
+        "tags": ["Data"],
+        "operationId": "downloadBackup",
+        "responses": {
+          "200": {
+            "description": "Latest authenticated-account snapshot",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BackupDownload"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/scenes": {
+      "get": {
+        "tags": ["Data"],
+        "operationId": "listCuratedScenes",
+        "responses": {
+          "200": {
+            "description": "Optional curated packs; local scenes do not depend on this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ScenePack"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/account/export": {
+      "post": {
+        "tags": ["Data"],
+        "operationId": "requestAccountExport",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "responses": {
+          "202": {
+            "$ref": "#/components/responses/Accepted"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/account": {
+      "delete": {
+        "tags": ["Data"],
+        "operationId": "deleteAccount",
+        "description": "Requires recent authentication or step-up verification. Revokes sessions immediately and returns a trackable deletion receipt.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["confirmation"],
+                "properties": {
+                  "confirmation": {
+                    "type": "string",
+                    "const": "DELETE"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "$ref": "#/components/responses/Accepted"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "opaque-session-token",
+        "description": "Revocable desktop session token; never stored in WebView persistence or logs"
+      }
+    },
+    "parameters": {
+      "IdempotencyKey": {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 16,
+          "maxLength": 160
+        },
+        "description": "Unique per side-effecting intent; replay returns the original result"
+      },
+      "ClientVersion": {
+        "name": "X-OpenTypeless-Version",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "maxLength": 40
+        }
+      }
+    },
+    "responses": {
+      "Error": {
+        "description": "Content-free stable error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorEnvelope"
+            }
+          }
+        }
+      },
+      "Session": {
+        "description": "Authenticated session; native clients may receive set-auth-token",
+        "headers": {
+          "set-auth-token": {
+            "schema": {
+              "type": "string"
+            },
+            "description": "Move immediately to the OS credential vault"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Session"
+            }
+          }
+        }
+      },
+      "Url": {
+        "description": "Short-lived managed-origin billing redirect URL",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "required": ["url"],
+              "additionalProperties": false,
+              "description": "Return a short-lived HTTPS URL on the exact configured managed API origin. That managed endpoint may redirect in the external browser to the billing provider; the desktop WebView never opens an arbitrary provider origin directly.",
+              "properties": {
+                "url": {
+                  "type": "string",
+                  "format": "uri",
+                  "maxLength": 2048,
+                  "description": "HTTPS URL with no user-info credentials or fragment and an origin exactly equal to the configured managed API origin."
+                }
+              }
+            }
+          }
+        }
+      },
+      "Accepted": {
+        "description": "Accepted for asynchronous, idempotent processing",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "required": ["requestId", "status"],
+              "properties": {
+                "requestId": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": ["accepted", "processing", "complete"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "EmailPassword": {
+        "type": "object",
+        "required": ["email", "password"],
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 320
+          },
+          "password": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 256
+          }
+        }
+      },
+      "User": {
+        "type": "object",
+        "required": ["id", "email", "emailVerified"],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "name": {
+            "type": ["string", "null"]
+          },
+          "emailVerified": {
+            "type": "boolean"
+          }
+        }
+      },
+      "Session": {
+        "type": "object",
+        "required": ["user", "session"],
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/User"
+          },
+          "session": {
+            "type": "object",
+            "required": ["id", "expiresAt"],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "expiresAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          }
+        }
+      },
+      "Plan": {
+        "type": "object",
+        "required": [
+          "product",
+          "active",
+          "displayName",
+          "billingModel",
+          "billingInterval",
+          "currency",
+          "priceMinor",
+          "allowances"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "product": {
+            "type": "string",
+            "enum": ["pro_monthly", "lifetime_starter"]
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "displayName": {
+            "type": "string",
+            "minLength": 1
+          },
+          "billingModel": {
+            "type": "string",
+            "enum": ["subscription", "one_time"]
+          },
+          "billingInterval": {
+            "type": ["string", "null"],
+            "enum": ["month", null]
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "priceMinor": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "allowances": {
+            "$ref": "#/components/schemas/PlanAllowances"
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "product": {
+                  "const": "pro_monthly"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "billingModel": {
+                  "const": "subscription"
+                },
+                "billingInterval": {
+                  "const": "month"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "product": {
+                  "const": "lifetime_starter"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "billingModel": {
+                  "const": "one_time"
+                },
+                "billingInterval": {
+                  "const": null
+                }
+              }
+            }
+          }
+        ]
+      },
+      "UsageLimits": {
+        "type": "object",
+        "required": ["quotaModel"],
+        "properties": {
+          "quotaModel": {
+            "type": "string",
+            "enum": ["none", "seconds", "characters", "tokens", "operations"]
+          },
+          "period": {
+            "type": ["string", "null"],
+            "enum": ["day", "month", "lifetime", null]
+          },
+          "included": {
+            "type": ["integer", "null"],
+            "minimum": 0
+          }
+        }
+      },
+      "SubscriptionStatus": {
+        "type": "object",
+        "required": [
+          "plan",
+          "source",
+          "displayName",
+          "subscriptionEnd",
+          "subscriptionStatus",
+          "quotaModel",
+          "displayWordsUsedEstimate",
+          "displayWordsLimit",
+          "displayWordsResetAt",
+          "sttSecondsUsed",
+          "sttSecondsLimit",
+          "llmTokensUsed",
+          "llmTokensLimit",
+          "cloudWordsUsed",
+          "cloudWordsLimit",
+          "cloudWordsResetAt",
+          "byokUnlimited"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "plan": {
+            "type": "string",
+            "enum": [
+              "free",
+              "pro",
+              "lifetime_starter",
+              "appsumo_tier1",
+              "appsumo_tier2",
+              "appsumo_tier3"
+            ]
+          },
+          "source": {
+            "type": "string",
+            "enum": ["free", "creem", "lifetime", "appsumo"]
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "subscriptionEnd": {
+            "type": ["string", "null"],
+            "format": "date-time"
+          },
+          "subscriptionStatus": {
+            "type": ["string", "null"]
+          },
+          "licenseStatus": {
+            "type": ["string", "null"],
+            "enum": ["pending", "active", "refunded", "deactivated", null]
+          },
+          "quotaModel": {
+            "type": "string",
+            "enum": ["legacy_dual_meter", "cloud_words"]
+          },
+          "displayWordsUsedEstimate": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "displayWordsLimit": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "displayWordsResetAt": {
+            "type": ["string", "null"],
+            "format": "date-time"
+          },
+          "sttSecondsUsed": {
+            "type": "number",
+            "minimum": 0
+          },
+          "sttSecondsLimit": {
+            "type": "number",
+            "minimum": 0
+          },
+          "llmTokensUsed": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "llmTokensLimit": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "cloudWordsUsed": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "cloudWordsLimit": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "cloudWordsResetAt": {
+            "type": ["string", "null"],
+            "format": "date-time"
+          },
+          "byokUnlimited": {
+            "type": "boolean"
+          }
+        }
+      },
+      "OperationContext": {
+        "type": "object",
+        "required": ["operationId", "stageKey", "requestType"],
+        "properties": {
+          "operationId": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128,
+            "description": "Correlates content-free support telemetry"
+          },
+          "stageKey": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 160,
+            "description": "Unique account-scoped billable stage identifier"
+          },
+          "requestType": {
+            "type": "string",
+            "enum": ["voice_pipeline", "ask_anything", "connection_benchmark"]
+          }
+        }
+      },
+      "BackupSnapshot": {
+        "type": "object",
+        "description": "Current desktop backup snapshot. The service validates this exact allow-list before storage; it never stores rejected payloads or logs payload content.",
+        "required": ["version", "createdAt", "history", "dictionary", "settings"],
+        "additionalProperties": false,
+        "x-backup-policy": {
+          "maxBodyBytes": 8388608,
+          "maxJsonDepth": 8,
+          "rejectPropertyNameTokens": [
+            "apikey",
+            "secret",
+            "accesstoken",
+            "refreshtoken",
+            "sessiontoken",
+            "password",
+            "credential",
+            "privatekey",
+            "authorization",
+            "cookie"
+          ],
+          "propertyNameNormalization": "Lowercase each property name, remove non-alphanumeric characters, and reject if the result contains a listed token.",
+          "rejectUrlCredentialsAndSecretQueryParameters": true
+        },
+        "properties": {
+          "version": {
+            "type": "integer",
+            "const": 1
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "history": {
+            "type": "array",
+            "maxItems": 5000,
+            "items": {
+              "$ref": "#/components/schemas/BackupHistoryEntry"
+            }
+          },
+          "dictionary": {
+            "$ref": "#/components/schemas/BackupDictionary"
+          },
+          "settings": {
+            "$ref": "#/components/schemas/BackupSettings"
+          }
+        }
+      },
+      "ScenePack": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "description",
+          "category",
+          "promptTemplate",
+          "dictionaryTerms",
+          "isPro"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "promptTemplate": {
+            "type": "string",
+            "maxLength": 20000
+          },
+          "dictionaryTerms": {
+            "type": "array",
+            "maxItems": 10000,
+            "items": {
+              "type": "object",
+              "required": ["word"],
+              "additionalProperties": false,
+              "properties": {
+                "word": {
+                  "type": "string"
+                },
+                "pronunciation": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "isPro": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ErrorEnvelope": {
+        "type": "object",
+        "required": ["error", "requestId"],
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": ["code", "message"],
+            "properties": {
+              "code": {
+                "type": "string",
+                "enum": [
+                  "AUTH_REQUIRED",
+                  "AUTH_SESSION_INVALID",
+                  "AUTH_RECENT_LOGIN_REQUIRED",
+                  "ENTITLEMENT_REQUIRED",
+                  "QUOTA_EXHAUSTED",
+                  "QUOTA_RESERVATION_CONFLICT",
+                  "RATE_LIMITED",
+                  "INVALID_REQUEST",
+                  "PAYLOAD_TOO_LARGE",
+                  "PROVIDER_UNAVAILABLE",
+                  "BACKUP_NOT_FOUND",
+                  "INTERNAL_ERROR"
+                ]
+              },
+              "message": {
+                "type": "string",
+                "maxLength": 240,
+                "description": "Safe user-facing text without upstream response bodies or user content"
+              },
+              "retryable": {
+                "type": "boolean"
+              },
+              "retryAfterMs": {
+                "type": ["integer", "null"],
+                "minimum": 0
+              }
+            }
+          },
+          "requestId": {
+            "type": "string"
+          }
+        }
+      },
+      "BackupDownload": {
+        "type": "object",
+        "description": "Latest snapshot. version and createdAt may be absent only for a legacy pre-versioning snapshot during migration.",
+        "required": ["history", "dictionary", "settings"],
+        "additionalProperties": false,
+        "properties": {
+          "version": {
+            "type": "integer",
+            "const": 1
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "maxLength": 64
+          },
+          "history": {
+            "type": "array",
+            "maxItems": 5000,
+            "items": {
+              "$ref": "#/components/schemas/BackupHistoryEntry"
+            }
+          },
+          "dictionary": {
+            "$ref": "#/components/schemas/BackupDictionary"
+          },
+          "settings": {
+            "$ref": "#/components/schemas/BackupSettings"
+          }
+        },
+        "dependentRequired": {
+          "version": ["createdAt"],
+          "createdAt": ["version"]
+        },
+        "x-max-encoded-response-bytes": 8388608
+      },
+      "BackupHistoryEntry": {
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "context_profile_id",
+          "context_label",
+          "context_icon_key",
+          "context_family",
+          "browser_access_status",
+          "provider_kind",
+          "raw_text",
+          "polished_text",
+          "language",
+          "duration_ms",
+          "stt_ms",
+          "llm_ms",
+          "total_ms",
+          "active_scene_id",
+          "active_scene_source",
+          "active_scene_name",
+          "active_scene_prompt_chars",
+          "active_scene_prompt_truncated",
+          "output_status",
+          "output_error"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "created_at": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "context_profile_id": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "context_label": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "context_icon_key": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "context_family": {
+            "type": "string",
+            "enum": [
+              "email",
+              "work_chat",
+              "personal_chat",
+              "document",
+              "project_management",
+              "developer_collaboration",
+              "prompt_or_code",
+              "support",
+              "social",
+              "general"
+            ]
+          },
+          "browser_access_status": {
+            "type": "string",
+            "enum": ["available", "needs_permission", "not_applicable", "unknown"]
+          },
+          "provider_kind": {
+            "type": "string",
+            "enum": ["managed_cloud", "byok", "local"]
+          },
+          "raw_text": {
+            "type": "string",
+            "maxLength": 1000000
+          },
+          "polished_text": {
+            "type": "string",
+            "maxLength": 1000000
+          },
+          "language": {
+            "type": ["string", "null"],
+            "maxLength": 100
+          },
+          "duration_ms": {
+            "type": ["integer", "null"],
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "stt_ms": {
+            "type": ["integer", "null"],
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "llm_ms": {
+            "type": ["integer", "null"],
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "total_ms": {
+            "type": ["integer", "null"],
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "active_scene_id": {
+            "type": ["string", "null"],
+            "maxLength": 200
+          },
+          "active_scene_source": {
+            "type": ["string", "null"],
+            "maxLength": 100
+          },
+          "active_scene_name": {
+            "type": ["string", "null"],
+            "maxLength": 200
+          },
+          "active_scene_prompt_chars": {
+            "type": ["integer", "null"],
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "active_scene_prompt_truncated": {
+            "type": "boolean"
+          },
+          "output_status": {
+            "type": ["string", "null"],
+            "maxLength": 100
+          },
+          "output_error": {
+            "type": ["string", "null"],
+            "maxLength": 2000
+          }
+        },
+        "anyOf": [
+          {
+            "properties": {
+              "raw_text": {
+                "minLength": 1
+              }
+            }
+          },
+          {
+            "properties": {
+              "polished_text": {
+                "minLength": 1
+              }
+            }
+          }
+        ]
+      },
+      "BackupDictionaryEntry": {
+        "type": "object",
+        "required": ["id", "word", "pronunciation"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "word": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "pronunciation": {
+            "type": ["string", "null"],
+            "maxLength": 100
+          }
+        }
+      },
+      "BackupCorrectionRule": {
+        "type": "object",
+        "required": ["id", "pattern", "replacement", "enabled"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "pattern": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "replacement": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        }
+      },
+      "BackupDictionary": {
+        "type": "object",
+        "required": ["entries", "correction_rules"],
+        "additionalProperties": false,
+        "properties": {
+          "entries": {
+            "type": "array",
+            "maxItems": 10000,
+            "items": {
+              "$ref": "#/components/schemas/BackupDictionaryEntry"
+            }
+          },
+          "correction_rules": {
+            "type": "array",
+            "maxItems": 10000,
+            "items": {
+              "$ref": "#/components/schemas/BackupCorrectionRule"
+            }
+          }
+        }
+      },
+      "BackupShortcutBinding": {
+        "type": "object",
+        "required": ["primary", "modifiers"],
+        "additionalProperties": false,
+        "properties": {
+          "primary": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 32
+          },
+          "modifiers": {
+            "type": "array",
+            "maxItems": 4,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 16
+            }
+          }
+        }
+      },
+      "BackupHotkeyConfig": {
+        "type": "object",
+        "required": [
+          "dictation",
+          "ask",
+          "translate",
+          "dictationBindings",
+          "askBindings",
+          "translateBindings",
+          "editSelection",
+          "switchScene",
+          "openApp",
+          "dictationMode"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "dictation": {
+            "$ref": "#/components/schemas/BackupShortcutBinding"
+          },
+          "ask": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/BackupShortcutBinding"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "translate": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/BackupShortcutBinding"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "dictationBindings": {
+            "type": "array",
+            "maxItems": 3,
+            "items": {
+              "$ref": "#/components/schemas/BackupShortcutBinding"
+            },
+            "uniqueItems": true,
+            "minItems": 1
+          },
+          "askBindings": {
+            "type": "array",
+            "maxItems": 3,
+            "items": {
+              "$ref": "#/components/schemas/BackupShortcutBinding"
+            },
+            "uniqueItems": true
+          },
+          "translateBindings": {
+            "type": "array",
+            "maxItems": 3,
+            "items": {
+              "$ref": "#/components/schemas/BackupShortcutBinding"
+            },
+            "uniqueItems": true
+          },
+          "editSelection": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/BackupShortcutBinding"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "switchScene": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/BackupShortcutBinding"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "openApp": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/BackupShortcutBinding"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "dictationMode": {
+            "type": "string",
+            "enum": ["hold", "toggle"]
+          }
+        },
+        "x-scalar-binding-consistency": "dictation, ask, and translate must equal the first element of their corresponding Bindings array, or null only when that array is empty."
+      },
+      "BackupVoiceRoutingFlags": {
+        "type": "object",
+        "required": ["draft_insert", "rewrite_selection", "translate_selection", "search"],
+        "additionalProperties": false,
+        "properties": {
+          "draft_insert": {
+            "type": "boolean"
+          },
+          "rewrite_selection": {
+            "type": "boolean"
+          },
+          "translate_selection": {
+            "type": "boolean"
+          },
+          "search": {
+            "type": "boolean"
+          }
+        }
+      },
+      "BackupCustomScene": {
+        "type": "object",
+        "required": ["id", "name", "description", "prompt_template", "created_at", "updated_at"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 240
+          },
+          "prompt_template": {
+            "type": "string",
+            "maxLength": 4000
+          },
+          "created_at": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "updated_at": {
+            "type": "string",
+            "maxLength": 64
+          }
+        }
+      },
+      "BackupSystemSceneOverride": {
+        "type": "object",
+        "required": ["id", "prompt_template"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "prompt_template": {
+            "type": "string",
+            "maxLength": 4000
+          }
+        }
+      },
+      "BackupActiveScene": {
+        "type": ["object", "null"],
+        "required": ["id", "source", "name", "prompt_template"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "source": {
+            "type": "string",
+            "enum": ["custom", "builtin", "cloud"]
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "prompt_template": {
+            "type": "string",
+            "maxLength": 4000
+          }
+        }
+      },
+      "BackupFamilySceneAssignment": {
+        "type": "object",
+        "required": ["family", "scene_id"],
+        "additionalProperties": false,
+        "properties": {
+          "family": {
+            "type": "string",
+            "enum": [
+              "email",
+              "work_chat",
+              "personal_chat",
+              "document",
+              "project_management",
+              "developer_collaboration",
+              "prompt_or_code",
+              "support",
+              "social",
+              "general"
+            ]
+          },
+          "scene_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          }
+        }
+      },
+      "BackupTranslationConfig": {
+        "type": "object",
+        "required": ["targets", "active_target"],
+        "additionalProperties": false,
+        "properties": {
+          "targets": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 5,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 16
+            }
+          },
+          "active_target": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 16
+          }
+        }
+      },
+      "BackupSettings": {
+        "type": "object",
+        "required": [
+          "stt_language",
+          "polish_enabled",
+          "context_adaptation_enabled",
+          "voice_routing_flags",
+          "polish_style",
+          "polish_custom_prompt",
+          "polish_chinese_script",
+          "custom_scenes",
+          "system_scene_overrides",
+          "active_scene",
+          "family_scene_assignments",
+          "translate_enabled",
+          "target_lang",
+          "translation",
+          "hotkey",
+          "ask_hotkey",
+          "hotkey_mode",
+          "hotkeys",
+          "output_mode",
+          "insertion_strategy",
+          "restore_clipboard_after_paste",
+          "paste_shortcut",
+          "windows_sendinput_newline_mode",
+          "streaming_insert_enabled",
+          "selected_text_enabled",
+          "theme",
+          "auto_start",
+          "close_to_tray",
+          "start_minimized",
+          "max_recording_seconds",
+          "history_enabled",
+          "history_retention_days",
+          "history_max_entries",
+          "ui_language",
+          "capsule_auto_hide"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "stt_language": {
+            "type": "string",
+            "maxLength": 32
+          },
+          "polish_enabled": {
+            "type": "boolean"
+          },
+          "context_adaptation_enabled": {
+            "type": "boolean"
+          },
+          "voice_routing_flags": {
+            "$ref": "#/components/schemas/BackupVoiceRoutingFlags"
+          },
+          "polish_style": {
+            "type": "string",
+            "enum": ["minimal", "clean", "structured", "professional"]
+          },
+          "polish_custom_prompt": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "polish_chinese_script": {
+            "type": "string",
+            "enum": ["preserve", "simplified", "traditional"]
+          },
+          "custom_scenes": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "$ref": "#/components/schemas/BackupCustomScene"
+            }
+          },
+          "system_scene_overrides": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "$ref": "#/components/schemas/BackupSystemSceneOverride"
+            }
+          },
+          "active_scene": {
+            "$ref": "#/components/schemas/BackupActiveScene"
+          },
+          "family_scene_assignments": {
+            "type": "array",
+            "maxItems": 10,
+            "items": {
+              "$ref": "#/components/schemas/BackupFamilySceneAssignment"
+            }
+          },
+          "translate_enabled": {
+            "type": "boolean"
+          },
+          "target_lang": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 16
+          },
+          "translation": {
+            "$ref": "#/components/schemas/BackupTranslationConfig"
+          },
+          "hotkey": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "ask_hotkey": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "hotkey_mode": {
+            "type": "string",
+            "enum": ["hold", "toggle"]
+          },
+          "hotkeys": {
+            "$ref": "#/components/schemas/BackupHotkeyConfig"
+          },
+          "output_mode": {
+            "type": "string",
+            "enum": ["keyboard", "clipboard"]
+          },
+          "insertion_strategy": {
+            "type": "string",
+            "enum": ["auto", "keyboard", "clipboardPaste", "clipboardCopyOnly", "windowsSendInput"]
+          },
+          "restore_clipboard_after_paste": {
+            "type": "boolean"
+          },
+          "paste_shortcut": {
+            "type": "string",
+            "enum": ["ctrlV", "ctrlShiftV", "shiftInsert"]
+          },
+          "windows_sendinput_newline_mode": {
+            "type": "string",
+            "enum": ["enter", "shiftEnter", "crlf"]
+          },
+          "streaming_insert_enabled": {
+            "type": "boolean"
+          },
+          "selected_text_enabled": {
+            "type": "boolean"
+          },
+          "theme": {
+            "type": "string",
+            "enum": ["light", "dark", "system"]
+          },
+          "auto_start": {
+            "type": "boolean"
+          },
+          "close_to_tray": {
+            "type": "boolean"
+          },
+          "start_minimized": {
+            "type": "boolean"
+          },
+          "max_recording_seconds": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "const": 0
+              },
+              {
+                "type": "integer",
+                "minimum": 5,
+                "maximum": 720
+              }
+            ]
+          },
+          "history_enabled": {
+            "type": "boolean"
+          },
+          "history_retention_days": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 3650
+          },
+          "history_max_entries": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5000
+          },
+          "ui_language": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 16
+          },
+          "capsule_auto_hide": {
+            "type": "boolean"
+          }
+        },
+        "description": "Portable preferences only. Provider selection, endpoint routing, models, resource IDs, and BYOK credentials are device-local and are never uploaded, returned, or restored."
+      },
+      "PlanAllowances": {
+        "type": "object",
+        "required": ["cloudWordsPerMonth"],
+        "additionalProperties": false,
+        "properties": {
+          "cloudWordsPerMonth": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    }
+  }
+}

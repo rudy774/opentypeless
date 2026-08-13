@@ -699,6 +699,8 @@ async fn answer_question(
     operation_id: Option<&str>,
     voice_intent: &VoiceIntent,
 ) -> Result<String, AppError> {
+    crate::llm::validate_provider_base_url(&config.llm_provider, &config.llm_base_url)
+        .map_err(AppError::Config)?;
     let llm_api_key = if config.llm_provider == "cloud" {
         String::new()
     } else {
@@ -729,9 +731,8 @@ async fn answer_question(
     ))
 }
 
-fn response_error(status: reqwest::StatusCode, text: String) -> String {
-    let sanitized: String = text.chars().take(200).collect();
-    format!("Ask request failed ({}): {}", status.as_u16(), sanitized)
+fn response_error(status: reqwest::StatusCode) -> String {
+    format!("Ask request failed (HTTP {})", status.as_u16())
 }
 
 fn cloud_response_error(status: reqwest::StatusCode, text: String) -> AppError {
@@ -820,11 +821,7 @@ async fn ask_via_byok(
     question: &str,
     selected_text: Option<&str>,
 ) -> Result<String, String> {
-    let parsed =
-        url::Url::parse(&config.llm_base_url).map_err(|e| format!("Invalid LLM base URL: {e}"))?;
-    if parsed.scheme() != "https" && parsed.scheme() != "http" {
-        return Err("LLM base URL must use http or https scheme".to_string());
-    }
+    crate::llm::validate_provider_base_url(&config.llm_provider, &config.llm_base_url)?;
 
     let url = format!(
         "{}/chat/completions",
@@ -844,14 +841,19 @@ async fn ask_via_byok(
         request = request.header("Authorization", format!("Bearer {}", api_key));
     }
 
-    let resp = request.send().await.map_err(|e| e.to_string())?;
+    let resp = request
+        .send()
+        .await
+        .map_err(|_| "LLM provider network request failed".to_string())?;
     let status = resp.status();
     if !status.is_success() {
-        let text = resp.text().await.unwrap_or_default();
-        return Err(response_error(status, text));
+        return Err(response_error(status));
     }
 
-    let body: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
+    let body: serde_json::Value = resp
+        .json()
+        .await
+        .map_err(|_| "LLM provider returned an invalid response".to_string())?;
     extract_byok_ask_answer(&body)
 }
 
@@ -874,6 +876,9 @@ async fn ask_via_cloud(
     operation_id: Option<&str>,
     voice_intent: &VoiceIntent,
 ) -> Result<String, AppError> {
+    if !crate::managed_service_configured() {
+        return Err(crate::managed_service_unconfigured_error());
+    }
     let token = token_store
         .0
         .lock()
@@ -1010,6 +1015,15 @@ pub(crate) async fn start_reserved_ask_dictation(
             tracing::info!("Ask shortcut captured selected text context");
         }
 
+        let custom_whisper_config = if config.stt_provider == stt::config::CUSTOM_WHISPER_PROVIDER
+        {
+            Some(stt::config::build_custom_whisper_config(
+                &config.stt_custom_base_url,
+                &config.stt_custom_model,
+            )?)
+        } else {
+            None
+        };
         let stt_api_key = ask_stt_api_key(&config, &token_store)?;
         if stt::config::stt_provider_requires_api_key(&config.stt_provider)
             && stt_api_key.is_empty()
@@ -1020,15 +1034,6 @@ pub(crate) async fn start_reserved_ask_dictation(
             );
         }
 
-        let custom_whisper_config = if config.stt_provider == stt::config::CUSTOM_WHISPER_PROVIDER
-        {
-            Some(stt::config::build_custom_whisper_config(
-                &config.stt_custom_base_url,
-                &config.stt_custom_model,
-            )?)
-        } else {
-            None
-        };
         let operation_id = synthetic_operation_id();
         let stt_config = build_ask_stt_config(&config, stt_api_key, operation_id.clone());
         let mut provider = stt::create_provider(
@@ -1737,8 +1742,8 @@ mod tests {
 
     #[test]
     fn byok_ask_errors_do_not_use_cloud_auth_copy() {
-        let message = response_error(reqwest::StatusCode::UNAUTHORIZED, "bad key".to_string());
-        assert_eq!(message, "Ask request failed (401): bad key");
+        let message = response_error(reqwest::StatusCode::UNAUTHORIZED);
+        assert_eq!(message, "Ask request failed (HTTP 401)");
     }
 
     #[test]

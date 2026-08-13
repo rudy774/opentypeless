@@ -1,14 +1,47 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { ApiError, CloudApiError } from '../api'
 import { API_BASE_URL, APP_VERSION_HEADER_VALUE, CLIENT_VERSION_HEADER } from '../constants'
+import { createBackupSettings, InvalidBackupSettingsError } from '../backup-settings'
+import { useAppStore } from '../../stores/appStore'
 
 const invalidateCloudSessionOnce = vi.hoisted(() => vi.fn().mockResolvedValue(undefined))
+vi.mock('../constants', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../constants')>()
+  return {
+    ...actual,
+    API_BASE_URL: 'https://managed.example.test',
+    MANAGED_SERVICE_CONFIGURED: true,
+  }
+})
+
+const getCloudSessionToken = vi.hoisted(() => vi.fn<() => string | null>(() => null))
 
 vi.mock('../cloud-session', () => ({
+  getCloudSessionToken,
   invalidateCloudSessionOnce,
 }))
 
 const API_BASE = API_BASE_URL
+const validSubscriptionStatus = {
+  plan: 'pro',
+  source: 'creem',
+  displayName: 'Pro',
+  subscriptionEnd: '2025-12-31T00:00:00.000Z',
+  subscriptionStatus: 'active',
+  licenseStatus: null,
+  quotaModel: 'legacy_dual_meter',
+  displayWordsUsedEstimate: 2500,
+  displayWordsLimit: 100000,
+  displayWordsResetAt: '2026-07-01T00:00:00.000Z',
+  sttSecondsUsed: 100,
+  sttSecondsLimit: 36000,
+  llmTokensUsed: 5000,
+  llmTokensLimit: 5000000,
+  cloudWordsUsed: 2500,
+  cloudWordsLimit: 100000,
+  cloudWordsResetAt: '2026-07-01T00:00:00.000Z',
+  byokUnlimited: true,
+}
 
 describe('ApiError', () => {
   it('stores status and message', () => {
@@ -22,23 +55,12 @@ describe('ApiError', () => {
 
 describe('request() via getSubscriptionStatus', () => {
   beforeEach(() => {
+    getCloudSessionToken.mockReturnValue(null)
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue({
         ok: true,
-        json: () =>
-          Promise.resolve({
-            plan: 'pro',
-            subscriptionEnd: '2025-12-31',
-            quotaModel: 'legacy_dual_meter',
-            displayWordsUsedEstimate: 2500,
-            displayWordsLimit: 100000,
-            displayWordsResetAt: '2026-07-01T00:00:00.000Z',
-            sttSecondsUsed: 100,
-            sttSecondsLimit: 36000,
-            llmTokensUsed: 5000,
-            llmTokensLimit: 5000000,
-          }),
+        json: () => Promise.resolve(validSubscriptionStatus),
       }),
     )
   })
@@ -54,13 +76,29 @@ describe('request() via getSubscriptionStatus', () => {
     expect(fetch).toHaveBeenCalledWith(
       `${API_BASE}/api/subscription/status`,
       expect.objectContaining({
-        credentials: 'include',
+        credentials: 'omit',
         headers: expect.objectContaining({
           'Content-Type': 'application/json',
           [CLIENT_VERSION_HEADER]: APP_VERSION_HEADER_VALUE,
         }),
       }),
     )
+  })
+
+  it('adds the active in-memory bearer token without reading browser storage', async () => {
+    getCloudSessionToken.mockReturnValue('memory-token')
+    const storageSpy = vi.spyOn(Storage.prototype, 'getItem')
+
+    const { getSubscriptionStatus } = await import('../api')
+    await getSubscriptionStatus()
+
+    expect(fetch).toHaveBeenCalledWith(
+      `${API_BASE}/api/subscription/status`,
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: 'Bearer memory-token' }),
+      }),
+    )
+    expect(storageSpy).not.toHaveBeenCalledWith('session_token')
   })
 
   it('returns parsed JSON on success', async () => {
@@ -70,6 +108,26 @@ describe('request() via getSubscriptionStatus', () => {
     expect(result.quotaModel).toBe('legacy_dual_meter')
     expect(result.displayWordsLimit).toBe(100000)
     expect(result.sttSecondsLimit).toBe(36000)
+  })
+  it.each([
+    ['unknown plan', { ...validSubscriptionStatus, plan: 'enterprise' }],
+    ['impossible plan/source pair', { ...validSubscriptionStatus, source: 'appsumo' }],
+    [
+      'missing entitlement field',
+      (({ cloudWordsLimit: _, ...rest }) => rest)(validSubscriptionStatus),
+    ],
+    ['negative quota', { ...validSubscriptionStatus, cloudWordsLimit: -1 }],
+    ['non-finite usage', { ...validSubscriptionStatus, sttSecondsUsed: Number.NaN }],
+    ['invalid reset date', { ...validSubscriptionStatus, cloudWordsResetAt: 'tomorrow' }],
+    ['unexpected field', { ...validSubscriptionStatus, isAdmin: true }],
+  ])('fails closed for %s', async (_case, malformedStatus) => {
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve(malformedStatus),
+    } as Response)
+    const { getSubscriptionStatus, InvalidSubscriptionStatusError } = await import('../api')
+
+    await expect(getSubscriptionStatus()).rejects.toBeInstanceOf(InvalidSubscriptionStatusError)
   })
 })
 
@@ -179,6 +237,68 @@ describe('request() error handling', () => {
   })
 })
 
+describe('exchangeDesktopAuthCode', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('posts the exact code and verifier without bearer or browser credentials', async () => {
+    getCloudSessionToken.mockReturnValue('existing-session-token')
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ token: 'exchanged-session-token' }),
+      }),
+    )
+
+    const { exchangeDesktopAuthCode } = await import('../api')
+    await expect(
+      exchangeDesktopAuthCode('desktop-code-123456', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'),
+    ).resolves.toEqual({ token: 'exchanged-session-token' })
+
+    const options = vi.mocked(fetch).mock.calls[0][1]
+    expect(fetch).toHaveBeenCalledWith(
+      `${API_BASE}/api/auth/desktop/exchange`,
+      expect.objectContaining({
+        method: 'POST',
+        credentials: 'omit',
+        body: JSON.stringify({
+          code: 'desktop-code-123456',
+          codeVerifier: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        }),
+      }),
+    )
+    const headers = options?.headers as Record<string, string>
+    expect(headers.Authorization).toBeUndefined()
+  })
+
+  it('rejects malformed input before making a request', async () => {
+    vi.stubGlobal('fetch', vi.fn())
+    const { exchangeDesktopAuthCode, InvalidDesktopAuthExchangeError } = await import('../api')
+
+    await expect(exchangeDesktopAuthCode('short', 'short')).rejects.toBeInstanceOf(
+      InvalidDesktopAuthExchangeError,
+    )
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('rejects extra or malformed response fields', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ token: 'exchanged-session-token', stale: true }),
+      }),
+    )
+    const { exchangeDesktopAuthCode, InvalidDesktopAuthExchangeError } = await import('../api')
+
+    await expect(
+      exchangeDesktopAuthCode('desktop-code-123456', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'),
+    ).rejects.toBeInstanceOf(InvalidDesktopAuthExchangeError)
+  })
+})
+
 describe('createCheckout', () => {
   afterEach(() => {
     vi.restoreAllMocks()
@@ -189,24 +309,247 @@ describe('createCheckout', () => {
       'fetch',
       vi.fn().mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({ url: 'https://checkout.stripe.com/xxx' }),
+        json: () =>
+          Promise.resolve({ url: `${API_BASE}/billing/checkout/session-123?token=opaque` }),
       }),
     )
 
     const { createCheckout } = await import('../api')
-    const result = await createCheckout('web', 'lifetime_starter')
+    const result = await createCheckout(
+      'web',
+      'lifetime_starter',
+      '11111111-1111-4111-8111-111111111111',
+    )
 
     expect(fetch).toHaveBeenCalledWith(
       `${API_BASE}/api/checkout/create`,
       expect.objectContaining({
         method: 'POST',
+        headers: expect.objectContaining({
+          'Idempotency-Key': '11111111-1111-4111-8111-111111111111',
+        }),
         body: JSON.stringify({ origin: 'web', product: 'lifetime_starter' }),
       }),
     )
-    expect(result.url).toBe('https://checkout.stripe.com/xxx')
+    expect(result.url).toBe(`${API_BASE}/billing/checkout/session-123?token=opaque`)
+  })
+
+  it.each([
+    ['plain HTTP', 'http://managed.example.test/billing/session'],
+    ['foreign origin', 'https://checkout.example.test/session'],
+    ['embedded credentials', 'https://user:secret@managed.example.test/session'],
+    ['fragment', 'https://managed.example.test/session#token'],
+  ])('rejects a %s billing link', async (_case, url) => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ url }),
+      }),
+    )
+
+    const { createCheckout, InvalidHostedBillingResponseError } = await import('../api')
+    await expect(createCheckout()).rejects.toBeInstanceOf(InvalidHostedBillingResponseError)
+  })
+
+  it('rejects unexpected checkout response fields', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ url: `${API_BASE}/billing/session`, redirectOverride: true }),
+      }),
+    )
+
+    const { createCheckout, InvalidHostedBillingResponseError } = await import('../api')
+    await expect(createCheckout()).rejects.toBeInstanceOf(InvalidHostedBillingResponseError)
   })
 })
 
+describe('createPortalSession', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('accepts only an exact service-origin HTTPS response', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ url: `${API_BASE}/billing/portal/session-123` }),
+      }),
+    )
+
+    const { createPortalSession } = await import('../api')
+    await expect(createPortalSession()).resolves.toEqual({
+      url: `${API_BASE}/billing/portal/session-123`,
+    })
+  })
+})
+
+describe('backup API', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('uploads a versioned snapshot with a stable idempotency key', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ success: true, version: 1 }),
+      }),
+    )
+
+    const { uploadBackup, BACKUP_SCHEMA_VERSION } = await import('../api')
+    const result = await uploadBackup(
+      {
+        history: [{ id: 1 }],
+        dictionary: { entries: [], correction_rules: [] },
+        settings: { polish_enabled: true },
+      },
+      '22222222-2222-4222-8222-222222222222',
+    )
+
+    const options = vi.mocked(fetch).mock.calls[0][1]
+    expect(fetch).toHaveBeenCalledWith(
+      `${API_BASE}/api/backup/upload`,
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          'Idempotency-Key': '22222222-2222-4222-8222-222222222222',
+        }),
+      }),
+    )
+    const body = JSON.parse(String(options?.body))
+    expect(body).toMatchObject({
+      version: BACKUP_SCHEMA_VERSION,
+      history: [{ id: 1 }],
+      dictionary: { entries: [], correction_rules: [] },
+      settings: { polish_enabled: true },
+    })
+    expect(new Date(body.createdAt).toISOString()).toBe(body.createdAt)
+    expect(result).toEqual({ success: true, version: 1 })
+  })
+
+  it('generates cryptographically formatted UUID retry keys', async () => {
+    const { createIdempotencyKey } = await import('../api')
+    expect(createIdempotencyKey()).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+    )
+  })
+})
+describe('backup download parser', () => {
+  const validHistoryEntry = {
+    id: 1,
+    created_at: '2026-08-13T00:00:00.000Z',
+    context_profile_id: 'general',
+    context_label: 'General',
+    context_icon_key: 'app',
+    context_family: 'general' as const,
+    browser_access_status: 'not_applicable' as const,
+    provider_kind: 'byok' as const,
+    raw_text: 'hello',
+    polished_text: 'Hello.',
+    language: 'en',
+    duration_ms: 1000,
+    stt_ms: 300,
+    llm_ms: 200,
+    total_ms: 500,
+    active_scene_id: null,
+    active_scene_source: null,
+    active_scene_name: null,
+    active_scene_prompt_chars: null,
+    active_scene_prompt_truncated: false,
+    output_status: 'inserted',
+    output_error: null,
+  }
+
+  function validBackupDownload() {
+    return {
+      version: 1,
+      createdAt: '2026-08-13T00:00:00.000Z',
+      history: [validHistoryEntry],
+      dictionary: {
+        entries: [{ id: 1, word: 'OpenTypeless', pronunciation: null }],
+        correction_rules: [
+          { id: 1, pattern: 'open type less', replacement: 'OpenTypeless', enabled: true },
+        ],
+      },
+      settings: createBackupSettings(useAppStore.getState().config),
+    }
+  }
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('accepts only the complete bounded contract shape', async () => {
+    const { parseBackupDownload } = await import('../api')
+    expect(parseBackupDownload(validBackupDownload())).toEqual(validBackupDownload())
+
+    expect(() => parseBackupDownload({ ...validBackupDownload(), unexpected: true })).toThrow()
+    expect(() =>
+      parseBackupDownload({
+        ...validBackupDownload(),
+        dictionary: { ...validBackupDownload().dictionary, entries: [{ id: 1, word: '' }] },
+      }),
+    ).toThrow()
+    expect(() =>
+      parseBackupDownload({
+        ...validBackupDownload(),
+        settings: {
+          ...validBackupDownload().settings,
+          hotkeys: {
+            ...validBackupDownload().settings.hotkeys,
+            openApp: { primary: 'A', modifiers: ['Ctrl'], injected: true },
+          },
+        },
+      }),
+    ).toThrow()
+  })
+
+  it('downloadBackup rejects injected endpoint routing instead of casting service JSON', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            ...validBackupDownload(),
+            settings: {
+              ...validBackupDownload().settings,
+              llm_provider: 'gemini',
+              llm_base_url: 'https://attacker.example/v1',
+            },
+          }),
+      }),
+    )
+    const { downloadBackup } = await import('../api')
+
+    await expect(downloadBackup()).rejects.toBeInstanceOf(InvalidBackupSettingsError)
+  })
+
+  it.each([
+    ['missing settings', (({ settings: _, ...rest }) => rest)(validBackupDownload())],
+    ['future version', { ...validBackupDownload(), version: 2 }],
+    ['unpaired legacy metadata', (({ createdAt: _, ...rest }) => rest)(validBackupDownload())],
+    [
+      'invalid history enum',
+      {
+        ...validBackupDownload(),
+        history: [{ ...validHistoryEntry, provider_kind: 'attacker' }],
+      },
+    ],
+  ])('downloadBackup rejects %s', async (_case, response) => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(response) }),
+    )
+    const { downloadBackup, InvalidManagedBackupError } = await import('../api')
+    await expect(downloadBackup()).rejects.toBeInstanceOf(InvalidManagedBackupError)
+  })
+})
 describe('proxyStt', () => {
   afterEach(() => {
     vi.restoreAllMocks()
@@ -282,5 +625,72 @@ describe('proxyLlm', () => {
       }),
     )
     expect(result.text).toBe('polished text')
+  })
+})
+
+describe('getPlans', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  const validPlan = {
+    product: 'pro_monthly',
+    active: true,
+    displayName: 'Pro Monthly',
+    billingModel: 'subscription',
+    billingInterval: 'month',
+    currency: 'USD',
+    priceMinor: 499,
+    allowances: { cloudWordsPerMonth: 100000 },
+  }
+
+  it('returns a strictly validated server-owned catalogue', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ plans: [validPlan] }),
+      }),
+    )
+
+    const { getPlans } = await import('../api')
+    await expect(getPlans()).resolves.toEqual([validPlan])
+    expect(fetch).toHaveBeenCalledWith(
+      `${API_BASE}/api/plans`,
+      expect.objectContaining({ credentials: 'omit' }),
+    )
+  })
+
+  it.each([
+    ['unsupported product', { ...validPlan, product: 'enterprise' }],
+    ['negative price', { ...validPlan, priceMinor: -1 }],
+    ['fractional price', { ...validPlan, priceMinor: 4.99 }],
+    ['invalid currency', { ...validPlan, currency: 'usd' }],
+    ['mismatched billing', { ...validPlan, billingInterval: null }],
+    ['invalid allowance', { ...validPlan, allowances: { cloudWordsPerMonth: -1 } }],
+  ])('rejects %s instead of exposing checkout', async (_case, invalidPlan) => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ plans: [invalidPlan] }),
+      }),
+    )
+
+    const { getPlans, InvalidPlanCatalogueError } = await import('../api')
+    await expect(getPlans()).rejects.toBeInstanceOf(InvalidPlanCatalogueError)
+  })
+
+  it('rejects duplicate products and unexpected catalogue fields', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ plans: [validPlan, validPlan], stalePrice: '$4.99' }),
+      }),
+    )
+
+    const { getPlans, InvalidPlanCatalogueError } = await import('../api')
+    await expect(getPlans()).rejects.toBeInstanceOf(InvalidPlanCatalogueError)
   })
 })

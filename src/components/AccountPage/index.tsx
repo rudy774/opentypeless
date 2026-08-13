@@ -14,7 +14,7 @@ import { openUrl } from '@tauri-apps/plugin-opener'
 import { readText } from '@tauri-apps/plugin-clipboard-manager'
 import { hasManagedCloudAccess, useAuthStore } from '../../stores/authStore'
 import { useAppStore } from '../../stores/appStore'
-import { API_BASE_URL } from '../../lib/constants'
+import { API_BASE_URL, MANAGED_SERVICE_CONFIGURED } from '../../lib/constants'
 import { uploadBackup, downloadBackup, createPortalSession } from '../../lib/api'
 import { createBackupSettings, mergeBackupSettings } from '../../lib/backup-settings'
 import {
@@ -22,6 +22,7 @@ import {
   getConfig,
   restoreBackupData,
   setAutoStart,
+  validateBackupData,
   updateConfig as persistConfig,
 } from '../../lib/tauri'
 import {
@@ -55,6 +56,32 @@ function accountErrorMessage(message: string | null, t: ReturnType<typeof useTra
 
 export function AccountPage() {
   const { user, loading } = useAuthStore()
+  const { t } = useTranslation()
+
+  if (!MANAGED_SERVICE_CONFIGURED) {
+    return (
+      <div className="max-w-[420px] mx-auto py-12 px-6 text-center">
+        <div className="rounded-[16px] border border-border bg-bg-secondary p-6 space-y-3">
+          <KeyRound size={28} className="mx-auto text-text-secondary" aria-hidden="true" />
+          <h1 className="text-[17px] font-semibold text-text-primary">
+            {t('account.managedUnavailableTitle', 'Account service unavailable')}
+          </h1>
+          <p className="text-[13px] leading-relaxed text-text-secondary">
+            {t(
+              'settings.managedServiceUnavailableByok',
+              'This build has no managed cloud service configured. Use a provider API key (BYOK) or a local endpoint.',
+            )}
+          </p>
+          <p className="text-[12px] text-text-tertiary">
+            {t(
+              'account.localOnlyPrivacy',
+              'Local transcription and your own provider keys remain available without an account.',
+            )}
+          </p>
+        </div>
+      </div>
+    )
+  }
 
   if (loading && !user) {
     return (
@@ -112,7 +139,7 @@ function AuthForm() {
         await requestPasswordReset(email, i18n.resolvedLanguage ?? i18n.language ?? 'en')
         setMode('forgot-sent')
       } else if (tab === 'signin') {
-        const verificationCallbackURL = createDesktopAuthCallbackURL(
+        const verificationCallbackURL = await createDesktopAuthCallbackURL(
           EMAIL_VERIFICATION_STATE_TTL_MS,
         )
         await signIn(email, password, { verificationCallbackURL })
@@ -128,7 +155,7 @@ function AuthForm() {
           setLocalError(t('account.passwordMinLength'))
           return
         }
-        const verificationCallbackURL = createDesktopAuthCallbackURL(
+        const verificationCallbackURL = await createDesktopAuthCallbackURL(
           EMAIL_VERIFICATION_STATE_TTL_MS,
         )
         await signUp(email, password, name, { verificationCallbackURL })
@@ -158,7 +185,7 @@ function AuthForm() {
           <button
             onClick={async () => {
               setResent(false)
-              const verificationCallbackURL = createDesktopAuthCallbackURL(
+              const verificationCallbackURL = await createDesktopAuthCallbackURL(
                 EMAIL_VERIFICATION_STATE_TTL_MS,
               )
               await resendVerification({ verificationCallbackURL })
@@ -198,10 +225,11 @@ function AuthForm() {
 
   const handleOAuth = async (provider: 'google' | 'github') => {
     try {
+      if (!MANAGED_SERVICE_CONFIGURED) throw new Error('Managed cloud service is not configured')
       setOauthPending(provider)
       setLocalError(null)
       useAuthStore.setState({ error: null })
-      const callbackURL = createDesktopAuthCallbackURL()
+      const callbackURL = await createDesktopAuthCallbackURL()
       // Open the desktop-oauth bridge route in the system browser. The server
       // internally POSTs to Better Auth, then 302-redirects the browser to the
       // OAuth provider while forwarding the state cookie — keeping cookie and
@@ -508,7 +536,8 @@ function AuthForm() {
         <div className="space-y-2">
           <button
             onClick={() => handleOAuth('google')}
-            className="w-full py-2 rounded-[8px] border border-border bg-transparent text-text-primary text-[13px] font-medium cursor-pointer hover:bg-bg-secondary transition-colors flex items-center justify-center gap-2"
+            disabled={!MANAGED_SERVICE_CONFIGURED}
+            className="w-full py-2 rounded-[8px] border border-border bg-transparent text-text-primary text-[13px] font-medium cursor-pointer hover:bg-bg-secondary transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
           >
             <svg width="16" height="16" viewBox="0 0 24 24">
               <path
@@ -532,7 +561,8 @@ function AuthForm() {
           </button>
           <button
             onClick={() => handleOAuth('github')}
-            className="w-full py-2 rounded-[8px] border border-border bg-transparent text-text-primary text-[13px] font-medium cursor-pointer hover:bg-bg-secondary transition-colors flex items-center justify-center gap-2"
+            className="w-full py-2 rounded-[8px] border border-border bg-transparent text-text-primary text-[13px] font-medium cursor-pointer hover:bg-bg-secondary transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
+            disabled={!MANAGED_SERVICE_CONFIGURED}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
               <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z" />
@@ -626,34 +656,94 @@ function AccountDetails() {
   const handleRestore = async () => {
     setBackupLoading(true)
     setBackupMsg(null)
-    let autoStartApplied = false
+    let previousPersistedConfig: Awaited<ReturnType<typeof getConfig>> | null = null
+    let restoredConfig: Awaited<ReturnType<typeof getConfig>> | null = null
+    let settingsMutationStarted = false
+    let autoStartMutationAttempted = false
+
     try {
       const data = await downloadBackup()
+      const backupHistory = data.history ?? null
+      const backupDictionary = data.dictionary ?? null
+
+      // Validate every database-backed section with the exact native restore
+      // validators before changing settings, autostart, or local UI state.
+      await validateBackupData(backupHistory, backupDictionary)
+
       if (data.settings) {
-        const restoredConfig = mergeBackupSettings(config, data.settings)
-        if (restoredConfig.auto_start !== config.auto_start) {
+        previousPersistedConfig = await getConfig()
+        restoredConfig = mergeBackupSettings(config, data.settings)
+        settingsMutationStarted = true
+        if (restoredConfig.auto_start !== previousPersistedConfig.auto_start) {
+          autoStartMutationAttempted = true
           await setAutoStart(restoredConfig.auto_start)
-          autoStartApplied = true
         }
-        try {
-          await persistConfig(restoredConfig)
-        } catch (error) {
-          if (autoStartApplied) await setAutoStart(config.auto_start).catch(() => {})
-          throw error
-        }
-        const persistedConfig = await getConfig().catch(() => restoredConfig)
-        setConfig(persistedConfig)
-        setSavedConfig(persistedConfig)
+        await persistConfig(restoredConfig)
       }
-      if (data.history != null || data.dictionary != null) {
-        const restoredData = await restoreBackupData(data.history ?? null, data.dictionary ?? null)
+
+      if (backupHistory != null || backupDictionary != null) {
+        const restoredData = await restoreBackupData(backupHistory, backupDictionary)
         setHistory(restoredData.history)
         setDictionary(restoredData.dictionary)
         setCorrectionRules(restoredData.correctionRules)
       }
+
+      if (restoredConfig) {
+        const persistedConfig = await getConfig().catch(() => restoredConfig!)
+        setConfig(persistedConfig)
+        setSavedConfig(persistedConfig)
+      }
       setBackupMsg(t('account.toast.restoreOk'))
-    } catch (e) {
-      setBackupMsg(e instanceof Error ? e.message : t('account.toast.restoreFail'))
+    } catch (error) {
+      const message = error instanceof Error ? error.message : t('account.toast.restoreFail')
+      const databaseCommitted = message.startsWith('backup_restore_committed_refresh_failed:')
+
+      if (databaseCommitted) {
+        // Database and settings are already committed. Do not create a mixed
+        // generation by rolling only settings back; report the partial refresh.
+        if (restoredConfig) {
+          const persistedConfig = await getConfig().catch(() => restoredConfig!)
+          setConfig(persistedConfig)
+          setSavedConfig(persistedConfig)
+        }
+        setBackupMsg(
+          t(
+            'account.toast.restoreCommittedRefreshFailed',
+            'Restore completed, but the app could not refresh the restored lists. Restart OpenTypeless to reload them.',
+          ),
+        )
+      } else {
+        const rollbackErrors: string[] = []
+        if (previousPersistedConfig && settingsMutationStarted) {
+          if (autoStartMutationAttempted) {
+            await setAutoStart(previousPersistedConfig.auto_start).catch((rollbackError) => {
+              rollbackErrors.push(
+                rollbackError instanceof Error
+                  ? rollbackError.message
+                  : 'autostart rollback failed',
+              )
+            })
+          }
+          await persistConfig(previousPersistedConfig).catch((rollbackError) => {
+            rollbackErrors.push(
+              rollbackError instanceof Error ? rollbackError.message : 'config rollback failed',
+            )
+          })
+        }
+
+        if (rollbackErrors.length > 0) {
+          const actualConfig = await getConfig().catch(() => null)
+          if (actualConfig) {
+            setConfig(actualConfig)
+            setSavedConfig(actualConfig)
+          }
+          setBackupMsg(
+            message + '; settings rollback incomplete (' + rollbackErrors.join(', ') + ')',
+          )
+        } else {
+          setBackupMsg(message)
+        }
+      }
     } finally {
       setBackupLoading(false)
     }

@@ -3,7 +3,12 @@ import { useTranslation } from 'react-i18next'
 import { useAppStore } from '../../stores/appStore'
 import type { PolishStyle } from '../../stores/appStore'
 import { hasManagedCloudAccess, useAuthStore } from '../../stores/authStore'
-import { LLM_PROVIDERS, LLM_DEFAULT_CONFIG, llmProviderRequiresApiKey } from '../../lib/constants'
+import {
+  LLM_PROVIDERS,
+  LLM_DEFAULT_CONFIG,
+  MANAGED_SERVICE_CONFIGURED,
+  llmProviderRequiresApiKey,
+} from '../../lib/constants'
 import {
   benchLlmConnection,
   fetchLlmModels,
@@ -42,8 +47,21 @@ export function LlmPane() {
   const hasCloudAccess = useAuthStore(hasManagedCloudAccess)
   const { t } = useTranslation()
 
-  const isCloud = config.llm_provider === 'cloud'
-  const requiresApiKey = llmProviderRequiresApiKey(config.llm_provider)
+  const hadUnavailableCloudProvider = !MANAGED_SERVICE_CONFIGURED && config.llm_provider === 'cloud'
+  const llmProvider = (
+    hadUnavailableCloudProvider ? 'openrouter' : config.llm_provider
+  ) as typeof config.llm_provider
+  const llmBaseUrl = hadUnavailableCloudProvider
+    ? LLM_DEFAULT_CONFIG.openrouter.baseUrl
+    : config.llm_base_url
+  const llmModel = hadUnavailableCloudProvider
+    ? LLM_DEFAULT_CONFIG.openrouter.model
+    : config.llm_model
+  const isCloud = MANAGED_SERVICE_CONFIGURED && llmProvider === 'cloud'
+  const requiresApiKey = llmProviderRequiresApiKey(llmProvider)
+  const visibleLlmProviders = LLM_PROVIDERS.filter(
+    (provider) => provider.value !== 'cloud' || MANAGED_SERVICE_CONFIGURED,
+  )
   const polishPromptLength = config.polish_custom_prompt.length
   const hasCustomPolishConfig = config.polish_custom_prompt.trim().length > 0
   const goUpgrade = () => {
@@ -81,6 +99,20 @@ export function LlmPane() {
     setMappingCandidate(candidate)
     setAppMappings(mappings)
   }, [])
+
+  useEffect(() => {
+    if (MANAGED_SERVICE_CONFIGURED || config.llm_provider !== 'cloud') return
+    const defaults = LLM_DEFAULT_CONFIG.openrouter
+    updateConfig({
+      llm_provider: 'openrouter',
+      llm_base_url: defaults.baseUrl,
+      llm_model: defaults.model,
+    })
+    setLlmTestStatus('idle')
+    setLlmLatencyMs(null)
+    setModels([])
+    setTestErrorMessage(null)
+  }, [config.llm_provider, setLlmLatencyMs, setLlmTestStatus, setModels, updateConfig])
 
   useEffect(() => {
     if (!lastContext) {
@@ -136,7 +168,7 @@ export function LlmPane() {
     const legacyApiKey = config.llm_api_key
     setLlmApiKey(legacyApiKey)
     setCredentialErrorMessage(null)
-    readCredential('llm', config.llm_provider)
+    readCredential('llm', llmProvider)
       .then((secret) => {
         if (!cancelled) setLlmApiKey(legacyApiKey || secret || '')
       })
@@ -145,7 +177,7 @@ export function LlmPane() {
     return () => {
       cancelled = true
     }
-  }, [config.llm_api_key, config.llm_provider, isCloud, requiresApiKey])
+  }, [config.llm_api_key, isCloud, llmProvider, requiresApiKey])
 
   const persistLlmCredential = useCallback(
     (value: string, delayMs = 350) => {
@@ -153,7 +185,7 @@ export function LlmPane() {
       if (credentialSaveRef.current) clearTimeout(credentialSaveRef.current)
       credentialSaveRef.current = setTimeout(() => {
         credentialSaveRef.current = null
-        setCredential('llm', config.llm_provider, value)
+        setCredential('llm', llmProvider, value)
           .then(() => setCredentialErrorMessage(null))
           .catch((error) => {
             const message = error instanceof Error ? error.message : String(error)
@@ -162,7 +194,7 @@ export function LlmPane() {
           })
       }, delayMs)
     },
-    [config.llm_provider, isCloud, requiresApiKey],
+    [isCloud, llmProvider, requiresApiKey],
   )
 
   const doFetchModels = useCallback(
@@ -185,11 +217,11 @@ export function LlmPane() {
   // Auto-fetch when API key or base URL changes (debounced); skips if models already cached
   useEffect(() => {
     if (isCloud) return
-    if ((requiresApiKey && !llmApiKey) || !config.llm_base_url) return
+    if ((requiresApiKey && !llmApiKey) || !llmBaseUrl) return
     if (models.length > 0) return
     if (debounceRef.current) clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(() => {
-      doFetchModels(llmApiKey, config.llm_provider, config.llm_base_url)
+      doFetchModels(llmApiKey, llmProvider, llmBaseUrl)
     }, 500)
     return () => {
       if (debounceRef.current) {
@@ -197,27 +229,14 @@ export function LlmPane() {
         debounceRef.current = null
       }
     }
-  }, [
-    config.llm_base_url,
-    config.llm_provider,
-    doFetchModels,
-    isCloud,
-    llmApiKey,
-    models.length,
-    requiresApiKey,
-  ])
+  }, [llmBaseUrl, llmProvider, doFetchModels, isCloud, llmApiKey, models.length, requiresApiKey])
 
   const handleTest = async () => {
     setLlmTestStatus('testing')
     setLlmLatencyMs(null)
     setTestErrorMessage(null)
     try {
-      const ms = await benchLlmConnection(
-        llmApiKey,
-        config.llm_provider,
-        config.llm_base_url,
-        config.llm_model,
-      )
+      const ms = await benchLlmConnection(llmApiKey, llmProvider, llmBaseUrl, llmModel)
       console.log('[LLM Test] Received latency:', ms, 'type:', typeof ms)
       setLlmLatencyMs(ms)
       setLlmTestStatus('success')
@@ -257,14 +276,14 @@ export function LlmPane() {
     <div className="space-y-4">
       <FormField label={t('settings.provider')}>
         <select
-          value={config.llm_provider}
+          value={llmProvider}
           onChange={(e) => {
             const provider = e.target.value as typeof config.llm_provider
             const defaults = LLM_DEFAULT_CONFIG[provider]
             updateConfig({
               llm_provider: provider,
-              llm_base_url: defaults?.baseUrl ?? config.llm_base_url,
-              llm_model: defaults?.model ?? config.llm_model,
+              llm_base_url: defaults?.baseUrl ?? llmBaseUrl,
+              llm_model: defaults?.model ?? llmModel,
             })
             setLlmTestStatus('idle')
             setLlmLatencyMs(null)
@@ -273,13 +292,22 @@ export function LlmPane() {
           }}
           className="w-full px-3 py-2.5 bg-bg-secondary border border-border rounded-[10px] text-[13px] text-text-primary outline-none focus:border-border-focus transition-colors"
         >
-          {LLM_PROVIDERS.map((p) => (
+          {visibleLlmProviders.map((p) => (
             <option key={p.value} value={p.value}>
               {t(p.labelKey)}
             </option>
           ))}
         </select>
       </FormField>
+
+      {!MANAGED_SERVICE_CONFIGURED && (
+        <div
+          role="note"
+          className="rounded-[10px] border border-border bg-bg-secondary/45 px-3 py-3 text-[12px] leading-5 text-text-secondary"
+        >
+          {t('settings.managedServiceUnavailableByok')}
+        </div>
+      )}
 
       {isCloud && (
         <div className="border border-border rounded-[10px] px-3 py-3 space-y-2">
@@ -344,7 +372,7 @@ export function LlmPane() {
               <div className="relative flex-1">
                 <input
                   list="llm-model-list"
-                  value={config.llm_model}
+                  value={llmModel}
                   onChange={(e) => {
                     updateConfig({ llm_model: e.target.value })
                     setLlmLatencyMs(null)
@@ -360,8 +388,8 @@ export function LlmPane() {
                 </datalist>
               </div>
               <button
-                onClick={() => doFetchModels(llmApiKey, config.llm_provider, config.llm_base_url)}
-                disabled={fetchingModels || !config.llm_base_url || (requiresApiKey && !llmApiKey)}
+                onClick={() => doFetchModels(llmApiKey, llmProvider, llmBaseUrl)}
+                disabled={fetchingModels || !llmBaseUrl || (requiresApiKey && !llmApiKey)}
                 className="px-3 py-2.5 bg-bg-secondary border border-border rounded-[10px] text-[13px] text-text-secondary cursor-pointer hover:border-border-focus disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
                 title={t('settings.fetchModels')}
               >
@@ -378,7 +406,7 @@ export function LlmPane() {
           <FormField label={t('settings.baseUrl')}>
             <div className="flex gap-2">
               <input
-                value={config.llm_base_url}
+                value={llmBaseUrl}
                 onChange={(e) => {
                   updateConfig({ llm_base_url: e.target.value })
                   setLlmTestStatus('idle')
@@ -386,7 +414,7 @@ export function LlmPane() {
                   setTestErrorMessage(null)
                 }}
                 placeholder={
-                  LLM_DEFAULT_CONFIG[config.llm_provider]?.baseUrl ?? 'https://api.openai.com/v1'
+                  LLM_DEFAULT_CONFIG[llmProvider]?.baseUrl ?? 'https://api.openai.com/v1'
                 }
                 className="min-w-0 flex-1 px-3 py-2.5 bg-bg-secondary border border-border rounded-[10px] text-[13px] text-text-primary outline-none focus:border-border-focus transition-colors"
               />
@@ -394,7 +422,7 @@ export function LlmPane() {
                 <button
                   type="button"
                   onClick={handleTest}
-                  disabled={!config.llm_base_url || llmTestStatus === 'testing'}
+                  disabled={!llmBaseUrl || llmTestStatus === 'testing'}
                   className="px-4 py-2.5 bg-accent text-on-accent rounded-[10px] text-[13px] border-none cursor-pointer hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
                 >
                   {llmTestStatus === 'testing' && <Loader2 size={14} className="animate-spin" />}

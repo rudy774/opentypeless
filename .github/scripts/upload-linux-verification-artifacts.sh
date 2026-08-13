@@ -67,5 +67,5 @@ if compgen -G "src-tauri/target/release/bundle/rpm/*.rpm" >/dev/null; then
 fi
 
 gh release upload "$TAG_NAME" "$verification_dir"/* \
-  --repo tover0314-w/opentypeless \
+  --repo "${GITHUB_REPOSITORY:?GITHUB_REPOSITORY is required}" \
   --clobber

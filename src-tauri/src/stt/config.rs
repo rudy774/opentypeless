@@ -67,6 +67,25 @@ pub fn normalize_custom_whisper_endpoint(base_url: &str) -> Result<String, Strin
     if parsed.scheme() != "http" && parsed.scheme() != "https" {
         return Err("Base URL must start with http:// or https://".to_string());
     }
+    let is_loopback = match parsed.host() {
+        Some(url::Host::Domain(host)) => host.eq_ignore_ascii_case("localhost"),
+        Some(url::Host::Ipv4(address)) => address.is_loopback(),
+        Some(url::Host::Ipv6(address)) => address.is_loopback(),
+        None => false,
+    };
+    if parsed.scheme() == "http" && !is_loopback {
+        return Err("Remote Custom Whisper base URLs must use HTTPS".to_string());
+    }
+    if !parsed.username().is_empty()
+        || parsed.password().is_some()
+        || parsed.query().is_some()
+        || parsed.fragment().is_some()
+    {
+        return Err(
+            "Custom Whisper base URL cannot contain credentials, a query, or a fragment"
+                .to_string(),
+        );
+    }
 
     if trimmed.ends_with("/audio/transcriptions") {
         Ok(trimmed.to_string())
@@ -235,6 +254,43 @@ mod tests {
     fn test_custom_whisper_rejects_non_http_url() {
         let err = normalize_custom_whisper_endpoint("file:///tmp/server").unwrap_err();
         assert!(err.contains("http://"));
+    }
+
+    #[test]
+    fn test_custom_whisper_rejects_url_secret_surfaces() {
+        for unsafe_url in [
+            "http://user:secret@localhost:8000/v1",
+            "http://localhost:8000/v1?api_key=secret",
+            "http://localhost:8000/v1#secret",
+        ] {
+            assert!(normalize_custom_whisper_endpoint(unsafe_url).is_err());
+        }
+    }
+
+    #[test]
+    fn test_custom_whisper_accepts_safe_local_and_remote_endpoints() {
+        for safe_url in [
+            "http://localhost:8000/v1",
+            "http://127.0.0.1:8000/v1",
+            "http://[::1]:8000/v1",
+            "https://custom-stt.example/v1",
+        ] {
+            assert!(
+                normalize_custom_whisper_endpoint(safe_url).is_ok(),
+                "{safe_url}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_custom_whisper_rejects_plaintext_remote_hosts() {
+        for unsafe_url in [
+            "http://custom-stt.example/v1",
+            "http://192.168.1.20:8000/v1",
+            "http://localhost.example:8000/v1",
+        ] {
+            assert!(normalize_custom_whisper_endpoint(unsafe_url).is_err());
+        }
     }
 
     #[test]

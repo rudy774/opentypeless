@@ -2,6 +2,9 @@
   <a href="README.md">English</a> | <a href="README_zh.md">中文</a> | <a href="README_ja.md">日本語</a> | <a href="README_ko.md">한국어</a> | <strong>Español</strong> | <a href="README_fr.md">Français</a> | <a href="README_de.md">Deutsch</a> | <a href="README_pt.md">Português</a> | <a href="README_ru.md">Русский</a> | <a href="README_ar.md">العربية</a> | <a href="README_hi.md">हिन्दी</a> | <a href="README_it.md">Italiano</a> | <a href="README_tr.md">Türkçe</a> | <a href="README_vi.md">Tiếng Việt</a> | <a href="README_th.md">ภาษาไทย</a> | <a href="README_id.md">Bahasa Indonesia</a> | <a href="README_pl.md">Polski</a> | <a href="README_nl.md">Nederlands</a>
 </p>
 
+> [!IMPORTANT]
+> **Fork status:** This is the **Rudy774 fork**, which differs from the original OpenTypeless project. Source code, releases, and support are provided only through [github.com/rudy774/opentypeless](https://github.com/rudy774/opentypeless). This fork does **not** currently provide a hosted paid service, and automatic updates are disabled.
+
 <p align="center">
   <img src="src-tauri/icons/128x128@2x.png" width="128" height="128" alt="OpenTypeless Logo" />
 </p>
@@ -19,11 +22,10 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/tover0314-w/opentypeless/actions/workflows/ci.yml"><img src="https://github.com/tover0314-w/opentypeless/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
-  <a href="https://github.com/tover0314-w/opentypeless/releases"><img src="https://img.shields.io/github/v/release/tover0314-w/opentypeless?color=2ABBA7" alt="Release" /></a>
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/tover0314-w/opentypeless" alt="Licencia" /></a>
-  <a href="https://github.com/tover0314-w/opentypeless/stargazers"><img src="https://img.shields.io/github/stars/tover0314-w/opentypeless?style=social" alt="Estrellas" /></a>
-  <a href="https://discord.gg/V6rRpJ4RGD"><img src="https://img.shields.io/badge/Discord-Join%20us-5865F2?logo=discord&logoColor=white" alt="Discord" /></a>
+  <a href="https://github.com/rudy774/opentypeless/actions/workflows/ci.yml"><img src="https://github.com/rudy774/opentypeless/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="https://github.com/rudy774/opentypeless/releases"><img src="https://img.shields.io/github/v/release/rudy774/opentypeless?color=2ABBA7" alt="Release" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/rudy774/opentypeless" alt="Licencia" /></a>
+  <a href="https://github.com/rudy774/opentypeless/stargazers"><img src="https://img.shields.io/github/stars/rudy774/opentypeless?style=social" alt="Estrellas" /></a>
 </p>
 
 <p align="center">
@@ -34,7 +36,9 @@
   <img src="docs/images/voice-flow-demo.gif" width="720" alt="Demo de OpenTypeless" />
 </p>
 
-## Novedades de v1.1.49
+## Inherited upstream capabilities
+
+The capabilities below originated in the upstream project before this fork. This is historical attribution, not a release-version or support claim.
 
 - **Escritura adaptada a cada aplicación** detecta localmente la aplicación activa y ajusta la estructura y el tono para correo, chat, documentos, gestores de incidencias, herramientas de desarrollo y más.
 - **Enrutamiento de intención por voz** distingue entre dictado, edición del texto seleccionado, traducción, Ask Anything y acciones de voz compatibles en inglés, chino simplificado y chino tradicional.
@@ -47,7 +51,7 @@ La detección de aplicaciones, los mapeos, el diccionario y las reglas de correc
 
 | Pulido con IA adaptado a la aplicación | Diccionario local y correcciones |
 | --- | --- |
-| <img src="docs/images/v1.1.49-app-aware-polish.jpg" width="420" alt="Pulido con IA adaptado a la aplicación en OpenTypeless v1.1.49" /> | <img src="docs/images/v1.1.49-dictionary.jpg" width="420" alt="Diccionario local y correcciones en OpenTypeless v1.1.49" /> |
+| <img src="docs/images/v1.1.49-app-aware-polish.jpg" width="420" alt="Pulido con IA adaptado a la aplicación en OpenTypeless inherited upstream" /> | <img src="docs/images/v1.1.49-dictionary.jpg" width="420" alt="Diccionario local y correcciones en OpenTypeless inherited upstream" /> |
 
 <details>
 <summary>Más capturas de pantalla</summary>
@@ -107,7 +111,7 @@ La detección de aplicaciones, los mapeos, el diccionario y las reglas de correc
 
 Descarga la última versión para tu plataforma:
 
-**[Descargar desde Releases](https://github.com/tover0314-w/opentypeless/releases)**
+**[Descargar desde Releases](https://github.com/rudy774/opentypeless/releases)**
 
 | Plataforma | Archivo |
 |------------|---------|
@@ -149,43 +153,11 @@ Todos los ajustes son accesibles desde el panel de Configuración de la aplicaci
 
 Las claves API se almacenan localmente mediante `tauri-plugin-store`. Ninguna clave se envía a los servidores de OpenTypeless — todas las solicitudes STT/LLM van directamente al proveedor que configures.
 
-### Opción Cloud (Pro)
+### Managed service status for this fork
 
-OpenTypeless también ofrece una suscripción Pro opcional que proporciona cuota gestionada de STT y LLM para que no necesites tus propias claves API. Esto es completamente opcional — la aplicación es totalmente funcional con tus propias claves.
+This fork currently supports bring-your-own-key and local providers. It does not include a hosted paid service. Account, entitlement, checkout, backup, and managed transcription features remain disabled unless you build and operate a compatible backend yourself.
 
-[Más información sobre Pro](https://www.opentypeless.com)
-
-### Modo BYOK (Trae Tu Propia Clave) vs Cloud
-
-| | Modo BYOK | Modo Cloud (Pro) |
-|---|---|---|
-| STT | Tu propia clave API (Deepgram, AssemblyAI, etc.) | Cuota gestionada (10h/mes) |
-| LLM | Tu propia clave API (OpenAI, DeepSeek, etc.) | Cuota gestionada (~5M tokens/mes) |
-| Dependencia de la nube | Ninguna — todas las solicitudes van directamente a tu proveedor | Requiere conexión a www.opentypeless.com |
-| Coste | Pagas directamente a tu proveedor | Suscripción de $4.99/mes |
-
-Todas las funciones principales — grabación, transcripción, pulido IA, salida por teclado/portapapeles, diccionario, historial — funcionan completamente sin conexión a los servidores de OpenTypeless en modo BYOK.
-
-### Auto-alojamiento / Sin Cloud
-
-Para ejecutar OpenTypeless sin ninguna dependencia de la nube:
-
-1. Elige cualquier proveedor STT y LLM que no sea Cloud en Configuración
-2. Introduce tus propias claves API
-3. Eso es todo — no se necesita cuenta ni conexión a internet con opentypeless.com
-
-Si deseas apuntar las funciones opcionales de la nube a tu propio backend, establece estas variables de entorno antes de compilar:
-
-| Variable | Valor por defecto | Descripción |
-|---|---|---|
-| `VITE_API_BASE_URL` | `https://www.opentypeless.com` | URL base de la API cloud del frontend |
-| `API_BASE_URL` | `https://www.opentypeless.com` | URL base de la API cloud del backend Rust |
-
-```bash
-# Ejemplo: compilar con un backend personalizado
-VITE_API_BASE_URL=https://my-server.example.com API_BASE_URL=https://my-server.example.com npm run tauri build
-```
-
+A self-hosted managed backend must be configured explicitly at build time with both `VITE_MANAGED_API_BASE_URL` and `OPENTYPELESS_MANAGED_API_BASE_URL`. There is no production default. Both values must be the same owned HTTPS origin; see `docs/MANAGED_SERVICE_API.md` and `docs/COMMERCIALIZATION.md`.
 ## Arquitectura
 
 **Pipeline de flujo de datos:**
@@ -237,9 +209,8 @@ Sí. La aplicación es totalmente funcional con tus propias claves API (BYOK). L
 
 ## Comunidad
 
-- 💬 [Discord](https://discord.gg/V6rRpJ4RGD) — Conversa, obtén ayuda, comparte comentarios
-- 🗣️ [GitHub Discussions](https://github.com/tover0314-w/opentypeless/discussions) — Propuestas de funciones, preguntas y respuestas
-- 🐛 [Issue Tracker](https://github.com/tover0314-w/opentypeless/issues) — Reportes de errores y solicitudes de funciones
+- 🗣️ [GitHub Discussions](https://github.com/rudy774/opentypeless/discussions) — Propuestas de funciones, preguntas y respuestas
+- 🐛 [Issue Tracker](https://github.com/rudy774/opentypeless/issues) — Reportes de errores y solicitudes de funciones
 - 📖 [Guía de contribución](CONTRIBUTING.md) — Configuración de desarrollo y directrices
 - 🔒 [Política de seguridad](SECURITY.md) — Reportar vulnerabilidades de forma responsable
 - 🧭 [Visión](VISION.md) — Principios del proyecto y dirección del roadmap
@@ -248,15 +219,15 @@ Sí. La aplicación es totalmente funcional con tus propias claves API (BYOK). L
 
 ¡Las contribuciones son bienvenidas! Consulta [CONTRIBUTING.md](CONTRIBUTING.md) para la configuración de desarrollo y las directrices.
 
-¿Buscas por dónde empezar? Revisa los issues etiquetados como [`good first issue`](https://github.com/tover0314-w/opentypeless/labels/good%20first%20issue).
+¿Buscas por dónde empezar? Revisa los issues etiquetados como [`good first issue`](https://github.com/rudy774/opentypeless/labels/good%20first%20issue).
 
 ## Historial de estrellas
 
-<a href="https://star-history.com/#tover0314-w/opentypeless&Date">
+<a href="https://star-history.com/#rudy774/opentypeless&Date">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=tover0314-w/opentypeless&type=Date&theme=dark" />
-    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=tover0314-w/opentypeless&type=Date" />
-    <img alt="Gráfico de historial de estrellas" src="https://api.star-history.com/svg?repos=tover0314-w/opentypeless&type=Date" />
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=rudy774/opentypeless&type=Date&theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=rudy774/opentypeless&type=Date" />
+    <img alt="Gráfico de historial de estrellas" src="https://api.star-history.com/svg?repos=rudy774/opentypeless&type=Date" />
   </picture>
 </a>
 

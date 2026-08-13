@@ -6,9 +6,9 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release tag (e.g. v0.1.14)'
+        description: 'Existing stable release tag (for example v1.2.3)'
         required: true
-        default: 'v0.1.14'
+        type: string
       platform:
         description: 'Platform group to build'
         required: true
@@ -19,125 +19,284 @@ on:
           - macos
           - linux
           - windows
-      skip_stapling:
-        description: 'macOS only: skip notarization stapling wait (testing only)'
-        required: true
-        default: 'false'
-        type: choice
-        options:
-          - 'false'
-          - 'true'
-      allow_unsigned_windows:
-        description: 'Windows only: explicitly allow publishing unsigned installers'
-        required: true
-        default: 'false'
-        type: choice
-        options:
-          - 'false'
-          - 'true'
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: release-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+  cancel-in-progress: false
 
 jobs:
+  resolve-source:
+    if: ${{ vars.COMMERCIAL_RELEASE_ENABLED == 'true' }}
+    runs-on: ubuntu-22.04
+    outputs:
+      tag: ${{ steps.source.outputs.tag }}
+      version: ${{ steps.source.outputs.version }}
+      commit: ${{ steps.source.outputs.commit }}
+      matrix: ${{ steps.source.outputs.matrix }}
+      selected-platform: ${{ steps.source.outputs.selected-platform }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.repository.default_branch }}
+
+      - name: Require manual runs to originate from the default branch
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        shell: bash
+        env:
+          SOURCE_REF: ${{ github.ref }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          expected_ref="refs/heads/${DEFAULT_BRANCH}"
+          if [[ "$SOURCE_REF" != "$expected_ref" ]]; then
+            echo "::error::Manual releases must be dispatched from ${expected_ref}."
+            exit 1
+          fi
+
+      - name: Resolve one immutable release source and build matrix
+        id: source
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_COMMIT: ${{ github.sha }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          REQUESTED_PLATFORM: ${{ github.event_name == 'workflow_dispatch' && inputs.platform || 'all' }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$RELEASE_TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "::error::Release tag must use the exact stable format vMAJOR.MINOR.PATCH."
+            exit 1
+          fi
+          git fetch --force --tags origin
+          if ! git show-ref --verify --quiet "refs/tags/${RELEASE_TAG}"; then
+            echo "::error::Release tag ${RELEASE_TAG} does not exist."
+            exit 1
+          fi
+          tag_commit="$(git rev-parse "refs/tags/${RELEASE_TAG}^{commit}")"
+          if [[ "$EVENT_NAME" == "push" && "$tag_commit" != "$EVENT_COMMIT" ]]; then
+            echo "::error::Tag event commit does not match the resolved release tag."
+            exit 1
+          fi
+          git fetch --no-tags origin "$DEFAULT_BRANCH"
+          if ! git merge-base --is-ancestor "$tag_commit" "origin/${DEFAULT_BRANCH}"; then
+            echo "::error::Release tag must point to a commit contained in ${DEFAULT_BRANCH}."
+            exit 1
+          fi
+
+          case "$REQUESTED_PLATFORM" in
+            all)
+              matrix='{"include":[{"platform":"macos-latest","platform_group":"macos","rust_targets":"aarch64-apple-darwin,x86_64-apple-darwin","args":"--target universal-apple-darwin","timeout_minutes":60},{"platform":"ubuntu-22.04","platform_group":"linux","rust_targets":"x86_64-unknown-linux-gnu","args":"","timeout_minutes":45},{"platform":"windows-latest","platform_group":"windows","rust_targets":"x86_64-pc-windows-msvc","args":"--target x86_64-pc-windows-msvc","timeout_minutes":45}]}'
+              ;;
+            macos)
+              matrix='{"include":[{"platform":"macos-latest","platform_group":"macos","rust_targets":"aarch64-apple-darwin,x86_64-apple-darwin","args":"--target universal-apple-darwin","timeout_minutes":60}]}'
+              ;;
+            linux)
+              matrix='{"include":[{"platform":"ubuntu-22.04","platform_group":"linux","rust_targets":"x86_64-unknown-linux-gnu","args":"","timeout_minutes":45}]}'
+              ;;
+            windows)
+              matrix='{"include":[{"platform":"windows-latest","platform_group":"windows","rust_targets":"x86_64-pc-windows-msvc","args":"--target x86_64-pc-windows-msvc","timeout_minutes":45}]}'
+              ;;
+            *)
+              echo "::error::Unsupported platform selection: ${REQUESTED_PLATFORM}"
+              exit 1
+              ;;
+          esac
+
+          echo "tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${RELEASE_TAG#v}" >> "$GITHUB_OUTPUT"
+          echo "commit=$tag_commit" >> "$GITHUB_OUTPUT"
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          echo "selected-platform=$REQUESTED_PLATFORM" >> "$GITHUB_OUTPUT"
+
+  preflight:
+    needs: resolve-source
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ needs.resolve-source.outputs.commit }}
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable
+        with:
+          components: clippy, rustfmt
+
+      - uses: swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
+        with:
+          workspaces: src-tauri -> target
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libasound2-dev libxdo-dev
+
+      - run: npm ci
+      - name: Sync version from validated tag
+        env:
+          RELEASE_TAG: ${{ needs.resolve-source.outputs.tag }}
+        run: node scripts/sync-release-version.mjs
+      - run: npm run service:contract:check
+      - run: npm run service:contract:test
+      - run: npm run commercial:check:test
+      - run: npm run release:version:test
+      - run: npm run build
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm test
+      - run: cargo fmt --check --manifest-path src-tauri/Cargo.toml
+      - run: cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
+      - run: cargo test --manifest-path src-tauri/Cargo.toml
+      - name: Audit locked Rust dependencies
+        run: |
+          cargo install cargo-audit --version 0.22.2 --locked
+          cargo audit --file src-tauri/Cargo.lock
+
+  create-draft-release:
+    needs: [resolve-source, preflight]
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.resolve-source.outputs.commit }}
+
+      - name: Create an empty draft release for verified assets
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.resolve-source.outputs.tag }}
+          EXPECTED_COMMIT: ${{ needs.resolve-source.outputs.commit }}
+          PRODUCT_NAME: ${{ vars.COMMERCIAL_PRODUCT_NAME }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$PRODUCT_NAME" ]]; then
+            echo "::error::COMMERCIAL_PRODUCT_NAME must be configured before a release draft is created."
+            exit 1
+          fi
+
+          git fetch --force --tags origin
+          actual_commit="$(git rev-parse "refs/tags/${RELEASE_TAG}^{commit}")"
+          if [[ "$actual_commit" != "$EXPECTED_COMMIT" ]]; then
+            echo "::error::Release tag moved after source resolution; refusing to create a release."
+            exit 1
+          fi
+
+          if release_json="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" 2>/dev/null)"; then
+            is_draft="$(jq -r '.draft' <<< "$release_json")"
+            target_commitish="$(jq -r '.target_commitish' <<< "$release_json")"
+            asset_count="$(jq -r '.assets | length' <<< "$release_json")"
+            if [[ "$is_draft" != "true" || "$target_commitish" != "$EXPECTED_COMMIT" || "$asset_count" != "0" ]]; then
+              echo "::error::An existing release is published, targets another commit, or contains stale assets. Delete the stale draft manually before retrying."
+              exit 1
+            fi
+          else
+            gh release create "$RELEASE_TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --draft \
+              --verify-tag \
+              --target "$EXPECTED_COMMIT" \
+              --title "${PRODUCT_NAME} ${RELEASE_TAG}" \
+              --notes 'Signed release assets are being verified. This draft is not public.'
+          fi
+
   build:
+    needs: [resolve-source, preflight, create-draft-release]
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - platform: macos-latest
-            platform_group: macos
-            rust_targets: aarch64-apple-darwin,x86_64-apple-darwin
-            args: '--target universal-apple-darwin'
-            timeout_minutes: 60
-          - platform: ubuntu-22.04
-            platform_group: linux
-            rust_targets: x86_64-unknown-linux-gnu
-            args: ''
-            timeout_minutes: 45
-          - platform: windows-latest
-            platform_group: windows
-            rust_targets: x86_64-pc-windows-msvc
-            args: '--target x86_64-pc-windows-msvc'
-            timeout_minutes: 45
-
+      matrix: ${{ fromJSON(needs.resolve-source.outputs.matrix) }}
     runs-on: ${{ matrix.platform }}
     timeout-minutes: ${{ matrix.timeout_minutes }}
     steps:
-      - uses: actions/checkout@v4
-        if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.platform == 'all' || github.event.inputs.platform == matrix.platform_group }}
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ needs.resolve-source.outputs.commit }}
 
-      - name: Sync version from tag
-        if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.platform == 'all' || github.event.inputs.platform == matrix.platform_group }}
-        shell: bash
-        run: |
-          TAG_VERSION="${{ github.event.inputs.tag || github.ref_name }}"
-          VERSION="${TAG_VERSION#v}"
-          echo "Syncing version: $VERSION"
-          echo "VITE_APP_VERSION=v$VERSION" >> "$GITHUB_ENV"
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 20
+          cache: npm
 
-          node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));p.version='$VERSION';fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n');"
+      - uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable
+        with:
+          targets: ${{ matrix.rust_targets }}
 
-          node -e "const fs=require('fs');const c=JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json','utf8'));c.version='$VERSION';fs.writeFileSync('src-tauri/tauri.conf.json',JSON.stringify(c,null,2)+'\n');"
-
-          node -e "const fs=require('fs');let c=fs.readFileSync('src-tauri/Cargo.toml','utf8');c=c.replace(/^version = \".*\"/m,'version = \"$VERSION\"');fs.writeFileSync('src-tauri/Cargo.toml',c);"
+      - uses: swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
+        with:
+          workspaces: src-tauri -> target
 
       - name: Install Linux dependencies
-        if: ${{ matrix.platform == 'ubuntu-22.04' && (github.event_name != 'workflow_dispatch' || github.event.inputs.platform == 'all' || github.event.inputs.platform == matrix.platform_group) }}
+        if: matrix.platform == 'ubuntu-22.04'
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libasound2-dev libxdo-dev libfuse2 gnupg rpm
 
-      - name: Verify release publishing token
-        if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.platform == 'all' || github.event.inputs.platform == matrix.platform_group }}
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
-        run: |
-          if [ -z "$GH_TOKEN" ]; then
-            echo "::error::RELEASE_TOKEN is required to publish releases to tover0314-w/opentypeless."
-            exit 1
-          fi
-
-          gh api repos/tover0314-w/opentypeless >/dev/null
-
-      - uses: actions/setup-node@v4
-        if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.platform == 'all' || github.event.inputs.platform == matrix.platform_group }}
-        with:
-          node-version: 20
-          cache: 'npm'
-
-      - uses: dtolnay/rust-toolchain@stable
-        if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.platform == 'all' || github.event.inputs.platform == matrix.platform_group }}
-        with:
-          targets: ${{ matrix.rust_targets }}
-
-      - uses: swatinem/rust-cache@v2
-        if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.platform == 'all' || github.event.inputs.platform == matrix.platform_group }}
-        with:
-          workspaces: src-tauri -> target
-
       - run: npm ci
-        if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.platform == 'all' || github.event.inputs.platform == matrix.platform_group }}
+      - name: Sync version from validated tag
+        env:
+          RELEASE_TAG: ${{ needs.resolve-source.outputs.tag }}
+        run: node scripts/sync-release-version.mjs
 
-      - name: Verify updater signing key
-        if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.platform == 'all' || github.event.inputs.platform == matrix.platform_group }}
+      - name: Verify release tag has not moved
         shell: bash
         env:
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          RELEASE_TAG: ${{ needs.resolve-source.outputs.tag }}
+          EXPECTED_COMMIT: ${{ needs.resolve-source.outputs.commit }}
         run: |
-          if [ -z "$TAURI_SIGNING_PRIVATE_KEY" ]; then
-            echo "::error::TAURI_SIGNING_PRIVATE_KEY is required to publish auto-update artifacts."
+          set -euo pipefail
+          git fetch --force --tags origin
+          actual_commit="$(git rev-parse "refs/tags/${RELEASE_TAG}^{commit}")"
+          if [[ "$actual_commit" != "$EXPECTED_COMMIT" ]]; then
+            echo "::error::Release tag moved after source resolution; refusing to upload."
             exit 1
           fi
-          if [ -z "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" ]; then
-            echo "::error::TAURI_SIGNING_PRIVATE_KEY_PASSWORD is required because the updater signing key is encrypted."
-            exit 1
-          fi
+
+      - name: Verify owned commercial client identity
+        env:
+          COMMERCIAL_BUILD: 'true'
+          COMMERCIAL_API_ORIGIN: ${{ vars.COMMERCIAL_API_ORIGIN }}
+          VITE_MANAGED_API_BASE_URL: ${{ vars.COMMERCIAL_API_ORIGIN }}
+          OPENTYPELESS_MANAGED_API_BASE_URL: ${{ vars.COMMERCIAL_API_ORIGIN }}
+          COMMERCIAL_WEBSITE_URL: ${{ vars.COMMERCIAL_WEBSITE_URL }}
+          COMMERCIAL_REPOSITORY_URL: ${{ vars.COMMERCIAL_REPOSITORY_URL }}
+          COMMERCIAL_SUPPORT_URL: ${{ vars.COMMERCIAL_SUPPORT_URL }}
+          COMMERCIAL_PRIVACY_URL: ${{ vars.COMMERCIAL_PRIVACY_URL }}
+          COMMERCIAL_TERMS_URL: ${{ vars.COMMERCIAL_TERMS_URL }}
+          COMMERCIAL_PRODUCT_NAME: ${{ vars.COMMERCIAL_PRODUCT_NAME }}
+          COMMERCIAL_APP_IDENTIFIER: ${{ vars.COMMERCIAL_APP_IDENTIFIER }}
+          COMMERCIAL_DEEP_LINK_SCHEME: ${{ vars.COMMERCIAL_DEEP_LINK_SCHEME }}
+          VITE_APP_DEEP_LINK_SCHEME: ${{ vars.COMMERCIAL_DEEP_LINK_SCHEME }}
+          COMMERCIAL_TAURI_CONFIG_PATH: src-tauri/tauri.commercial.generated.json
+        run: |
+          node scripts/generate-commercial-tauri-config.mjs
+          node scripts/check-commercial-release.mjs
+
+      - name: Export managed service build identity
+        shell: bash
+        env:
+          MANAGED_API_ORIGIN: ${{ vars.COMMERCIAL_API_ORIGIN }}
+          DEEP_LINK_SCHEME: ${{ vars.COMMERCIAL_DEEP_LINK_SCHEME }}
+        run: |
+          echo "VITE_MANAGED_API_BASE_URL=$MANAGED_API_ORIGIN" >> "$GITHUB_ENV"
+          echo "VITE_APP_DEEP_LINK_SCHEME=$DEEP_LINK_SCHEME" >> "$GITHUB_ENV"
+          echo "OPENTYPELESS_MANAGED_API_BASE_URL=$MANAGED_API_ORIGIN" >> "$GITHUB_ENV"
 
       - name: Verify Apple signing secrets
-        if: ${{ matrix.platform == 'macos-latest' && (github.event_name != 'workflow_dispatch' || github.event.inputs.platform == 'all' || github.event.inputs.platform == matrix.platform_group) }}
+        if: matrix.platform == 'macos-latest'
         shell: bash
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
@@ -155,7 +314,7 @@ jobs:
           done
 
       - name: Import Linux GPG signing key
-        if: ${{ matrix.platform == 'ubuntu-22.04' && (github.event_name != 'workflow_dispatch' || github.event.inputs.platform == 'all' || github.event.inputs.platform == matrix.platform_group) }}
+        if: matrix.platform == 'ubuntu-22.04'
         shell: bash
         env:
           LINUX_GPG_PRIVATE_KEY: ${{ secrets.LINUX_GPG_PRIVATE_KEY }}
@@ -164,50 +323,192 @@ jobs:
         run: ./.github/scripts/import-linux-gpg-key.sh
 
       - name: Import Windows signing certificate
-        if: ${{ matrix.platform == 'windows-latest' && (github.event_name != 'workflow_dispatch' || github.event.inputs.platform == 'all' || github.event.inputs.platform == matrix.platform_group) }}
+        if: matrix.platform == 'windows-latest'
         shell: pwsh
         env:
           WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
           WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
           WINDOWS_TIMESTAMP_URL: ${{ secrets.WINDOWS_TIMESTAMP_URL }}
-          ALLOW_UNSIGNED_WINDOWS: ${{ github.event.inputs.allow_unsigned_windows }}
         run: ./.github/scripts/import-windows-certificate.ps1
 
-      - uses: tauri-apps/tauri-action@v0
-        if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.platform == 'all' || github.event.inputs.platform == matrix.platform_group }}
+      - uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0
         id: tauri
         env:
-          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           APPIMAGETOOL_SIGN_PASSPHRASE: ${{ secrets.LINUX_GPG_PASSPHRASE }}
           TAURI_SIGNING_RPM_KEY_PASSPHRASE: ${{ secrets.LINUX_GPG_PASSPHRASE }}
           WINDOWS_CERTIFICATE_THUMBPRINT: ${{ env.WINDOWS_CERTIFICATE_THUMBPRINT }}
           WINDOWS_TIMESTAMP_URL: ${{ env.WINDOWS_TIMESTAMP_URL }}
         with:
-          owner: tover0314-w
-          repo: opentypeless
-          releaseCommitish: main
-          tagName: ${{ github.event.inputs.tag || github.ref_name }}
-          releaseName: 'OpenTypeless ${{ github.event.inputs.tag || github.ref_name }}'
-          releaseBody: 'See the assets below to download and install.'
-          releaseDraft: false
-          prerelease: true
-          args: ${{ matrix.args }} ${{ matrix.platform == 'macos-latest' && github.event.inputs.skip_stapling == 'true' && '--skip-stapling' || '' }}
+          owner: ${{ github.repository_owner }}
+          repo: ${{ github.event.repository.name }}
+          releaseCommitish: ${{ needs.resolve-source.outputs.commit }}
+          tagName: ${{ needs.resolve-source.outputs.tag }}
+          releaseName: '${{ vars.COMMERCIAL_PRODUCT_NAME }} ${{ needs.resolve-source.outputs.tag }}'
+          releaseBody: 'See the signed assets below to download and install.'
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }} --config src-tauri/tauri.commercial.generated.json
+
+      - name: Verify macOS code signing and notarization tickets
+        if: matrix.platform == 'macos-latest'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -d '' apps < <(find src-tauri/target -type d -name '*.app' -path '*/bundle/*' -print0)
+          mapfile -d '' dmgs < <(find src-tauri/target -type f -name '*.dmg' -path '*/bundle/*' -print0)
+          if (( ${#apps[@]} == 0 || ${#dmgs[@]} == 0 )); then
+            echo '::error::Expected a signed app bundle and DMG.'
+            exit 1
+          fi
+          for app in "${apps[@]}"; do
+            codesign --verify --deep --strict --verbose=2 "$app"
+          done
+          for dmg in "${dmgs[@]}"; do
+            xcrun stapler validate "$dmg"
+          done
+
+      - name: Verify Windows installers are production signed
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $installers = Get-ChildItem -Path src-tauri/target -Recurse -File |
+            Where-Object { $_.Extension -in '.exe', '.msi' -and $_.FullName -match '[\\/]bundle[\\/]' }
+          if ($installers.Count -lt 2) {
+            Write-Error "Expected signed NSIS and MSI installers, found $($installers.Count)."
+          }
+          foreach ($installer in $installers) {
+            if ($installer.Name -match '(?i)(^|[._-])(unsigned|test|debug|dev)([._-]|$)') {
+              Write-Error "Refusing an unsafe Windows release asset name: $($installer.Name)"
+            }
+            $signature = Get-AuthenticodeSignature -LiteralPath $installer.FullName
+            if ($signature.Status -ne 'Valid') {
+              Write-Error "Invalid Authenticode signature for $($installer.Name): $($signature.Status)"
+            }
+            if (-not $signature.TimeStamperCertificate) {
+              Write-Error "Missing trusted timestamp for $($installer.Name)."
+            }
+            $certificateIdentity = "$($signature.SignerCertificate.Subject) $($signature.SignerCertificate.Issuer)"
+            if ($certificateIdentity -match '(?i)(^|[ ,._-])(test|development)([ ,._-]|$)') {
+              Write-Error "Refusing a test or development signing certificate for $($installer.Name)."
+            }
+            Write-Host "$($installer.Name): valid Authenticode signature and timestamp"
+          }
 
       - name: Upload Linux verification artifacts
-        if: ${{ matrix.platform == 'ubuntu-22.04' && (github.event_name != 'workflow_dispatch' || github.event.inputs.platform == 'all' || github.event.inputs.platform == matrix.platform_group) }}
+        if: matrix.platform == 'ubuntu-22.04'
         shell: bash
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
-          TAG_NAME: ${{ github.event.inputs.tag || github.ref_name }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_NAME: ${{ needs.resolve-source.outputs.tag }}
           LINUX_GPG_KEY_ID: ${{ secrets.LINUX_GPG_KEY_ID }}
           LINUX_GPG_PASSPHRASE: ${{ secrets.LINUX_GPG_PASSPHRASE }}
           TAURI_SIGNING_RPM_KEY: ''
         run: ./.github/scripts/upload-linux-verification-artifacts.sh
+
+  verify-and-publish:
+    needs: [resolve-source, create-draft-release, build]
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.resolve-source.outputs.commit }}
+
+      - name: Verify the complete draft and publish atomically
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.resolve-source.outputs.tag }}
+          EXPECTED_COMMIT: ${{ needs.resolve-source.outputs.commit }}
+          SELECTED_PLATFORM: ${{ needs.resolve-source.outputs.selected-platform }}
+        run: |
+          set -euo pipefail
+          git fetch --force --tags origin
+          actual_commit="$(git rev-parse "refs/tags/${RELEASE_TAG}^{commit}")"
+          if [[ "$actual_commit" != "$EXPECTED_COMMIT" ]]; then
+            echo "::error::Release tag moved during the build; leaving the release as a draft."
+            exit 1
+          fi
+
+          release_json="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}")"
+          if [[ "$(jq -r '.draft' <<< "$release_json")" != "true" ]]; then
+            echo "::error::Release is not a draft; refusing to modify an already-public release."
+            exit 1
+          fi
+          if [[ "$(jq -r '.target_commitish' <<< "$release_json")" != "$EXPECTED_COMMIT" ]]; then
+            echo "::error::Draft release target does not match the immutable source commit."
+            exit 1
+          fi
+
+          mapfile -t assets < <(jq -r '.assets[].name' <<< "$release_json")
+          if (( ${#assets[@]} == 0 )); then
+            echo "::error::Draft release contains no assets."
+            exit 1
+          fi
+
+          unsafe_asset_pattern='(^|[._-])(unsigned|test|debug|dev)([._-]|$)'
+          for asset in "${assets[@]}"; do
+            if [[ "${asset,,}" =~ $unsafe_asset_pattern ]]; then
+              echo "::error::Draft contains an unsafe unsigned/test asset: ${asset}"
+              exit 1
+            fi
+          done
+
+          has_asset() {
+            local pattern="$1"
+            printf '%s\n' "${assets[@]}" | grep -Eiq -- "$pattern"
+          }
+
+          require_platform_assets() {
+            case "$1" in
+              macos)
+                has_asset '\.dmg$' || { echo '::error::Missing signed macOS DMG.'; exit 1; }
+                ;;
+              windows)
+                has_asset '\.msi$' || { echo '::error::Missing signed Windows MSI.'; exit 1; }
+                has_asset '\.exe$' || { echo '::error::Missing signed Windows NSIS installer.'; exit 1; }
+                ;;
+              linux)
+                has_asset '\.AppImage$' || { echo '::error::Missing Linux AppImage.'; exit 1; }
+                has_asset '\.deb$' || { echo '::error::Missing Linux DEB.'; exit 1; }
+                has_asset '\.rpm$' || { echo '::error::Missing Linux RPM.'; exit 1; }
+                for asset in "${assets[@]}"; do
+                  if [[ "$asset" =~ \.(AppImage|deb|rpm)$ ]] && ! printf '%s\n' "${assets[@]}" | grep -Fxq -- "${asset}.asc"; then
+                    echo "::error::Missing detached signature for ${asset}."
+                    exit 1
+                  fi
+                done
+                has_asset '^SHA256SUMS-linux-x86_64\.txt$' || { echo '::error::Missing Linux checksums.'; exit 1; }
+                has_asset '^SHA256SUMS-linux-x86_64\.txt\.asc$' || { echo '::error::Missing signed Linux checksums.'; exit 1; }
+                has_asset '^OpenTypeless-Linux-GPG-KEY\.asc$' || { echo '::error::Missing Linux verification key.'; exit 1; }
+                ;;
+              *)
+                echo "::error::Unsupported selected platform: $1"
+                exit 1
+                ;;
+            esac
+          }
+
+          if [[ "$SELECTED_PLATFORM" == 'all' ]]; then
+            require_platform_assets macos
+            require_platform_assets linux
+            require_platform_assets windows
+          else
+            require_platform_assets "$SELECTED_PLATFORM"
+          fi
+
+          gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false
+          if [[ "$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" --jq '.draft')" != "false" ]]; then
+            echo "::error::GitHub did not publish the verified release."
+            exit 1
+          fi

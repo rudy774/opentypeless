@@ -48,50 +48,44 @@ Do not sell a managed build until:
    quota creates an indefinite inference cost and must not be enabled by
    default without approval.
 
-## Commercial release guard
+## Commercial client identity and release guard
 
-**npm run commercial:check** skips normal development and becomes strict only
-when **COMMERCIAL_BUILD=true**. Strict mode requires:
+The checked-in source build is fail-safe:
 
-- COMMERCIAL_API_ORIGIN
-- COMMERCIAL_WEBSITE_URL
-- COMMERCIAL_REPOSITORY_URL
-- COMMERCIAL_SUPPORT_URL
-- COMMERCIAL_PRIVACY_URL
-- COMMERCIAL_TERMS_URL
-- COMMERCIAL_APP_IDENTIFIER
-- COMMERCIAL_UPDATER_ENDPOINT
-- COMMERCIAL_UPDATER_PUBLIC_KEY
+- the checked-in `com.opentypeless.app` identifier is retained only to preserve the existing OS data directory and installed-user settings; it is a legacy compatibility value, not a commercial identity;
+- every distributed commercial build must apply the generated overlay with an operator-owned identifier (changing the source identifier without a migration can make existing data appear lost);
+- repository and support links belong to the Rudy774 fork;
+- the registered deep-link scheme is fork-specific;
+- CSP does not permit the upstream managed-service origin;
+- frontend and Rust managed API origins are empty unless explicitly supplied at build time;
+- BYOK and local providers remain available without a managed service; and
+- updater configuration, updater artifacts, runtime permission/registration, and legacy updater workflows remain disabled.
 
-It rejects missing values, obvious placeholders, the current upstream
-OpenTypeless defaults, non-HTTPS URLs, invalid identifiers, and the upstream
-updater public key. It also inspects the actual package metadata, frontend and
-Rust API defaults, Tauri identifier/CSP/deep-link/updater configuration,
-capability permissions, updater registration, and release automation. Supplying
-plausible environment values cannot make the check pass while those static
-files still point to upstream infrastructure. It never requests billing
-credentials, provider API keys, OAuth secrets, deployment tokens, or signing
-private keys.
+The product name, identifier, deep-link scheme, CSP origin, and managed API origins are compiled into the generated client configuration. `COMMERCIAL_WEBSITE_URL`, `COMMERCIAL_REPOSITORY_URL`, `COMMERCIAL_SUPPORT_URL`, `COMMERCIAL_PRIVACY_URL`, and `COMMERCIAL_TERMS_URL` are checklist-only guard inputs: the generator does not wire them into the app. Before sale, link those owned destinations from the product UI and release materials and verify them independently.
 
-Copy **.env.commercial.example** to an ignored **.env.commercial**, replace
-every placeholder, and run:
+Strict mode is enabled only with `COMMERCIAL_BUILD=true`. It requires public, owned client identity values for the API, website, repository, support, policies, product name, application identifier, and deep-link scheme. It also requires `VITE_MANAGED_API_BASE_URL` and `OPENTYPELESS_MANAGED_API_BASE_URL` to exactly match `COMMERCIAL_API_ORIGIN` so the webview and Rust pipeline cannot silently use different services.
 
-    node --env-file=.env.commercial scripts/check-commercial-release.mjs
+Copy `.env.commercial.example` to the ignored `.env.commercial`, replace every placeholder, and generate the Tauri overlay:
 
-The example intentionally fails strict mode until completed.
+```bash
+node --env-file=.env.commercial scripts/generate-commercial-tauri-config.mjs
+node --env-file=.env.commercial scripts/check-commercial-release.mjs
+```
 
-These variables are currently a checklist only. Runtime and Tauri settings
-remain statically configured elsewhere. Launch still requires wiring the
-validated values into the build and proving the packaged binary contains them.
-This guard does not prove ownership, deployment, legal readiness, or security.
+The generated `src-tauri/tauri.commercial.generated.json` is ignored because it is distribution identity, not a universal source default. It sets the owned product name, application identifier, URI scheme, and the exact managed API CSP origin while explicitly keeping updater artifact creation off. Apply it at build time:
 
-The updater is intentionally disabled in this fork: updater artifact creation,
-the upstream feed and public key, runtime plugin registration, and capability
-permission are not active. Re-enable those pieces only after a Rudy-owned
-release feed and signing pair exist, then extend the strict guard to verify the
-packaged updater identity. Keeping the updater dependencies installed is
-deliberate so that future wiring remains build-compatible; dependencies alone
-do not activate the updater.
+```bash
+VITE_MANAGED_API_BASE_URL=https://api.your-owned-domain.example \
+VITE_APP_DEEP_LINK_SCHEME=yourproduct \
+OPENTYPELESS_MANAGED_API_BASE_URL=https://api.your-owned-domain.example \
+npm run tauri build -- --config src-tauri/tauri.commercial.generated.json
+```
+
+The release workflow is inert until the repository variable `COMMERCIAL_RELEASE_ENABLED=true` is set. It takes the same public identity fields from GitHub Actions variables, regenerates and audits the overlay, exports the managed origin to both compiler paths, publishes only to `github.repository`, and uses the repository-scoped GitHub token. It does not request an updater signing key because auto-update is still disabled.
+
+The guard rejects missing or placeholder values, upstream origins/repositories/identifiers/deep links, non-HTTPS endpoints, mismatched compile-time origins, overlays outside the repository, missing CSP access, active updater configuration, and upstream release targets. It never asks for or prints billing credentials, provider API keys, OAuth secrets, deployment tokens, or signing private keys.
+
+Passing this local guard proves configuration consistency only. It cannot prove domain/repository ownership, backend deployment, OAuth callback registration, billing correctness, legal readiness, operating support, OS code-signing identity, or production security. Those remain launch evidence, not assumptions.
 
 ## Service and metrics foundation
 
