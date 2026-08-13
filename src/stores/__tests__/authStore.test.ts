@@ -280,37 +280,70 @@ describe('authStore', () => {
         hasManagedCloudAccess({
           plan: 'appsumo_tier1',
           source: 'appsumo',
+          subscriptionStatus: null,
           cloudWordsLimit: 200000,
           licenseStatus: 'active',
         }),
       ).toBe(true)
     })
 
-    it('allows Creem Pro plans with cloud words', () => {
+    it('allows active or trialing paid subscriptions with cloud words', () => {
       expect(
         hasManagedCloudAccess({
           plan: 'pro',
           source: 'creem',
+          subscriptionStatus: 'active',
+          cloudWordsLimit: 200000,
+          licenseStatus: null,
+        }),
+      ).toBe(true)
+      expect(
+        hasManagedCloudAccess({
+          plan: 'pro',
+          source: 'stripe',
+          subscriptionStatus: 'trialing',
           cloudWordsLimit: 200000,
           licenseStatus: null,
         }),
       ).toBe(true)
     })
 
-    it('allows direct lifetime plans', () => {
+    it('denies inactive or zero-quota paid subscriptions', () => {
+      expect(
+        hasManagedCloudAccess({
+          plan: 'pro',
+          source: 'stripe',
+          subscriptionStatus: 'past_due',
+          cloudWordsLimit: 200000,
+          licenseStatus: null,
+        }),
+      ).toBe(false)
+      expect(
+        hasManagedCloudAccess({
+          plan: 'pro',
+          source: 'stripe',
+          subscriptionStatus: 'trialing',
+          cloudWordsLimit: 0,
+          licenseStatus: null,
+        }),
+      ).toBe(false)
+    })
+    it('requires positive quota for direct lifetime plans', () => {
       expect(
         hasManagedCloudAccess({
           plan: 'lifetime_starter',
           source: 'lifetime',
+          subscriptionStatus: null,
           cloudWordsLimit: 0,
           licenseStatus: 'active',
         }),
-      ).toBe(true)
+      ).toBe(false)
 
       expect(
         hasManagedCloudAccess({
           plan: 'lifetime_starter',
           source: 'lifetime',
+          subscriptionStatus: null,
           cloudWordsLimit: 100000,
           licenseStatus: null,
         }),
@@ -322,6 +355,7 @@ describe('authStore', () => {
         hasManagedCloudAccess({
           plan: 'appsumo_tier1',
           source: 'appsumo',
+          subscriptionStatus: null,
           cloudWordsLimit: 200000,
           licenseStatus: 'refunded',
         }),
@@ -333,6 +367,7 @@ describe('authStore', () => {
         hasManagedCloudAccess({
           plan: 'appsumo_tier1',
           source: 'appsumo',
+          subscriptionStatus: null,
           cloudWordsLimit: 200000,
           licenseStatus: 'pending',
         }),
@@ -342,6 +377,7 @@ describe('authStore', () => {
         hasManagedCloudAccess({
           plan: 'appsumo_tier1',
           source: 'appsumo',
+          subscriptionStatus: null,
           cloudWordsLimit: 200000,
           licenseStatus: null,
         }),

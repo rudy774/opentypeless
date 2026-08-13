@@ -91,7 +91,7 @@ export function AccountStep() {
           setLocalError(t('onboarding.account.nameRequired'))
           return
         }
-        if (password.length < 8) {
+        if (password.length < 12) {
           setLocalError(t('onboarding.account.passwordTooShort'))
           return
         }
@@ -404,7 +404,7 @@ export function AccountStep() {
             placeholder="••••••••"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            minLength={8}
+            minLength={12}
             className="w-full px-3 py-2.5 bg-bg-secondary border border-border rounded-[10px] text-[13px] text-text-primary outline-none focus:border-border-focus transition-colors"
             required
           />

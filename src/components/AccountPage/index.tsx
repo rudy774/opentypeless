@@ -151,7 +151,7 @@ function AuthForm() {
           setLocalError(t('account.nameRequired'))
           return
         }
-        if (password.length < 8) {
+        if (password.length < 12) {
           setLocalError(t('account.passwordMinLength'))
           return
         }
@@ -620,7 +620,7 @@ function AccountDetails() {
   const hasCloudAccess = useAuthStore(hasManagedCloudAccess)
   const isAppSumo = source === 'appsumo'
   const isDirectLifetime = source === 'lifetime' || plan === 'lifetime_starter'
-  const canManageSubscription = source === 'creem' || plan === 'pro'
+  const canManageSubscription = source === 'stripe' || source === 'creem' || plan === 'pro'
   const wordsUsed =
     quotaModel === 'legacy_dual_meter' && displayWordsLimit > 0
       ? displayWordsUsedEstimate

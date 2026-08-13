@@ -1,6 +1,6 @@
 # Managed Service API Contract
 
-This is the implementation contract for a future Rudy-owned OpenTypeless managed service. It is paired with [`managed-service.openapi.json`](managed-service.openapi.json), which is checked in CI by `npm run service:contract:check`.
+This is the implementation contract for the Rudy-owned OpenTypeless managed service included in `services/managed-api`. It is paired with [`managed-service.openapi.json`](managed-service.openapi.json), which is checked in CI by `npm run service:contract:check`.
 
 The desktop remains useful without this service. BYOK transcription, local history, shortcuts, dictionary, scenes, and AI cleanup must never depend on an account or this API. A commercial build may expose managed features only when a real HTTPS service origin is supplied at build time and passes the commercial release guard.
 
@@ -102,4 +102,4 @@ Do not enable managed plans until all of the following have evidence attached to
 - Privacy Policy, Terms, refund/cancellation policy, support contact, subprocessors, retention policy, and incident response are live.
 - The packaged client contains only Rudy-owned application, API, repository, deep-link, signing, and updater identities.
 
-This contract prepares the desktop/backend boundary; it is not evidence that a production service, payment account, policies, or support operation exists.
+The checked-in implementation and contract prepare the desktop/backend boundary; they are not evidence that a production deployment, payment account, policies, monitoring, or support operation exists.

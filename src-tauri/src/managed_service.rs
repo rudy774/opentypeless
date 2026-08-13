@@ -21,6 +21,7 @@ enum SubscriptionPlan {
 #[serde(rename_all = "snake_case")]
 enum SubscriptionSource {
     Free,
+    Stripe,
     Creem,
     Lifetime,
     Appsumo,
@@ -195,8 +196,16 @@ impl SubscriptionStatus {
 
         match (self.plan, self.source) {
             (SubscriptionPlan::Free, SubscriptionSource::Free) => false,
-            (SubscriptionPlan::Pro, SubscriptionSource::Creem) => true,
-            (SubscriptionPlan::LifetimeStarter, SubscriptionSource::Lifetime) => true,
+            (SubscriptionPlan::Pro, SubscriptionSource::Stripe | SubscriptionSource::Creem) => {
+                self.cloud_words_limit > 0
+                    && matches!(
+                        self.subscription_status.as_deref(),
+                        Some("active" | "trialing")
+                    )
+            }
+            (SubscriptionPlan::LifetimeStarter, SubscriptionSource::Lifetime) => {
+                self.cloud_words_limit > 0
+            }
             (
                 SubscriptionPlan::AppsumoTier1
                 | SubscriptionPlan::AppsumoTier2
@@ -212,7 +221,10 @@ fn valid_plan_source_pair(plan: SubscriptionPlan, source: SubscriptionSource) ->
     matches!(
         (plan, source),
         (SubscriptionPlan::Free, SubscriptionSource::Free)
-            | (SubscriptionPlan::Pro, SubscriptionSource::Creem)
+            | (
+                SubscriptionPlan::Pro,
+                SubscriptionSource::Stripe | SubscriptionSource::Creem
+            )
             | (
                 SubscriptionPlan::LifetimeStarter,
                 SubscriptionSource::Lifetime
@@ -302,6 +314,10 @@ mod tests {
         let pro = parse(valid_status()).unwrap();
         assert!(pro.has_cloud_access());
 
+        let mut stripe_pro = valid_status();
+        stripe_pro["source"] = json!("stripe");
+        assert!(parse(stripe_pro).unwrap().has_cloud_access());
+
         let mut free = valid_status();
         free["plan"] = json!("free");
         free["source"] = json!("free");
@@ -314,7 +330,7 @@ mod tests {
         lifetime["source"] = json!("lifetime");
         lifetime["displayName"] = json!("Lifetime Starter");
         lifetime["licenseStatus"] = json!("active");
-        lifetime["cloudWordsLimit"] = json!(0);
+        lifetime["cloudWordsLimit"] = json!(25_000);
         assert!(parse(lifetime).unwrap().has_cloud_access());
 
         let mut lifetime_without_license = valid_status();
@@ -439,6 +455,14 @@ mod tests {
             appsumo["licenseStatus"] = json!(license);
             assert!(!parse(appsumo).unwrap().has_cloud_access());
         }
+
+        let mut inactive_pro = valid_status();
+        inactive_pro["subscriptionStatus"] = json!("past_due");
+        assert!(!parse(inactive_pro).unwrap().has_cloud_access());
+
+        let mut zero_quota_pro = valid_status();
+        zero_quota_pro["cloudWordsLimit"] = json!(0);
+        assert!(!parse(zero_quota_pro).unwrap().has_cloud_access());
 
         let mut revoked_pro = valid_status();
         revoked_pro["licenseStatus"] = json!("refunded");

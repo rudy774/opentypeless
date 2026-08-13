@@ -110,6 +110,29 @@ fn cloud_voice_intent_metadata(intent: &crate::voice_intent::VoiceIntent) -> ser
         .expect("voice intent metadata must serialize")
 }
 
+enum CloudStreamEvent {
+    Done,
+    Delta(String),
+    Ignore,
+}
+
+fn parse_cloud_stream_line(line: &str) -> CloudStreamEvent {
+    let Some(data) = line.trim().strip_prefix("data: ") else {
+        return CloudStreamEvent::Ignore;
+    };
+    if data == "[DONE]" {
+        return CloudStreamEvent::Done;
+    }
+    serde_json::from_str::<serde_json::Value>(data)
+        .ok()
+        .and_then(|value| {
+            value["choices"][0]["delta"]["content"]
+                .as_str()
+                .filter(|content| !content.is_empty())
+                .map(|content| CloudStreamEvent::Delta(content.to_string()))
+        })
+        .unwrap_or(CloudStreamEvent::Ignore)
+}
 #[async_trait]
 impl LlmProvider for CloudLlmProvider {
     async fn polish(
@@ -290,8 +313,9 @@ impl LlmProvider for CloudLlmProvider {
             let mut full_text = String::new();
             let mut stream = response.bytes_stream();
             let mut buffer = String::new();
+            let mut saw_done = false;
 
-            while let Some(chunk) = stream.next().await {
+            'stream: while let Some(chunk) = stream.next().await {
                 let chunk = chunk?;
                 buffer.push_str(&String::from_utf8_lossy(&chunk));
 
@@ -299,20 +323,24 @@ impl LlmProvider for CloudLlmProvider {
                     let line = buffer[..line_end].trim().to_string();
                     buffer = buffer[line_end + 1..].to_string();
 
-                    if let Some(data) = line.strip_prefix("data: ") {
-                        if data == "[DONE]" {
-                            break;
+                    match parse_cloud_stream_line(&line) {
+                        CloudStreamEvent::Done => {
+                            saw_done = true;
+                            break 'stream;
                         }
-                        if let Ok(v) = serde_json::from_str::<serde_json::Value>(data) {
-                            if let Some(content) = v["choices"][0]["delta"]["content"].as_str() {
-                                if !content.is_empty() {
-                                    full_text.push_str(content);
-                                    callback(content);
-                                }
-                            }
+                        CloudStreamEvent::Delta(content) => {
+                            full_text.push_str(&content);
+                            callback(&content);
                         }
+                        CloudStreamEvent::Ignore => {}
                     }
                 }
+            }
+
+            if !saw_done {
+                return Err(AppError::Network(
+                    "managed stream ended before completion".to_string(),
+                ));
             }
 
             Ok(PolishResponse {
@@ -358,6 +386,23 @@ mod tests {
         assert!(matches!(err, AppError::LlmQuota(_)));
     }
 
+    #[test]
+    fn cloud_stream_requires_explicit_done_marker() {
+        assert!(matches!(
+            parse_cloud_stream_line("data: [DONE]"),
+            CloudStreamEvent::Done
+        ));
+        assert!(matches!(
+            parse_cloud_stream_line(
+                r#"data: {"choices":[{"delta":{"content":"complete"}}]}"#
+            ),
+            CloudStreamEvent::Delta(content) if content == "complete"
+        ));
+        assert!(matches!(
+            parse_cloud_stream_line("data: not-json"),
+            CloudStreamEvent::Ignore
+        ));
+    }
     #[test]
     fn managed_context_metadata_excludes_labels_icons_and_raw_signals() {
         let metadata = cloud_context_metadata(&ContextProfileSummary {

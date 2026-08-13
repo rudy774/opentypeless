@@ -3,7 +3,7 @@
   "info": {
     "title": "Rudy OpenTypeless Managed Service",
     "version": "0.1.0",
-    "description": "Pre-launch contract for the optional paid service. The local/BYOK desktop remains fully usable without this API. No production service is implied."
+    "description": "Contract implemented by services/managed-api for the optional paid service. The local/BYOK desktop remains fully usable without this API. A checked-in implementation does not imply a deployed production service."
   },
   "servers": [
     {
@@ -217,7 +217,7 @@
             "name": "callbackURL",
             "in": "query",
             "required": true,
-            "description": "Desktop callback created by the client, shaped as https://\u003cconfigured-api-origin\u003e/auth/callback?desktop=\u003cclient-state\u003e\u0026code_challenge=\u003cbase64url-sha256\u003e\u0026code_challenge_method=S256. Never accept an arbitrary redirect origin or PKCE method.",
+            "description": "Desktop callback created by the client, shaped as https://<configured-api-origin>/auth/callback?desktop=<client-state>&code_challenge=<base64url-sha256>&code_challenge_method=S256. Never accept an arbitrary redirect origin or PKCE method.",
             "schema": {
               "type": "string",
               "format": "uri",
@@ -891,7 +891,8 @@
           "429": {
             "$ref": "#/components/responses/Error"
           }
-        }
+        },
+        "description": "Creates an encrypted account export, stores only a hashed one-time token, and emails a 30-minute managed-origin download link. Export content is never attached to email."
       }
     },
     "/api/account": {
@@ -929,6 +930,206 @@
             "$ref": "#/components/responses/Error"
           },
           "409": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/billing/stripe/webhook": {
+      "post": {
+        "tags": ["Billing"],
+        "operationId": "receiveStripeWebhook",
+        "security": [],
+        "description": "Verifies Stripe-Signature against the untouched bounded raw body, claims each processor event idempotently, applies entitlement transitions, and leaves transient failures retryable.",
+        "parameters": [
+          {
+            "name": "Stripe-Signature",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Event processed or already completed"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/auth/desktop/complete": {
+      "get": {
+        "tags": ["Auth"],
+        "operationId": "completeDesktopOAuth",
+        "security": [],
+        "description": "External-browser callback. Requires the short-lived transaction and the Better Auth browser session, atomically consumes the transaction, creates a five-minute PKCE-bound desktop code, and redirects to the owned desktop scheme without a bearer token.",
+        "parameters": [
+          {
+            "name": "transaction",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 43,
+              "maxLength": 43,
+              "pattern": "^[A-Za-z0-9_-]{43}$"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Redirect to the owned desktop deep-link with one-time code and state only"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/auth/callback": {
+      "get": {
+        "tags": ["Auth"],
+        "operationId": "emailVerificationLanding",
+        "security": [],
+        "description": "Owned, content-security-policy-restricted landing page used after desktop email verification. Accepts only exact PKCE-shaped desktop, code_challenge, and code_challenge_method=S256 values.",
+        "parameters": [
+          {
+            "name": "desktop",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 43,
+              "maxLength": 43,
+              "pattern": "^[A-Za-z0-9_-]{43}$"
+            }
+          },
+          {
+            "name": "code_challenge",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 43,
+              "maxLength": 43,
+              "pattern": "^[A-Za-z0-9_-]{43}$"
+            }
+          },
+          {
+            "name": "code_challenge_method",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "const": "S256"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Minimal verification-complete page with no external resources"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/billing/redirect": {
+      "get": {
+        "tags": ["Billing"],
+        "operationId": "followHostedBillingRedirect",
+        "security": [],
+        "description": "Decrypts a ten-minute managed-origin token, revalidates an HTTPS stripe.com destination, and redirects only in the external browser.",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 40,
+              "maxLength": 1800,
+              "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          }
+        ],
+        "responses": {
+          "303": {
+            "description": "Redirect to a revalidated Stripe-hosted destination"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/account/export/download": {
+      "get": {
+        "tags": ["Data"],
+        "operationId": "downloadAccountExport",
+        "security": [],
+        "description": "Atomically consumes a random one-time token, decrypts the account export, and returns it as an attachment. The token expires after 30 minutes and is invalid after the first request.",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 43,
+              "maxLength": 43,
+              "pattern": "^[A-Za-z0-9_-]{43}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One-time JSON account export attachment",
+            "headers": {
+              "Content-Disposition": {
+                "schema": {
+                  "type": "string",
+                  "const": "attachment; filename=\"opentypeless-account-export.json\""
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "404": {
             "$ref": "#/components/responses/Error"
           }
         }
@@ -1235,7 +1436,7 @@
           },
           "source": {
             "type": "string",
-            "enum": ["free", "creem", "lifetime", "appsumo"]
+            "enum": ["free", "stripe", "creem", "lifetime", "appsumo"]
           },
           "displayName": {
             "type": "string"

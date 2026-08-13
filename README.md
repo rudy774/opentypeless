@@ -49,8 +49,8 @@ This repository is a Windows-focused fork of the original OpenTypeless project. 
 | **Pause-friendly manual recording**            | One shortcut press starts recording and the next stops it. Automatic stop can be disabled, so quiet pauses do not end dictation and you do not need to predict a recording duration.                                                                |
 | **Original text-field restoration on Windows** | The app remembers the exact field focused when dictation starts. You can click elsewhere while it processes; OpenTypeless restores and verifies the original field before insertion, with a safe clipboard fallback if that field no longer exists. |
 | **Live microphone and capsule feedback**       | The capsule responds to captured microphone levels, displays elapsed recording time, and uses transparent native-window styling without an unwanted black frame.                                                                                    |
-| **Movable always-on-top capsule**               | The recording pill returns to the top without focusing the main GUI, remembers where you drag it, and introduces first-time users to repositioning it after onboarding.                                                                             |
-| **Faster startup and result delivery**          | The capsule loads independently from account and settings screens, language packs load on demand, and ElevenLabs/Gemini connections are refreshed concurrently during recording to reduce avoidable local and connection delay.                     |
+| **Movable always-on-top capsule**              | The recording pill returns to the top without focusing the main GUI, remembers where you drag it, and introduces first-time users to repositioning it after onboarding.                                                                             |
+| **Faster startup and result delivery**         | The capsule loads independently from account and settings screens, language packs load on demand, and ElevenLabs/Gemini connections are refreshed concurrently during recording to reduce avoidable local and connection delay.                     |
 | **Accurate dictation-time dashboard**          | Home-page totals can be filtered by day, week, or month. Only actual recording time is counted; provider processing time and implausible duration outliers are excluded.                                                                            |
 | **Hotkey recovery and diagnostics**            | Recording-state recovery, persistent diagnostic logs, clearer output-failure reporting, and an in-app diagnostics panel make failed hotkeys and abnormal timing easier to investigate.                                                              |
 
@@ -120,8 +120,8 @@ Linux keeps conservative Ctrl-based defaults because global Right Alt handling i
   <img src="docs/images/voice-flow-demo.gif" width="760" alt="OpenTypeless voice workflow demo" />
 </p>
 
-| App-aware AI polish                                                                                               | Local dictionary and corrections                                                                                   |
-| ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| App-aware AI polish                                                                                                          | Local dictionary and corrections                                                                                              |
+| ---------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | <img src="docs/images/v1.1.49-app-aware-polish.jpg" width="420" alt="OpenTypeless inherited upstream app-aware AI polish" /> | <img src="docs/images/v1.1.49-dictionary.jpg" width="420" alt="OpenTypeless inherited upstream dictionary and corrections" /> |
 
 <details>
@@ -187,21 +187,21 @@ Most desktop dictation tools stop at transcription. OpenTypeless adds the AI rew
 
 ## Features
 
-| Area              | Highlights                                                                                                                                                            |
-| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Voice capture     | Native Fn / Right Alt hotkeys on macOS/Windows, Linux Ctrl defaults, multiple bindings per workflow, hold or toggle mode, floating capsule states, idle auto-hide     |
-| AI rewriting      | App-aware writing, local per-app style mappings, polish styles, streaming polish, selected-text context, and custom instructions                                      |
-| Ask Anything      | One-shot voice question flow: record in the capsule, think, then show a small answer note with copy support                                                           |
-| Voice actions     | Deterministic English, Simplified Chinese, and Traditional Chinese routing for editing, translation, Ask, and supported actions                                       |
+| Area              | Highlights                                                                                                                                                                                         |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Voice capture     | Native Fn / Right Alt hotkeys on macOS/Windows, Linux Ctrl defaults, multiple bindings per workflow, hold or toggle mode, floating capsule states, idle auto-hide                                  |
+| AI rewriting      | App-aware writing, local per-app style mappings, polish styles, streaming polish, selected-text context, and custom instructions                                                                   |
+| Ask Anything      | One-shot voice question flow: record in the capsule, think, then show a small answer note with copy support                                                                                        |
+| Voice actions     | Deterministic English, Simplified Chinese, and Traditional Chinese routing for editing, translation, Ask, and supported actions                                                                    |
 | STT providers     | Managed STT (operator-configured only), Apple Speech on macOS, ElevenLabs Scribe v2, Deepgram, AssemblyAI, GLM-ASR, OpenAI Whisper, Groq Whisper, SiliconFlow, Volcengine Doubao, custom endpoints |
 | LLM providers     | Managed LLM (operator-configured only) or OpenAI-compatible APIs including OpenAI, DeepSeek, Claude via OpenRouter, Gemini, Groq, Qwen, Moonshot, Ollama, and more                                 |
-| Output            | Keyboard simulation, clipboard paste/copy-only, Windows SendInput, clipboard restore, and output-failure diagnostics                                                  |
-| Language          | Auto-detect speech, dedicated translation shortcut, switchable target languages, and 20+ translation targets                                                          |
-| Dictionary        | Custom terms, import/export, and local correction rules for recurring transcription mistakes                                                                          |
-| Scenes            | Built-in scenes, local custom scenes, active scene metadata, import/export for reusable writing styles                                                                |
-| Privacy           | Local app detection and mappings, provider keys in the OS credential vault where available, plus BYOK and local/self-hosted paths                                     |
-| Account and quota | Inactive integration surfaces for a future operator-owned managed service                                                                                     |
-| Desktop polish    | Dark/light/system theme, onboarding, local history search, auto-start, manual signed releases, cross-platform Tauri app                                                          |
+| Output            | Keyboard simulation, clipboard paste/copy-only, Windows SendInput, clipboard restore, and output-failure diagnostics                                                                               |
+| Language          | Auto-detect speech, dedicated translation shortcut, switchable target languages, and 20+ translation targets                                                                                       |
+| Dictionary        | Custom terms, import/export, and local correction rules for recurring transcription mistakes                                                                                                       |
+| Scenes            | Built-in scenes, local custom scenes, active scene metadata, import/export for reusable writing styles                                                                                             |
+| Privacy           | Local app detection and mappings, provider keys in the OS credential vault where available, plus BYOK and local/self-hosted paths                                                                  |
+| Account and quota | Optional operator-hosted managed service implementation with accounts, plans, quota, encrypted backup, export, and deletion                                                                        |
+| Desktop polish    | Dark/light/system theme, onboarding, local history search, auto-start, manual signed releases, cross-platform Tauri app                                                                            |
 
 UI localization currently ships with complete English and Chinese copy, plus additional locale files that may still fall back to English for newer advanced features.
 
@@ -322,17 +322,17 @@ All settings are accessible from the in-app Settings panel:
 - **General** — manage multiple Dictation, Ask Anything, and Translation shortcuts, output mode, auto-start, and idle capsule visibility
 - **Dictionary** — add or import custom terms, export your dictionary, and create local correction rules for recurring transcription mistakes
 - **Scenes** — built-in and local prompt templates with import/export for reusable writing styles
-- **Account / Upgrade** — inactive integration surfaces for a future owned service; this fork currently offers no account or paid plan
+- **Account / Upgrade** — optional operator-hosted account, plan, quota, backup, export, and deletion surfaces; normal source builds remain local/BYOK-only
 
 API keys are stored locally in the OS credential vault where available, with a local fallback for unsupported environments. No BYOK keys are sent to OpenTypeless servers — STT/LLM requests go directly to the provider you configure.
 
 ### Managed Service Status
 
-This public fork does **not** ship with a managed cloud endpoint, paid plan, or updater. A normal source build is BYOK/local-only and never falls back to the upstream OpenTypeless service. Existing account and managed-provider client screens are integration surfaces for a future Rudy-owned backend, not an offer of a currently available service.
+This public fork includes a deployable managed API under `services/managed-api`, but it does **not** ship with a live managed endpoint, configured paid plan, or updater. A normal source build is BYOK/local-only and never falls back to the upstream OpenTypeless service. Account and managed-provider screens activate only in an explicitly configured commercial build.
 
 All core features - recording, transcription, AI cleanup, output, dictionary, and history - work without a Rudy-managed service when you choose non-Cloud providers. Provider API keys stay on the device and requests go directly to the provider you configure.
 
-Commercial operators must implement and verify the service contract, billing, policies, signing, and support requirements in [docs/COMMERCIALIZATION.md](docs/COMMERCIALIZATION.md). Do not advertise managed plans until that checklist passes against deployed infrastructure.
+Commercial operators must deploy and verify the included service, then complete the billing, policy, signing, monitoring, and support requirements in [docs/COMMERCIALIZATION.md](docs/COMMERCIALIZATION.md) and [services/managed-api/README.md](services/managed-api/README.md). Do not advertise managed plans until that checklist passes against deployed infrastructure.
 
 ### Build-time managed identity
 
@@ -347,6 +347,7 @@ For a configured build, expose the same owned origin to both compile steps and a
 
 ```bash
 VITE_MANAGED_API_BASE_URL=https://api.your-owned-domain.example \
+VITE_APP_DEEP_LINK_SCHEME=yourproduct \
 OPENTYPELESS_MANAGED_API_BASE_URL=https://api.your-owned-domain.example \
 npm run tauri build -- --config src-tauri/tauri.commercial.generated.json
 ```

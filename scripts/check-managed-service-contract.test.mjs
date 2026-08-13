@@ -45,6 +45,29 @@ test('public auth and idempotency boundaries cannot be weakened', () => {
   )
 })
 
+test('operational routes and service implementation parity cannot drift', () => {
+  const contract = clone(loadManagedServiceContract())
+  delete contract.paths['/api/billing/stripe/webhook']
+  contract.paths['/api/account/export/download'].get.security = [{ bearerAuth: [] }]
+  contract.paths['/api/auth/desktop/complete'].get.description = 'Redirect.'
+  const errors = validateManagedServiceContract(contract)
+  assert.ok(errors.includes('missing required operation post /api/billing/stripe/webhook'))
+  assert.ok(
+    errors.includes(
+      'get /api/account/export/download must explicitly opt out of bearer authentication',
+    ),
+  )
+  assert.ok(errors.includes('/api/auth/desktop/complete must document atomically consumes'))
+
+  const sources = loadManagedServiceClientSources()
+  const parityErrors = validateManagedServiceClientParity(loadManagedServiceContract(), {
+    ...sources,
+    serviceApp: sources.serviceApp.replaceAll("'/api/account/export/download'", "'/removed'"),
+  })
+  assert.ok(
+    parityErrors.includes('managed service implementation is missing /api/account/export/download'),
+  )
+})
 test('desktop OAuth must use provider and callbackURL with strict callback validation', () => {
   const contract = clone(loadManagedServiceContract())
   const oauth = contract.paths['/api/auth/desktop-oauth'].get

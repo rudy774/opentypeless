@@ -311,7 +311,7 @@ export type SubscriptionPlan =
   | 'appsumo_tier2'
   | 'appsumo_tier3'
 
-export type SubscriptionSource = 'free' | 'creem' | 'lifetime' | 'appsumo'
+export type SubscriptionSource = 'free' | 'stripe' | 'creem' | 'lifetime' | 'appsumo'
 export type LicenseStatus = 'pending' | 'active' | 'refunded' | 'deactivated'
 export type QuotaModel = 'legacy_dual_meter' | 'cloud_words'
 
@@ -351,7 +351,13 @@ const SUBSCRIPTION_PLANS: readonly SubscriptionPlan[] = [
   'appsumo_tier2',
   'appsumo_tier3',
 ]
-const SUBSCRIPTION_SOURCES: readonly SubscriptionSource[] = ['free', 'creem', 'lifetime', 'appsumo']
+const SUBSCRIPTION_SOURCES: readonly SubscriptionSource[] = [
+  'free',
+  'stripe',
+  'creem',
+  'lifetime',
+  'appsumo',
+]
 const LICENSE_STATUSES: readonly LicenseStatus[] = ['pending', 'active', 'refunded', 'deactivated']
 const QUOTA_MODELS: readonly QuotaModel[] = ['legacy_dual_meter', 'cloud_words']
 const SUBSCRIPTION_REQUIRED_KEYS = [
@@ -402,7 +408,7 @@ function isSafeNonNegativeNumber(value: unknown, integer: boolean): value is num
 
 function hasValidPlanSourcePair(plan: SubscriptionPlan, source: SubscriptionSource): boolean {
   if (plan === 'free') return source === 'free'
-  if (plan === 'pro') return source === 'creem'
+  if (plan === 'pro') return source === 'stripe' || source === 'creem'
   if (plan === 'lifetime_starter') return source === 'lifetime'
   return source === 'appsumo'
 }

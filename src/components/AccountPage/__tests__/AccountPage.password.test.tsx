@@ -50,6 +50,9 @@ function signedIn(capability: 'unknown' | 'present' | 'none') {
     plan: 'free',
     source: 'free',
     displayName: 'Free',
+    subscriptionStatus: null,
+    cloudWordsLimit: 0,
+    licenseStatus: null,
     requestPasswordReset,
     changePassword,
     refreshCredentialCapability,
@@ -144,6 +147,7 @@ describe('AccountPage password controls', () => {
     useAuthStore.setState({
       plan: 'pro',
       source: 'creem',
+      subscriptionStatus: 'active',
       cloudWordsLimit: 1000,
       licenseStatus: 'active',
     })
@@ -197,6 +201,7 @@ describe('AccountPage password controls', () => {
     useAuthStore.setState({
       plan: 'pro',
       source: 'creem',
+      subscriptionStatus: 'active',
       cloudWordsLimit: 1000,
       licenseStatus: 'active',
     })
@@ -242,6 +247,7 @@ describe('AccountPage password controls', () => {
     useAuthStore.setState({
       plan: 'pro',
       source: 'creem',
+      subscriptionStatus: 'active',
       cloudWordsLimit: 1000,
       licenseStatus: 'active',
     })
@@ -287,6 +293,7 @@ describe('AccountPage password controls', () => {
     useAuthStore.setState({
       plan: 'pro',
       source: 'creem',
+      subscriptionStatus: 'active',
       cloudWordsLimit: 1000,
       licenseStatus: 'active',
     })
@@ -334,6 +341,7 @@ describe('AccountPage password controls', () => {
     useAuthStore.setState({
       plan: 'pro',
       source: 'creem',
+      subscriptionStatus: 'active',
       cloudWordsLimit: 1000,
       licenseStatus: 'active',
     })
@@ -386,6 +394,7 @@ describe('AccountPage password controls', () => {
     useAuthStore.setState({
       plan: 'pro',
       source: 'creem',
+      subscriptionStatus: 'active',
       cloudWordsLimit: 1000,
       licenseStatus: 'active',
     })
@@ -437,6 +446,7 @@ describe('AccountPage password controls', () => {
     useAuthStore.setState({
       plan: 'pro',
       source: 'creem',
+      subscriptionStatus: 'active',
       cloudWordsLimit: 1000,
       licenseStatus: 'active',
     })
@@ -496,7 +506,7 @@ describe('AccountPage password controls', () => {
       target: { value: tooLong },
     })
 
-    expect(within(dialog).getByText('Password must be 8 to 128 characters')).toBeInTheDocument()
+    expect(within(dialog).getByText('Password must be 12 to 128 characters')).toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: 'Set password' })).toBeDisabled()
   })
 
