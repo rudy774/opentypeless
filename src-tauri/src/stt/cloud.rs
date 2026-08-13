@@ -104,6 +104,9 @@ impl CloudSttProvider {
 #[async_trait]
 impl SttProvider for CloudSttProvider {
     async fn connect(&mut self, config: &SttConfig) -> Result<(), AppError> {
+        if !crate::managed_service_configured() {
+            return Err(crate::managed_service_unconfigured_error());
+        }
         if config.api_key.is_empty() {
             return Err(AppError::Auth(
                 "Cloud STT: session token is missing. Please sign in first.".to_string(),

@@ -5,7 +5,7 @@ import { Loader2, UserCircle, CheckCircle2, Mail, ClipboardCheck } from 'lucide-
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { readText } from '@tauri-apps/plugin-clipboard-manager'
 import { useAuthStore } from '../../stores/authStore'
-import { API_BASE_URL } from '../../lib/constants'
+import { API_BASE_URL, MANAGED_SERVICE_CONFIGURED } from '../../lib/constants'
 import {
   EMAIL_VERIFICATION_STATE_TTL_MS,
   OAUTH_STATE_TTL_MS,
@@ -46,6 +46,31 @@ export function AccountStep() {
     }
   }, [user, oauthPending])
 
+  if (!MANAGED_SERVICE_CONFIGURED) {
+    return (
+      <div className="max-w-[320px] mx-auto py-6 text-center">
+        <div className="rounded-[16px] border border-border bg-bg-secondary p-6 space-y-3">
+          <UserCircle size={36} className="mx-auto text-text-secondary" aria-hidden="true" />
+          <h2 className="text-[17px] font-semibold text-text-primary">
+            {t('onboarding.account.localOnlyTitle', 'Continue in local mode')}
+          </h2>
+          <p className="text-[13px] leading-relaxed text-text-secondary">
+            {t(
+              'settings.managedServiceUnavailableByok',
+              'This build has no managed cloud service configured. Use a provider API key (BYOK) or a local endpoint.',
+            )}
+          </p>
+          <p className="text-[12px] text-text-tertiary">
+            {t(
+              'onboarding.account.localOnlyNext',
+              'Choose Skip below to continue to your speech provider setup. No account is required.',
+            )}
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   const displayError = localError ?? error
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -54,7 +79,9 @@ export function AccountStep() {
     let verificationCallbackURL: string | null = null
     try {
       if (tab === 'signin') {
-        verificationCallbackURL = createDesktopAuthCallbackURL(EMAIL_VERIFICATION_STATE_TTL_MS)
+        verificationCallbackURL = await createDesktopAuthCallbackURL(
+          EMAIL_VERIFICATION_STATE_TTL_MS,
+        )
         await signIn(email, password, { verificationCallbackURL })
         if (!useAuthStore.getState().emailVerificationPending) {
           clearOAuthState()
@@ -68,7 +95,9 @@ export function AccountStep() {
           setLocalError(t('onboarding.account.passwordTooShort'))
           return
         }
-        verificationCallbackURL = createDesktopAuthCallbackURL(EMAIL_VERIFICATION_STATE_TTL_MS)
+        verificationCallbackURL = await createDesktopAuthCallbackURL(
+          EMAIL_VERIFICATION_STATE_TTL_MS,
+        )
         await signUp(email, password, name, { verificationCallbackURL })
       }
     } catch {
@@ -81,10 +110,11 @@ export function AccountStep() {
 
   const handleOAuth = async (provider: 'google' | 'github') => {
     try {
+      if (!MANAGED_SERVICE_CONFIGURED) throw new Error('Managed cloud service is not configured')
       setOauthPending(provider)
       setLocalError(null)
       useAuthStore.setState({ error: null })
-      const callbackURL = createDesktopAuthCallbackURL()
+      const callbackURL = await createDesktopAuthCallbackURL()
       const url = `${API_BASE_URL}/api/auth/desktop-oauth?provider=${provider}&callbackURL=${encodeURIComponent(callbackURL)}`
       await openUrl(url)
     } catch {
@@ -166,7 +196,7 @@ export function AccountStep() {
           <button
             onClick={async () => {
               setResent(false)
-              const verificationCallbackURL = createDesktopAuthCallbackURL(
+              const verificationCallbackURL = await createDesktopAuthCallbackURL(
                 EMAIL_VERIFICATION_STATE_TTL_MS,
               )
               await resendVerification({ verificationCallbackURL })
@@ -401,7 +431,8 @@ export function AccountStep() {
       <div className="flex gap-2">
         <button
           onClick={() => handleOAuth('google')}
-          className="flex-1 py-2.5 rounded-[10px] border border-border bg-transparent text-text-primary text-[13px] font-medium cursor-pointer hover:bg-bg-secondary transition-colors flex items-center justify-center gap-2"
+          disabled={!MANAGED_SERVICE_CONFIGURED}
+          className="flex-1 py-2.5 rounded-[10px] border border-border bg-transparent text-text-primary text-[13px] font-medium cursor-pointer hover:bg-bg-secondary transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
         >
           <svg width="16" height="16" viewBox="0 0 24 24">
             <path
@@ -425,7 +456,8 @@ export function AccountStep() {
         </button>
         <button
           onClick={() => handleOAuth('github')}
-          className="flex-1 py-2.5 rounded-[10px] border border-border bg-transparent text-text-primary text-[13px] font-medium cursor-pointer hover:bg-bg-secondary transition-colors flex items-center justify-center gap-2"
+          className="flex-1 py-2.5 rounded-[10px] border border-border bg-transparent text-text-primary text-[13px] font-medium cursor-pointer hover:bg-bg-secondary transition-colors flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
+          disabled={!MANAGED_SERVICE_CONFIGURED}
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
             <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z" />

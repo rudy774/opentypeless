@@ -8,34 +8,48 @@ import {
   Clipboard,
   Crown,
   Keyboard,
+  Loader2,
   Mic2,
   Settings2,
   Sparkles,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { LLM_PROVIDERS, STT_PROVIDERS } from '../../lib/constants'
+import { CUSTOM_WHISPER_PROVIDER, LLM_PROVIDERS, STT_PROVIDERS } from '../../lib/constants'
 import { useAppStore } from '../../stores/appStore'
 import { hasManagedCloudAccess, useAuthStore } from '../../stores/authStore'
 import {
   getLocalActivityMetrics,
+  getSttProviderDiagnostics,
+  getSystemDiagnostics,
   type ActivityRangeMetrics,
   type LocalActivityMetricsSummary,
+  type SttProviderDiagnostics,
+  type SystemDiagnosticsReport,
 } from '../../lib/tauri'
 import {
   formatTranscriptionDuration,
   type TranscriptionTimeRange,
 } from '../../lib/transcription-time'
 
+const EMPTY_METRIC = '\u2014'
+
 const EMPTY_ACTIVITY_RANGE: ActivityRangeMetrics = {
   recordingMs: 0,
   savedTranscriptions: 0,
   outputChars: 0,
   activeDays: 0,
+  successfulAutomaticInsertions: 0,
   recordedFallbacks: 0,
+  recordedFailures: 0,
+  outputOutcomeSampleCount: 0,
   transformedOutputs: 0,
+  validDurationSampleCount: 0,
   excludedDurationCount: 0,
   averageTotalMs: null,
+  p50TotalMs: null,
+  p95TotalMs: null,
   timingSampleCount: 0,
+  excludedTimingCount: 0,
 }
 
 const EMPTY_ACTIVITY: LocalActivityMetricsSummary = {
@@ -43,10 +57,49 @@ const EMPTY_ACTIVITY: LocalActivityMetricsSummary = {
   week: EMPTY_ACTIVITY_RANGE,
   month: EMPTY_ACTIVITY_RANGE,
   totalRecordings: 0,
+  validDurationSampleCount: 0,
   excludedDurationCount: 0,
 }
 
 const TIME_RANGE_KEYS: TranscriptionTimeRange[] = ['day', 'week', 'month']
+const READINESS_FOCUS_REFRESH_MS = 60_000
+
+type HomeReadiness =
+  | { state: 'checking'; message: null }
+  | { state: 'ready'; message: null }
+  | { state: 'needsAttention'; message: string | null }
+
+const CHECKING_READINESS: HomeReadiness = { state: 'checking', message: null }
+
+function evaluateReadiness(
+  system: SystemDiagnosticsReport,
+  stt: SttProviderDiagnostics,
+  hotkeyRegistrationError: string | null,
+  managedCloudReady: boolean,
+): HomeReadiness {
+  if (hotkeyRegistrationError) {
+    return { state: 'needsAttention', message: hotkeyRegistrationError }
+  }
+
+  const microphone = system.rows.find((row) => row.id === 'microphone')
+  const hotkey = system.rows.find((row) => row.id === 'hotkey')
+  if (!microphone || !hotkey) return { state: 'needsAttention', message: null }
+  if (microphone.status === 'checking' || hotkey.status === 'checking') {
+    return CHECKING_READINESS
+  }
+  if (microphone.status !== 'ok') {
+    return { state: 'needsAttention', message: microphone.message }
+  }
+  if (hotkey.status !== 'ok') return { state: 'needsAttention', message: hotkey.message }
+  if (!stt.ready) {
+    return { state: 'needsAttention', message: stt.issues[0]?.message ?? null }
+  }
+  if (stt.kind === 'cloudManaged' && !managedCloudReady) {
+    return { state: 'needsAttention', message: null }
+  }
+
+  return { state: 'ready', message: null }
+}
 
 function currentNativeWindow() {
   try {
@@ -106,6 +159,87 @@ export function HomePage() {
   const [activity, setActivity] = useState<LocalActivityMetricsSummary>(EMPTY_ACTIVITY)
   const [activityLoaded, setActivityLoaded] = useState(false)
   const [activityLoading, setActivityLoading] = useState(true)
+  const [readiness, setReadiness] = useState<HomeReadiness>(CHECKING_READINESS)
+
+  useEffect(() => {
+    let cancelled = false
+    let refreshInFlight = false
+    let lastCheckedAt = 0
+    let unlistenFocus: (() => void) | null = null
+
+    const refreshReadiness = async (force = false) => {
+      if (refreshInFlight || cancelled) return
+      const now = Date.now()
+      if (!force && now - lastCheckedAt < READINESS_FOCUS_REFRESH_MS) return
+
+      refreshInFlight = true
+      try {
+        if (!(await isActivityViewVisible()) || cancelled) return
+        lastCheckedAt = now
+        if (force) setReadiness(CHECKING_READINESS)
+
+        const isCustomWhisper = config.stt_provider === CUSTOM_WHISPER_PROVIDER
+        const [system, stt] = await Promise.all([
+          getSystemDiagnostics(),
+          getSttProviderDiagnostics(
+            isCustomWhisper ? config.stt_custom_api_key : config.stt_api_key,
+            config.stt_provider,
+            isCustomWhisper ? config.stt_custom_base_url : undefined,
+            isCustomWhisper ? config.stt_custom_model : undefined,
+          ),
+        ])
+        if (!cancelled) {
+          setReadiness(
+            evaluateReadiness(
+              system,
+              stt,
+              hotkeyRegistrationError,
+              Boolean(user && hasCloudAccess),
+            ),
+          )
+        }
+      } catch {
+        if (!cancelled) setReadiness({ state: 'needsAttention', message: null })
+      } finally {
+        refreshInFlight = false
+      }
+    }
+
+    const onDocumentVisibility = () => {
+      if (document.visibilityState !== 'hidden') void refreshReadiness()
+    }
+    const onWindowFocus = () => void refreshReadiness()
+
+    document.addEventListener('visibilitychange', onDocumentVisibility)
+    window.addEventListener('focus', onWindowFocus)
+    currentNativeWindow()
+      ?.onFocusChanged((event) => {
+        if (event.payload) void refreshReadiness()
+      })
+      .then((unlisten) => {
+        if (cancelled) safeUnlisten(unlisten)
+        else unlistenFocus = unlisten
+      })
+      .catch(() => {})
+
+    void refreshReadiness(true)
+
+    return () => {
+      cancelled = true
+      document.removeEventListener('visibilitychange', onDocumentVisibility)
+      window.removeEventListener('focus', onWindowFocus)
+      if (unlistenFocus) safeUnlisten(unlistenFocus)
+    }
+  }, [
+    config.stt_api_key,
+    config.stt_custom_api_key,
+    config.stt_custom_base_url,
+    config.stt_custom_model,
+    config.stt_provider,
+    hasCloudAccess,
+    hotkeyRegistrationError,
+    user,
+  ])
 
   useEffect(() => {
     let cancelled = false
@@ -188,7 +322,22 @@ export function HomePage() {
     .split('+')
     .map((part) => part.trim())
     .filter(Boolean)
-  const hasShortcutIssue = Boolean(hotkeyRegistrationError)
+  const managedCloudNeedsAttention = config.stt_provider === 'cloud' && (!user || !hasCloudAccess)
+  const readinessNeedsAttention =
+    Boolean(hotkeyRegistrationError) ||
+    managedCloudNeedsAttention ||
+    readiness.state === 'needsAttention'
+  const readinessChecking = !readinessNeedsAttention && readiness.state === 'checking'
+  const readinessMessage =
+    hotkeyRegistrationError ??
+    readiness.message ??
+    (config.stt_provider === 'cloud' && !user
+      ? t('settings.sttSignInHint')
+      : config.stt_provider === 'cloud' && !hasCloudAccess
+        ? t('settings.sttUpgradeHint')
+        : readinessNeedsAttention
+          ? t('settings.diagnosticsUnavailable')
+          : null)
 
   return (
     <div className="mx-auto w-full max-w-[1060px] space-y-5 p-5 min-[900px]:p-7">
@@ -203,17 +352,31 @@ export function HomePage() {
         <div className="relative flex items-center justify-between gap-4">
           <div
             className={`inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-[11px] font-semibold tracking-[0.02em] ${
-              hasShortcutIssue
+              readinessNeedsAttention
                 ? 'border-[#ffb25f]/25 bg-[#ffb25f]/10 text-[#ffd099]'
-                : 'border-[#5ddcc5]/25 bg-[#5ddcc5]/10 text-[#8ce8d7]'
+                : readinessChecking
+                  ? 'border-white/15 bg-white/[0.06] text-white/65'
+                  : 'border-[#5ddcc5]/25 bg-[#5ddcc5]/10 text-[#8ce8d7]'
             }`}
+            role="status"
+            aria-live="polite"
           >
-            {hasShortcutIssue ? (
+            {readinessNeedsAttention ? (
               <AlertCircle size={13} aria-hidden="true" />
+            ) : readinessChecking ? (
+              <Loader2
+                size={13}
+                className="animate-spin motion-reduce:animate-none"
+                aria-hidden="true"
+              />
             ) : (
               <CircleCheck size={13} aria-hidden="true" />
             )}
-            {hasShortcutIssue ? t('settings.healthActionRequired') : t('home.configured')}
+            {readinessNeedsAttention
+              ? t('settings.healthActionRequired')
+              : readinessChecking
+                ? t('settings.healthChecking')
+                : t('settings.healthReady')}
           </div>
           <a
             href="#/settings"
@@ -248,9 +411,9 @@ export function HomePage() {
                 {t('settings.dictationHotkey')}
               </span>
             </div>
-            {hasShortcutIssue && hotkeyRegistrationError && (
+            {readinessNeedsAttention && readinessMessage && (
               <p className="mt-4 max-w-xl rounded-[9px] border border-[#ffb25f]/20 bg-[#ffb25f]/10 px-3 py-2 text-[12px] leading-relaxed text-[#ffd9ad]">
-                {hotkeyRegistrationError}
+                {readinessMessage}
               </p>
             )}
           </div>
@@ -328,7 +491,6 @@ export function HomePage() {
               ))}
             </div>
           </div>
-
           <dl
             id="activity-instrument-values"
             className="mt-5 grid grid-cols-2 gap-x-5 gap-y-4 border-t border-border pt-4 min-[520px]:grid-cols-4"
@@ -340,7 +502,7 @@ export function HomePage() {
               }
             />
             <ActivityStat
-              label={t('home.charactersDrafted')}
+              label={t('home.retainedOutputCharacters')}
               value={activityLoaded ? numberFormatter.format(selectedActivity.outputChars) : '—'}
             />
             <ActivityStat
@@ -366,28 +528,132 @@ export function HomePage() {
               }
             />
           </dl>
-          {(selectedActivity.transformedOutputs > 0 || selectedActivity.recordedFallbacks > 0) && (
+          {selectedActivity.transformedOutputs > 0 && (
             <p className="mt-4 border-t border-border pt-3 text-[12px] leading-relaxed text-text-secondary">
-              {t('home.activityDetails', {
-                transformed: numberFormatter.format(selectedActivity.transformedOutputs),
-                fallbacks: numberFormatter.format(selectedActivity.recordedFallbacks),
+              {t('home.transformedOutputsDetail', {
+                count: selectedActivity.transformedOutputs,
               })}
             </p>
           )}
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-t border-border pt-3 text-[12px] leading-relaxed text-text-tertiary">
-            <p>{t('home.localActivityDisclosure')}</p>
-            <p>
-              {activityLoaded
-                ? t('home.lifetimeRetained', {
-                    formattedCount: numberFormatter.format(activity.totalRecordings),
-                  })
-                : '—'}
+          <div className="mt-5 border-t border-border pt-4">
+            <p className="text-[12px] font-semibold text-text-secondary">
+              {t('home.retainedOutputOutcomes')}
             </p>
+            <dl className="mt-3 grid grid-cols-3 gap-x-5 gap-y-4">
+              <ActivityStat
+                label={t('home.retainedAutomaticInsertions')}
+                value={
+                  activityLoaded
+                    ? numberFormatter.format(selectedActivity.successfulAutomaticInsertions)
+                    : EMPTY_METRIC
+                }
+              />
+              <ActivityStat
+                label={t('home.retainedFallbacks')}
+                value={
+                  activityLoaded
+                    ? numberFormatter.format(selectedActivity.recordedFallbacks)
+                    : EMPTY_METRIC
+                }
+              />
+              <ActivityStat
+                label={t('home.retainedFailures')}
+                value={
+                  activityLoaded
+                    ? numberFormatter.format(selectedActivity.recordedFailures)
+                    : EMPTY_METRIC
+                }
+              />
+            </dl>
+            {activityLoaded && (
+              <div className="mt-3 space-y-1 text-[11px] leading-snug text-text-tertiary">
+                <p>
+                  {t('home.outputOutcomeCoverage', {
+                    count: selectedActivity.outputOutcomeSampleCount,
+                    total: selectedActivity.savedTranscriptions,
+                  })}
+                </p>
+                <p>{t('home.retainedOutputScope')}</p>
+              </div>
+            )}
+          </div>
+          <div className="mt-5 border-t border-border pt-4">
+            <p className="text-[12px] font-semibold text-text-secondary">
+              {t('home.turnaroundLatency')}
+            </p>
+            <dl className="mt-3 grid grid-cols-2 gap-x-5 gap-y-4">
+              <ActivityStat
+                label={t('home.typicalTurnaround')}
+                value={
+                  activityLoaded && selectedActivity.p50TotalMs !== null
+                    ? formatTurnaround(selectedActivity.p50TotalMs)
+                    : EMPTY_METRIC
+                }
+              />
+              <ActivityStat
+                label={t('home.slowEndTurnaround')}
+                value={
+                  activityLoaded && selectedActivity.p95TotalMs !== null
+                    ? formatTurnaround(selectedActivity.p95TotalMs)
+                    : EMPTY_METRIC
+                }
+              />
+            </dl>
+            {activityLoaded && (
+              <p className="mt-3 text-[11px] leading-snug text-text-tertiary">
+                {t('home.turnaroundCoverage', {
+                  count: selectedActivity.timingSampleCount,
+                  total: selectedActivity.savedTranscriptions,
+                })}
+              </p>
+            )}
+          </div>
+          <div className="mt-4 border-t border-border pt-3 text-[12px] leading-relaxed text-text-tertiary">
+            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+              <p>{t('home.localActivityDisclosure')}</p>
+              <p>
+                {activityLoaded
+                  ? t('home.lifetimeRetained', {
+                      formattedCount: numberFormatter.format(activity.totalRecordings),
+                    })
+                  : EMPTY_METRIC}
+              </p>
+            </div>
+            {activityLoaded && (
+              <p className="mt-1.5">
+                {t('home.durationCoverage', {
+                  count: selectedActivity.validDurationSampleCount,
+                  total: selectedActivity.savedTranscriptions,
+                })}
+              </p>
+            )}
+            {activityLoaded && (
+              <p className="mt-1">
+                {t('home.lifetimeDurationCoverage', {
+                  count: activity.validDurationSampleCount,
+                  total: activity.totalRecordings,
+                })}
+              </p>
+            )}
           </div>
           {selectedActivity.excludedDurationCount > 0 && (
             <p className="mt-3 rounded-[8px] border border-warning/25 bg-warning/10 px-3 py-2 text-[12px] leading-relaxed text-text-secondary">
-              {t('home.durationOutliersSelected', {
+              {t('home.invalidDurationsSelected', {
                 count: selectedActivity.excludedDurationCount,
+              })}
+            </p>
+          )}
+          {activity.excludedDurationCount > selectedActivity.excludedDurationCount && (
+            <p className="mt-3 rounded-[8px] border border-warning/25 bg-warning/10 px-3 py-2 text-[12px] leading-relaxed text-text-secondary">
+              {t('home.invalidDurationsLifetime', {
+                count: activity.excludedDurationCount,
+              })}
+            </p>
+          )}
+          {selectedActivity.excludedTimingCount > 0 && (
+            <p className="mt-3 rounded-[8px] border border-warning/25 bg-warning/10 px-3 py-2 text-[12px] leading-relaxed text-text-secondary">
+              {t('home.timingOutliersSelected', {
+                count: selectedActivity.excludedTimingCount,
               })}
             </p>
           )}

@@ -1,3 +1,4 @@
+use crate::session::SessionTokenStorage;
 use crate::storage;
 use crate::AskHotkeyCache;
 use crate::CloseToTrayCache;
@@ -6,7 +7,7 @@ use crate::HotkeyRegistrationError;
 use crate::HotkeyRoleCache;
 use crate::SessionTokenStore;
 use serde_json::{json, Map, Value};
-use tauri::Emitter;
+use tauri::{Emitter, Window};
 
 fn config_patch_between(previous: &storage::AppConfig, next: &storage::AppConfig) -> Value {
     let mut patch = Map::new();
@@ -54,6 +55,7 @@ fn prepare_config_for_save(mut config: storage::AppConfig) -> Result<storage::Ap
     crate::hotkey::validate_hotkey_config(&config.hotkeys).map_err(|e| e.to_string())?;
     config.normalize_values();
     crate::hotkey::validate_hotkey_config(&config.hotkeys).map_err(|e| e.to_string())?;
+    config.validate_provider_endpoints()?;
     Ok(config)
 }
 
@@ -297,17 +299,42 @@ pub async fn set_capsule_auto_hide(
 }
 
 #[tauri::command]
-pub async fn set_session_token(
+pub fn get_session_token(
+    window: Window,
+    state: tauri::State<'_, SessionTokenStore>,
+) -> Result<String, String> {
+    ensure_session_command_window(window.label())?;
+    Ok(state.token())
+}
+
+#[tauri::command]
+pub fn set_session_token(
+    window: Window,
     state: tauri::State<'_, SessionTokenStore>,
     token: String,
-) -> Result<(), String> {
-    *state.0.lock().unwrap_or_else(|e| e.into_inner()) = token;
-    Ok(())
+) -> Result<SessionTokenStorage, String> {
+    ensure_session_command_window(window.label())?;
+    state.set_persisted(token)
+}
+
+fn ensure_session_command_window(label: &str) -> Result<(), String> {
+    if label == "main" {
+        Ok(())
+    } else {
+        Err("cloud session access is only allowed from the main window".to_string())
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn session_token_commands_are_limited_to_main_window() {
+        assert_eq!(ensure_session_command_window("main"), Ok(()));
+        assert!(ensure_session_command_window("ask").is_err());
+        assert!(ensure_session_command_window("capsule").is_err());
+    }
 
     #[test]
     fn config_patch_includes_capsule_auto_hide_change() {
@@ -400,6 +427,47 @@ mod tests {
 
         assert_eq!(prepared.hotkeys.ask, None);
         assert_eq!(prepared.ask_hotkey, "");
+    }
+
+    #[test]
+    fn prepare_config_for_save_rejects_unsafe_keyed_provider_urls() {
+        for (provider, unsafe_url) in [
+            ("openai", "http://proxy.example/v1"),
+            (
+                "gemini",
+                "https://user:secret@proxy.example/v1?api_key=secret",
+            ),
+        ] {
+            let config = storage::AppConfig {
+                llm_provider: provider.to_string(),
+                llm_base_url: unsafe_url.to_string(),
+                ..Default::default()
+            };
+
+            let error = prepare_config_for_save(config).unwrap_err();
+
+            assert!(!error.contains("secret"));
+            assert!(!error.contains("proxy.example"));
+        }
+    }
+
+    #[test]
+    fn prepare_config_for_save_accepts_explicit_https_and_local_endpoints() {
+        let gemini = storage::AppConfig {
+            llm_provider: "gemini".to_string(),
+            llm_base_url: "https://proxy.example/v1".to_string(),
+            ..Default::default()
+        };
+        assert!(prepare_config_for_save(gemini).is_ok());
+
+        let local = storage::AppConfig {
+            llm_provider: "ollama".to_string(),
+            llm_base_url: "http://127.0.0.1:11434/v1".to_string(),
+            stt_provider: crate::stt::config::CUSTOM_WHISPER_PROVIDER.to_string(),
+            stt_custom_base_url: "http://localhost:8000/v1".to_string(),
+            ..Default::default()
+        };
+        assert!(prepare_config_for_save(local).is_ok());
     }
 
     #[test]

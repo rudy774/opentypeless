@@ -2,6 +2,9 @@
   <a href="README.md">English</a> | <a href="README_zh.md">中文</a> | <strong>日本語</strong> | <a href="README_ko.md">한국어</a> | <a href="README_es.md">Español</a> | <a href="README_fr.md">Français</a> | <a href="README_de.md">Deutsch</a> | <a href="README_pt.md">Português</a> | <a href="README_ru.md">Русский</a> | <a href="README_ar.md">العربية</a> | <a href="README_hi.md">हिन्दी</a> | <a href="README_it.md">Italiano</a> | <a href="README_tr.md">Türkçe</a> | <a href="README_vi.md">Tiếng Việt</a> | <a href="README_th.md">ภาษาไทย</a> | <a href="README_id.md">Bahasa Indonesia</a> | <a href="README_pl.md">Polski</a> | <a href="README_nl.md">Nederlands</a>
 </p>
 
+> [!IMPORTANT]
+> **Fork status:** This is the **Rudy774 fork**, which differs from the original OpenTypeless project. Source code, releases, and support are provided only through [github.com/rudy774/opentypeless](https://github.com/rudy774/opentypeless). This fork does **not** currently provide a hosted paid service, and automatic updates are disabled.
+
 <p align="center">
   <img src="src-tauri/icons/128x128@2x.png" width="128" height="128" alt="OpenTypeless ロゴ" />
 </p>
@@ -19,11 +22,10 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/tover0314-w/opentypeless/actions/workflows/ci.yml"><img src="https://github.com/tover0314-w/opentypeless/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
-  <a href="https://github.com/tover0314-w/opentypeless/releases"><img src="https://img.shields.io/github/v/release/tover0314-w/opentypeless?color=2ABBA7" alt="リリース" /></a>
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/tover0314-w/opentypeless" alt="ライセンス" /></a>
-  <a href="https://github.com/tover0314-w/opentypeless/stargazers"><img src="https://img.shields.io/github/stars/tover0314-w/opentypeless?style=social" alt="スター" /></a>
-  <a href="https://discord.gg/V6rRpJ4RGD"><img src="https://img.shields.io/badge/Discord-Join%20us-5865F2?logo=discord&logoColor=white" alt="Discord" /></a>
+  <a href="https://github.com/rudy774/opentypeless/actions/workflows/ci.yml"><img src="https://github.com/rudy774/opentypeless/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="https://github.com/rudy774/opentypeless/releases"><img src="https://img.shields.io/github/v/release/rudy774/opentypeless?color=2ABBA7" alt="リリース" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/rudy774/opentypeless" alt="ライセンス" /></a>
+  <a href="https://github.com/rudy774/opentypeless/stargazers"><img src="https://img.shields.io/github/stars/rudy774/opentypeless?style=social" alt="スター" /></a>
 </p>
 
 <p align="center">
@@ -34,7 +36,9 @@
   <img src="docs/images/voice-flow-demo.gif" width="720" alt="OpenTypeless デモ" />
 </p>
 
-## v1.1.49 の新機能
+## Inherited upstream capabilities
+
+The capabilities below originated in the upstream project before this fork. This is historical attribution, not a release-version or support claim.
 
 - **アプリ認識ライティング**は現在のアプリをローカルで検出し、メール、チャット、文書、Issue 管理、開発ツールなどに合わせて構成とトーンを調整します。
 - **音声インテントルーティング**は、通常のディクテーション、選択テキスト編集、翻訳、Ask Anything、対応する音声操作を英語・簡体字中国語・繁体字中国語で判別します。
@@ -47,7 +51,7 @@
 
 | アプリ認識 AI 文章調整 | ローカル辞書と修正ルール |
 | --- | --- |
-| <img src="docs/images/v1.1.49-app-aware-polish.jpg" width="420" alt="OpenTypeless v1.1.49 アプリ認識 AI 文章調整" /> | <img src="docs/images/v1.1.49-dictionary.jpg" width="420" alt="OpenTypeless v1.1.49 ローカル辞書と修正ルール" /> |
+| <img src="docs/images/v1.1.49-app-aware-polish.jpg" width="420" alt="OpenTypeless inherited upstream アプリ認識 AI 文章調整" /> | <img src="docs/images/v1.1.49-dictionary.jpg" width="420" alt="OpenTypeless inherited upstream ローカル辞書と修正ルール" /> |
 
 <details>
 <summary>その他のスクリーンショット</summary>
@@ -107,7 +111,7 @@
 
 お使いのプラットフォーム向けの最新バージョンをダウンロード：
 
-**[Releases からダウンロード](https://github.com/tover0314-w/opentypeless/releases)**
+**[Releases からダウンロード](https://github.com/rudy774/opentypeless/releases)**
 
 | プラットフォーム | ファイル |
 |-----------------|---------|
@@ -149,43 +153,11 @@ npm run tauri build
 
 APIキーは `tauri-plugin-store` を介してローカルに保存されます。キーがOpenTypelessサーバーに送信されることはありません — すべてのSTT/LLMリクエストは設定したプロバイダーに直接送信されます。
 
-### Cloud（Pro）オプション
+### Managed service status for this fork
 
-OpenTypelessは、自分のAPIキーが不要なマネージドSTTおよびLLMクォータを提供するオプションのProサブスクリプションも提供しています。これは完全にオプションです — アプリは自分のキーで完全に機能します。
+This fork currently supports bring-your-own-key and local providers. It does not include a hosted paid service. Account, entitlement, checkout, backup, and managed transcription features remain disabled unless you build and operate a compatible backend yourself.
 
-[Proについて詳しく](https://www.opentypeless.com)
-
-### BYOK（Bring Your Own Key）vs Cloud
-
-| | BYOKモード | Cloud（Pro）モード |
-|---|---|---|
-| STT | 自分のAPIキー（Deepgram、AssemblyAIなど） | 管理されたクォータ（10時間/月） |
-| LLM | 自分のAPIキー（OpenAI、DeepSeekなど） | 管理されたクォータ（約500万トークン/月） |
-| クラウド依存 | なし — すべてのリクエストはプロバイダーに直接送信 | www.opentypeless.comへの接続が必要 |
-| コスト | プロバイダーに直接支払い | $4.99/月のサブスクリプション |
-
-すべてのコア機能 — 録音、文字起こし、AI校正、キーボード/クリップボード出力、辞書、履歴 — はBYOKモードでOpenTypelessサーバーから完全にオフラインで動作します。
-
-### セルフホスティング / クラウドなし
-
-クラウド依存なしでOpenTypelessを実行するには：
-
-1. 設定でCloud以外のSTTおよびLLMプロバイダーを選択
-2. 自分のAPIキーを入力
-3. 以上です — www.opentypeless.comへのアカウントやインターネット接続は不要です
-
-オプションのクラウド機能を自分のバックエンドに向けたい場合は、ビルド前にこれらの環境変数を設定してください：
-
-| 変数 | デフォルト | 説明 |
-|---|---|---|
-| `VITE_API_BASE_URL` | `https://www.opentypeless.com` | フロントエンドクラウドAPIベースURL |
-| `API_BASE_URL` | `https://www.opentypeless.com` | RustバックエンドクラウドAPIベースURL |
-
-```bash
-# 例：カスタムバックエンドでビルド
-VITE_API_BASE_URL=https://my-server.example.com API_BASE_URL=https://my-server.example.com npm run tauri build
-```
-
+A self-hosted managed backend must be configured explicitly at build time with both `VITE_MANAGED_API_BASE_URL` and `OPENTYPELESS_MANAGED_API_BASE_URL`. There is no production default. Both values must be the same owned HTTPS origin; see `docs/MANAGED_SERVICE_API.md` and `docs/COMMERCIALIZATION.md`.
 ## アーキテクチャ
 
 **データフローパイプライン：**
@@ -237,9 +209,8 @@ STTはプロバイダーによって99以上の言語をサポートしていま
 
 ## コミュニティ
 
-- 💬 [Discord](https://discord.gg/V6rRpJ4RGD) — チャット、ヘルプ、フィードバック
-- 🗣️ [GitHub Discussions](https://github.com/tover0314-w/opentypeless/discussions) — 機能提案、Q&A
-- 🐛 [Issue Tracker](https://github.com/tover0314-w/opentypeless/issues) — バグ報告と機能リクエスト
+- 🗣️ [GitHub Discussions](https://github.com/rudy774/opentypeless/discussions) — 機能提案、Q&A
+- 🐛 [Issue Tracker](https://github.com/rudy774/opentypeless/issues) — バグ報告と機能リクエスト
 - 📖 [コントリビューションガイド](CONTRIBUTING.md) — 開発セットアップとガイドライン
 - 🔒 [セキュリティポリシー](SECURITY.md) — 脆弱性の責任ある報告
 - 🧭 [ビジョン](VISION.md) — プロジェクトの原則とロードマップの方向性
@@ -248,15 +219,15 @@ STTはプロバイダーによって99以上の言語をサポートしていま
 
 コントリビューションを歓迎します！開発セットアップとガイドラインについては [CONTRIBUTING.md](CONTRIBUTING.md) をご覧ください。
 
-始める場所をお探しですか？ [`good first issue`](https://github.com/tover0314-w/opentypeless/labels/good%20first%20issue) ラベルの付いたissueをチェックしてください。
+始める場所をお探しですか？ [`good first issue`](https://github.com/rudy774/opentypeless/labels/good%20first%20issue) ラベルの付いたissueをチェックしてください。
 
 ## Star History
 
-<a href="https://star-history.com/#tover0314-w/opentypeless&Date">
+<a href="https://star-history.com/#rudy774/opentypeless&Date">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=tover0314-w/opentypeless&type=Date&theme=dark" />
-    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=tover0314-w/opentypeless&type=Date" />
-    <img alt="Star History チャート" src="https://api.star-history.com/svg?repos=tover0314-w/opentypeless&type=Date" />
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=rudy774/opentypeless&type=Date&theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=rudy774/opentypeless&type=Date" />
+    <img alt="Star History チャート" src="https://api.star-history.com/svg?repos=rudy774/opentypeless&type=Date" />
   </picture>
 </a>
 

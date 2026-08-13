@@ -2,6 +2,9 @@
   <a href="README.md">English</a> | <a href="README_zh.md">中文</a> | <a href="README_ja.md">日本語</a> | <a href="README_ko.md">한국어</a> | <a href="README_es.md">Español</a> | <a href="README_fr.md">Français</a> | <a href="README_de.md">Deutsch</a> | <a href="README_pt.md">Português</a> | <a href="README_ru.md">Русский</a> | <a href="README_ar.md">العربية</a> | <a href="README_hi.md">हिन्दी</a> | <a href="README_it.md">Italiano</a> | <a href="README_tr.md">Türkçe</a> | <a href="README_vi.md">Tiếng Việt</a> | <strong>ภาษาไทย</strong> | <a href="README_id.md">Bahasa Indonesia</a> | <a href="README_pl.md">Polski</a> | <a href="README_nl.md">Nederlands</a>
 </p>
 
+> [!IMPORTANT]
+> **Fork status:** This is the **Rudy774 fork**, which differs from the original OpenTypeless project. Source code, releases, and support are provided only through [github.com/rudy774/opentypeless](https://github.com/rudy774/opentypeless). This fork does **not** currently provide a hosted paid service, and automatic updates are disabled.
+
 <p align="center">
   <img src="src-tauri/icons/128x128@2x.png" width="128" height="128" alt="โลโก้ OpenTypeless" />
 </p>
@@ -19,11 +22,10 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/tover0314-w/opentypeless/actions/workflows/ci.yml"><img src="https://github.com/tover0314-w/opentypeless/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
-  <a href="https://github.com/tover0314-w/opentypeless/releases"><img src="https://img.shields.io/github/v/release/tover0314-w/opentypeless?color=2ABBA7" alt="เวอร์ชัน" /></a>
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/tover0314-w/opentypeless" alt="สัญญาอนุญาต" /></a>
-  <a href="https://github.com/tover0314-w/opentypeless/stargazers"><img src="https://img.shields.io/github/stars/tover0314-w/opentypeless?style=social" alt="ดาว" /></a>
-  <a href="https://discord.gg/V6rRpJ4RGD"><img src="https://img.shields.io/badge/Discord-เข้าร่วม-5865F2?logo=discord&logoColor=white" alt="Discord" /></a>
+  <a href="https://github.com/rudy774/opentypeless/actions/workflows/ci.yml"><img src="https://github.com/rudy774/opentypeless/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="https://github.com/rudy774/opentypeless/releases"><img src="https://img.shields.io/github/v/release/rudy774/opentypeless?color=2ABBA7" alt="เวอร์ชัน" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/rudy774/opentypeless" alt="สัญญาอนุญาต" /></a>
+  <a href="https://github.com/rudy774/opentypeless/stargazers"><img src="https://img.shields.io/github/stars/rudy774/opentypeless?style=social" alt="ดาว" /></a>
 </p>
 
 <p align="center">
@@ -34,7 +36,9 @@
   <img src="docs/images/voice-flow-demo.gif" width="720" alt="สาธิต OpenTypeless" />
 </p>
 
-## มีอะไรใหม่ใน v1.1.49
+## Inherited upstream capabilities
+
+The capabilities below originated in the upstream project before this fork. This is historical attribution, not a release-version or support claim.
 
 - **การเขียนที่รับรู้แอป** ตรวจจับแอปที่กำลังใช้งานภายในเครื่อง แล้วปรับโครงสร้างและน้ำเสียงให้เหมาะกับอีเมล แชต เอกสาร ระบบติดตามปัญหา เครื่องมือพัฒนา และอื่น ๆ
 - **การกำหนดเส้นทางเจตนาด้วยเสียง** แยกการป้อนตามคำบอก การแก้ไขข้อความที่เลือก การแปล Ask Anything และคำสั่งเสียงที่รองรับในภาษาอังกฤษ จีนตัวย่อ และจีนตัวเต็ม
@@ -47,7 +51,7 @@
 
 | การปรับข้อความด้วย AI ตามแอป | พจนานุกรมและการแก้ไขในเครื่อง |
 | --- | --- |
-| <img src="docs/images/v1.1.49-app-aware-polish.jpg" width="420" alt="การปรับข้อความด้วย AI ตามแอปใน OpenTypeless v1.1.49" /> | <img src="docs/images/v1.1.49-dictionary.jpg" width="420" alt="พจนานุกรมและการแก้ไขในเครื่องของ OpenTypeless v1.1.49" /> |
+| <img src="docs/images/v1.1.49-app-aware-polish.jpg" width="420" alt="การปรับข้อความด้วย AI ตามแอปใน OpenTypeless inherited upstream" /> | <img src="docs/images/v1.1.49-dictionary.jpg" width="420" alt="พจนานุกรมและการแก้ไขในเครื่องของ OpenTypeless inherited upstream" /> |
 
 <details>
 <summary>ดูภาพหน้าจอเพิ่มเติม</summary>
@@ -107,7 +111,7 @@
 
 ดาวน์โหลดเวอร์ชันล่าสุดสำหรับแพลตฟอร์มของคุณ:
 
-**[ดาวน์โหลดจาก Releases](https://github.com/tover0314-w/opentypeless/releases)**
+**[ดาวน์โหลดจาก Releases](https://github.com/rudy774/opentypeless/releases)**
 
 | แพลตฟอร์ม | ไฟล์ |
 |----------|------|
@@ -149,43 +153,11 @@ npm run tauri build
 
 API key ถูกเก็บไว้ภายในเครื่องผ่าน `tauri-plugin-store` ไม่มี key ใดถูกส่งไปยังเซิร์ฟเวอร์ OpenTypeless — คำขอ STT/LLM ทั้งหมดส่งตรงไปยังผู้ให้บริการที่คุณกำหนดค่า
 
-### ตัวเลือก Cloud (Pro)
+### Managed service status for this fork
 
-OpenTypeless ยังมีการสมัครสมาชิก Pro แบบเลือกได้ที่ให้โควตา STT และ LLM ที่จัดการให้ เพื่อที่คุณไม่ต้องมี API key ของตัวเอง นี่เป็นตัวเลือกทั้งหมด — แอปทำงานได้เต็มรูปแบบด้วย key ของคุณเอง
+This fork currently supports bring-your-own-key and local providers. It does not include a hosted paid service. Account, entitlement, checkout, backup, and managed transcription features remain disabled unless you build and operate a compatible backend yourself.
 
-[เรียนรู้เพิ่มเติมเกี่ยวกับ Pro](https://www.opentypeless.com)
-
-### BYOK (นำ Key มาเอง) เทียบกับ Cloud
-
-| | โหมด BYOK | โหมด Cloud (Pro) |
-|---|---|---|
-| STT | API key ของคุณ (Deepgram, AssemblyAI ฯลฯ) | โควตาที่จัดการให้ (10 ชม./เดือน) |
-| LLM | API key ของคุณ (OpenAI, DeepSeek ฯลฯ) | โควตาที่จัดการให้ (~5M token/เดือน) |
-| การพึ่งพา cloud | ไม่มี — คำขอทั้งหมดส่งตรงไปยังผู้ให้บริการของคุณ | ต้องเชื่อมต่อกับ www.opentypeless.com |
-| ค่าใช้จ่าย | ชำระโดยตรงกับผู้ให้บริการ | สมัครสมาชิก $4.99/เดือน |
-
-คุณสมบัติหลักทั้งหมด — การบันทึกเสียง, การถอดเสียง, AI polish, ส่งออกแป้นพิมพ์/คลิปบอร์ด, พจนานุกรม, ประวัติ — ทำงานได้อย่างสมบูรณ์โดยไม่ต้องพึ่งเซิร์ฟเวอร์ OpenTypeless ในโหมด BYOK
-
-### โฮสต์เอง / ไม่ใช้ Cloud
-
-เพื่อใช้งาน OpenTypeless โดยไม่พึ่งพา cloud:
-
-1. เลือกผู้ให้บริการ STT และ LLM ที่ไม่ใช่ Cloud ในการตั้งค่า
-2. ป้อน API key ของคุณเอง
-3. แค่นั้นเอง — ไม่ต้องมีบัญชีหรือการเชื่อมต่ออินเทอร์เน็ตกับ www.opentypeless.com
-
-หากคุณต้องการชี้คุณสมบัติ cloud เสริมไปยัง backend ของคุณเอง ให้ตั้งค่าตัวแปรสภาพแวดล้อมเหล่านี้ก่อนสร้าง:
-
-| ตัวแปร | ค่าเริ่มต้น | คำอธิบาย |
-|---|---|---|
-| `VITE_API_BASE_URL` | `https://www.opentypeless.com` | URL ฐาน API cloud สำหรับ frontend |
-| `API_BASE_URL` | `https://www.opentypeless.com` | URL ฐาน API cloud สำหรับ Rust backend |
-
-```bash
-# ตัวอย่าง: สร้างด้วย backend กำหนดเอง
-VITE_API_BASE_URL=https://my-server.example.com API_BASE_URL=https://my-server.example.com npm run tauri build
-```
-
+A self-hosted managed backend must be configured explicitly at build time with both `VITE_MANAGED_API_BASE_URL` and `OPENTYPELESS_MANAGED_API_BASE_URL`. There is no production default. Both values must be the same owned HTTPS origin; see `docs/MANAGED_SERVICE_API.md` and `docs/COMMERCIALIZATION.md`.
 ## สถาปัตยกรรม
 
 **ไปป์ไลน์การไหลของข้อมูล:**
@@ -237,9 +209,8 @@ STT รองรับ 99+ ภาษา ขึ้นอยู่กับผู�
 
 ## ชุมชน
 
-- 💬 [Discord](https://discord.gg/V6rRpJ4RGD) — แชท, รับความช่วยเหลือ, แบ่งปันความคิดเห็น
-- 🗣️ [GitHub Discussions](https://github.com/tover0314-w/opentypeless/discussions) — เสนอคุณสมบัติ, ถาม-ตอบ
-- 🐛 [Issue Tracker](https://github.com/tover0314-w/opentypeless/issues) — รายงานบั๊กและคำร้องขอคุณสมบัติ
+- 🗣️ [GitHub Discussions](https://github.com/rudy774/opentypeless/discussions) — เสนอคุณสมบัติ, ถาม-ตอบ
+- 🐛 [Issue Tracker](https://github.com/rudy774/opentypeless/issues) — รายงานบั๊กและคำร้องขอคุณสมบัติ
 - 📖 [คู่มือการมีส่วนร่วม](CONTRIBUTING.md) — การตั้งค่าสำหรับพัฒนาและแนวทาง
 - 🔒 [นโยบายความปลอดภัย](SECURITY.md) — รายงานช่องโหว่อย่างรับผิดชอบ
 - 🧭 [วิสัยทัศน์](VISION.md) — หลักการโครงการและทิศทางแผนงาน
@@ -248,15 +219,15 @@ STT รองรับ 99+ ภาษา ขึ้นอยู่กับผู�
 
 ยินดีต้อนรับทุกการมีส่วนร่วม! ดู [CONTRIBUTING.md](CONTRIBUTING.md) สำหรับการตั้งค่าสำหรับพัฒนาและแนวทาง
 
-กำลังหาจุดเริ่มต้น? ดู issue ที่ติดป้าย [`good first issue`](https://github.com/tover0314-w/opentypeless/labels/good%20first%20issue)
+กำลังหาจุดเริ่มต้น? ดู issue ที่ติดป้าย [`good first issue`](https://github.com/rudy774/opentypeless/labels/good%20first%20issue)
 
 ## ประวัติ Star
 
-<a href="https://star-history.com/#tover0314-w/opentypeless&Date">
+<a href="https://star-history.com/#rudy774/opentypeless&Date">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=tover0314-w/opentypeless&type=Date&theme=dark" />
-    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=tover0314-w/opentypeless&type=Date" />
-    <img alt="แผนภูมิประวัติ Star" src="https://api.star-history.com/svg?repos=tover0314-w/opentypeless&type=Date" />
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=rudy774/opentypeless&type=Date&theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=rudy774/opentypeless&type=Date" />
+    <img alt="แผนภูมิประวัติ Star" src="https://api.star-history.com/svg?repos=rudy774/opentypeless&type=Date" />
   </picture>
 </a>
 

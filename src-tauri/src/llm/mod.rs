@@ -88,8 +88,87 @@ pub trait LlmProvider: Send + Sync {
     fn name(&self) -> &str;
 }
 
+pub const OLLAMA_PROVIDER: &str = "ollama";
+
+const SUPPORTED_LLM_PROVIDERS: &[&str] = &[
+    "zhipu",
+    "deepseek",
+    "siliconflow",
+    "openai",
+    "gemini",
+    "google-gemini",
+    "moonshot",
+    "doubao",
+    "qwen",
+    "groq",
+    "claude",
+    "openrouter",
+    OLLAMA_PROVIDER,
+    "cloud",
+];
+
+pub fn supported_provider(provider: &str) -> bool {
+    SUPPORTED_LLM_PROVIDERS.contains(&provider.trim())
+}
+
+pub fn validate_provider_base_url(provider: &str, base_url: &str) -> Result<(), String> {
+    let provider = provider.trim();
+    let base_url = base_url.trim();
+    if !supported_provider(provider) {
+        return Err("Unsupported LLM provider".to_string());
+    }
+
+    if provider == "cloud" {
+        let expected = format!("{}/api/proxy", crate::api_base_url());
+        return (base_url.trim_end_matches('/') == expected)
+            .then_some(())
+            .ok_or_else(|| "Managed cloud endpoint does not match this build".to_string());
+    }
+
+    if provider.eq_ignore_ascii_case(OLLAMA_PROVIDER) {
+        return validate_loopback_ollama_base_url(base_url);
+    }
+
+    validate_explicit_keyed_base_url(base_url)
+}
+
+fn parse_url_without_secret_surfaces(base_url: &str, label: &str) -> Result<url::Url, String> {
+    let parsed = url::Url::parse(base_url).map_err(|_| format!("{label} is invalid"))?;
+    if !parsed.username().is_empty()
+        || parsed.password().is_some()
+        || parsed.query().is_some()
+        || parsed.fragment().is_some()
+    {
+        return Err(format!(
+            "{label} cannot contain credentials, a query, or a fragment"
+        ));
+    }
+    Ok(parsed)
+}
+
+fn validate_explicit_keyed_base_url(base_url: &str) -> Result<(), String> {
+    let parsed = parse_url_without_secret_surfaces(base_url, "LLM base URL")?;
+    if parsed.scheme() != "https" || parsed.host_str().is_none() {
+        return Err("LLM base URL must use HTTPS".to_string());
+    }
+    Ok(())
+}
+
+fn validate_loopback_ollama_base_url(base_url: &str) -> Result<(), String> {
+    let parsed = parse_url_without_secret_surfaces(base_url, "Ollama base URL")?;
+    let is_loopback = match parsed.host() {
+        Some(url::Host::Domain(host)) => host.eq_ignore_ascii_case("localhost"),
+        Some(url::Host::Ipv4(address)) => address.is_loopback(),
+        Some(url::Host::Ipv6(address)) => address.is_loopback(),
+        None => false,
+    };
+    if !matches!(parsed.scheme(), "http" | "https") || !is_loopback {
+        return Err("Ollama base URL must be an HTTP(S) loopback URL".to_string());
+    }
+    Ok(())
+}
 pub fn provider_requires_api_key(provider: &str) -> bool {
-    !matches!(provider.trim().to_ascii_lowercase().as_str(), "ollama")
+    !provider.trim().eq_ignore_ascii_case(OLLAMA_PROVIDER)
 }
 
 pub fn has_usable_provider_credentials(provider: &str, api_key: &str) -> bool {
@@ -140,6 +219,47 @@ mod provider_capability_tests {
         assert!(!has_usable_provider_credentials("openai", ""));
         assert!(!has_usable_provider_credentials("openai", "   "));
         assert!(has_usable_provider_credentials("openai", "sk-test"));
+    }
+
+    #[test]
+    fn keyed_providers_allow_explicit_https_bases_without_secret_surfaces() {
+        for provider in ["openai", "gemini"] {
+            assert!(validate_provider_base_url(provider, "https://proxy.example/v1").is_ok());
+            for unsafe_url in [
+                "http://proxy.example/v1",
+                "https://user:secret@proxy.example/v1",
+                "https://proxy.example/v1?api_key=secret",
+                "https://proxy.example/v1#secret",
+            ] {
+                assert!(
+                    validate_provider_base_url(provider, unsafe_url).is_err(),
+                    "{provider}: {unsafe_url}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn ollama_is_limited_to_safe_loopback_urls() {
+        for safe in [
+            "http://localhost:11434/v1",
+            "http://127.0.0.1:11434/v1",
+            "http://[::1]:11434/v1",
+        ] {
+            assert!(validate_provider_base_url("ollama", safe).is_ok(), "{safe}");
+        }
+        for unsafe_url in [
+            "http://192.168.1.20:11434/v1",
+            "https://ollama.example/v1",
+            "http://user:secret@localhost:11434/v1",
+            "http://localhost:11434/v1?token=secret",
+            "http://localhost:11434/v1#secret",
+        ] {
+            assert!(
+                validate_provider_base_url("ollama", unsafe_url).is_err(),
+                "{unsafe_url}"
+            );
+        }
     }
 }
 

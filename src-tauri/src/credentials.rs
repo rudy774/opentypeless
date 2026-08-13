@@ -268,6 +268,10 @@ pub fn resolve_stt_config_secret<V: CredentialSecretReader>(
     vault: &V,
 ) -> Result<String> {
     let provider = stt_credential_provider(config);
+    if provider == crate::stt::config::CUSTOM_WHISPER_PROVIDER {
+        crate::stt::config::normalize_custom_whisper_endpoint(&config.stt_custom_base_url)
+            .map_err(anyhow::Error::msg)?;
+    }
     let legacy_secret = if provider == crate::stt::config::CUSTOM_WHISPER_PROVIDER {
         &config.stt_custom_api_key
     } else {
@@ -281,6 +285,8 @@ pub fn resolve_llm_config_secret<V: CredentialSecretReader>(
     config: &AppConfig,
     vault: &V,
 ) -> Result<String> {
+    crate::llm::validate_provider_base_url(&config.llm_provider, &config.llm_base_url)
+        .map_err(anyhow::Error::msg)?;
     resolve_config_secret(&config.llm_api_key, "llm", &config.llm_provider, vault)
 }
 
@@ -542,5 +548,47 @@ mod tests {
         let secret = resolve_llm_config_secret(&config, &vault).unwrap();
 
         assert_eq!(secret, "llm-secret");
+    }
+
+    #[test]
+    fn rejects_unsafe_llm_endpoint_before_reading_vault() {
+        struct PanicVault;
+
+        impl CredentialSecretReader for PanicVault {
+            fn get_secret(&self, _namespace: &str, _provider: &str) -> Result<Option<String>> {
+                panic!("vault must not be read for an unsafe LLM endpoint");
+            }
+        }
+
+        let config = AppConfig {
+            llm_provider: "gemini".to_string(),
+            llm_base_url: "http://attacker.example/v1beta/openai".to_string(),
+            ..AppConfig::default()
+        };
+
+        let error = resolve_llm_config_secret(&config, &PanicVault).unwrap_err();
+
+        assert!(error.to_string().contains("HTTPS"));
+    }
+
+    #[test]
+    fn rejects_unsafe_custom_stt_endpoint_before_reading_vault() {
+        struct PanicVault;
+
+        impl CredentialSecretReader for PanicVault {
+            fn get_secret(&self, _namespace: &str, _provider: &str) -> Result<Option<String>> {
+                panic!("vault must not be read for an unsafe custom STT endpoint");
+            }
+        }
+
+        let config = AppConfig {
+            stt_provider: crate::stt::config::CUSTOM_WHISPER_PROVIDER.to_string(),
+            stt_custom_base_url: "http://192.168.1.20:8080/v1".to_string(),
+            ..AppConfig::default()
+        };
+
+        let error = resolve_stt_config_secret(&config, &PanicVault).unwrap_err();
+
+        assert!(error.to_string().contains("HTTPS"));
     }
 }

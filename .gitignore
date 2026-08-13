@@ -56,4 +56,7 @@ jelly-reference*.png
 docs/superpowers/
 
 # Local isolated worktrees
+
+# Generated from local commercial identity values; never commit it.
+src-tauri/tauri.commercial.generated.json
 .worktrees/

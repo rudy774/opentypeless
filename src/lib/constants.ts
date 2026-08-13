@@ -16,11 +16,48 @@ export const APP_NAME = 'OpenTypeless'
 export const APP_VERSION = import.meta.env.VITE_APP_VERSION ?? 'v0.1.42'
 export const CLIENT_VERSION_HEADER = 'X-OpenTypeless-Version'
 export const APP_VERSION_HEADER_VALUE = APP_VERSION.replace(/^v/i, '')
-export const APP_REPO_URL = 'https://github.com/tover0314-w/opentypeless'
-export const APP_LICENSE_URL = 'https://github.com/tover0314-w/opentypeless/blob/main/LICENSE'
-// Cloud API base URL — defaults to www.opentypeless.com but can be overridden via VITE_API_BASE_URL env var.
-// All core features (BYOK mode) work without any cloud connection.
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'https://www.opentypeless.com'
+export const APP_DEEP_LINK_SCHEME = (
+  import.meta.env.VITE_APP_DEEP_LINK_SCHEME ?? 'rudyopentypeless'
+)
+  .trim()
+  .toLowerCase()
+export const APP_REPO_URL = 'https://github.com/rudy774/opentypeless'
+export const APP_LICENSE_URL = `${APP_REPO_URL}/blob/main/LICENSE`
+// Managed service access is opt-in at build time. A source build has no
+// managed endpoint and remains fully usable with BYOK or local providers.
+function normalizeManagedApiOrigin(value: string | undefined): string | null {
+  const normalized = value?.trim()
+  if (!normalized) return null
+
+  try {
+    const parsed = new URL(normalized)
+    const hostname = parsed.hostname.replace(/\.$/, '').toLowerCase()
+    if (
+      parsed.protocol !== 'https:' ||
+      parsed.username.length > 0 ||
+      parsed.password.length > 0 ||
+      parsed.pathname !== '/' ||
+      parsed.search.length > 0 ||
+      parsed.hash.length > 0 ||
+      hostname === 'opentypeless.com' ||
+      hostname.endsWith('.opentypeless.com')
+    ) {
+      return null
+    }
+
+    return parsed.origin
+  } catch {
+    return null
+  }
+}
+
+const configuredManagedApiBaseUrl = normalizeManagedApiOrigin(
+  import.meta.env.VITE_MANAGED_API_BASE_URL,
+)
+
+export const MANAGED_SERVICE_CONFIGURED = configuredManagedApiBaseUrl !== null
+export const API_BASE_URL =
+  configuredManagedApiBaseUrl ?? 'https://managed-service-unconfigured.invalid'
 
 export const FREE_PLAN = {
   sttMinutes: 15,
@@ -29,53 +66,28 @@ export const FREE_PLAN = {
 
 export type CheckoutProduct = 'pro_monthly' | 'lifetime_starter'
 
-const CLOUD_PLAN_BENEFITS = [
+export const CLOUD_PLAN_BENEFITS = [
   { labelKey: 'upgrade.benefits.cloudWords' },
   { labelKey: 'upgrade.benefits.noApiKey' },
   { labelKey: 'upgrade.benefits.backupScenes' },
 ] as const
 
-type CloudPlanBenefit = (typeof CLOUD_PLAN_BENEFITS)[number]
-
-export type CheckoutPlan = {
-  product: CheckoutProduct
-  nameKey: string
-  descriptionKey: string
-  badgeKey?: string
-  sublineKey?: string
-  price: string
-  upgradePrice?: string
-  upgradeSublineKey?: string
-  periodKey: string
-  ctaKey: string
-  benefits: readonly CloudPlanBenefit[]
+export const CHECKOUT_PRODUCT_COPY: Record<
+  CheckoutProduct,
+  {
+    descriptionKey: string
+    ctaKey: string
+  }
+> = {
+  pro_monthly: {
+    descriptionKey: 'upgrade.planDescriptions.pro',
+    ctaKey: 'upgrade.subscribeToPro',
+  },
+  lifetime_starter: {
+    descriptionKey: 'upgrade.planDescriptions.lifetime',
+    ctaKey: 'upgrade.buyLifetime',
+  },
 }
-
-export const PRO_PLAN = {
-  product: 'pro_monthly',
-  nameKey: 'upgrade.pro',
-  descriptionKey: 'upgrade.planDescriptions.pro',
-  price: '$4.99',
-  periodKey: 'upgrade.month',
-  ctaKey: 'upgrade.subscribeToPro',
-  benefits: CLOUD_PLAN_BENEFITS,
-} satisfies CheckoutPlan
-
-export const LIFETIME_PLAN = {
-  product: 'lifetime_starter',
-  nameKey: 'upgrade.lifetime',
-  descriptionKey: 'upgrade.planDescriptions.lifetime',
-  badgeKey: 'upgrade.lifetimeBadge',
-  sublineKey: 'upgrade.lifetimeSave',
-  price: '$89.99',
-  upgradePrice: '$84.99',
-  upgradeSublineKey: 'upgrade.lifetimeUpgradeSave',
-  periodKey: 'upgrade.oneTime',
-  ctaKey: 'upgrade.buyLifetime',
-  benefits: CLOUD_PLAN_BENEFITS,
-} satisfies CheckoutPlan
-
-export const CHECKOUT_PLANS: CheckoutPlan[] = [PRO_PLAN, LIFETIME_PLAN]
 
 export const DEFAULT_CHECKOUT_PRODUCT: CheckoutProduct = 'pro_monthly'
 

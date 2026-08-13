@@ -16,6 +16,7 @@ import {
   setCorrectionRuleEnabled,
   updateCorrectionRule,
   updateDictionaryEntry,
+  validateBackupData,
   waitForAccessibilityPermission,
 } from '../tauri'
 
@@ -191,6 +192,16 @@ describe('backup commands', () => {
     vi.clearAllMocks()
   })
 
+  it('validates backup sections through the native no-mutation command', async () => {
+    vi.mocked(invoke).mockResolvedValueOnce(undefined)
+    const history = [{ raw_text: 'hello' }]
+    const dictionary = { entries: [], correction_rules: [] }
+
+    await expect(validateBackupData(history, dictionary)).resolves.toBeUndefined()
+
+    expect(invoke).toHaveBeenCalledWith('validate_backup_data', { history, dictionary })
+  })
+
   it('requests a fresh persisted backup snapshot from Tauri', async () => {
     const snapshot = {
       history: [],
@@ -233,17 +244,25 @@ describe('history commands', () => {
       savedTranscriptions: 3,
       outputChars: 420,
       activeDays: 1,
+      successfulAutomaticInsertions: 1,
       recordedFallbacks: 1,
+      recordedFailures: 1,
+      outputOutcomeSampleCount: 3,
       transformedOutputs: 2,
+      validDurationSampleCount: 2,
       excludedDurationCount: 1,
       averageTotalMs: 850,
+      p50TotalMs: 800,
+      p95TotalMs: 900,
       timingSampleCount: 2,
+      excludedTimingCount: 1,
     }
     const summary = {
       day: range,
       week: range,
       month: range,
       totalRecordings: 17,
+      validDurationSampleCount: 16,
       excludedDurationCount: 1,
     }
     vi.mocked(invoke).mockResolvedValueOnce(summary)

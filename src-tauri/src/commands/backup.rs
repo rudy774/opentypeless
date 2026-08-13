@@ -219,6 +219,65 @@ impl From<storage::BackupSnapshot> for ExportBackupDataResult {
     }
 }
 
+struct PreparedBackupPayload {
+    history: Option<Vec<HistoryEntry>>,
+    dictionary: Option<Vec<DictionaryEntry>>,
+    correction_rules: Option<Vec<CorrectionRule>>,
+    fallback_timestamp: String,
+}
+
+fn prepare_backup_payload(
+    history: Option<Vec<BackupHistoryEntry>>,
+    dictionary: Option<DictionaryBackupPayload>,
+) -> Result<PreparedBackupPayload, String> {
+    let fallback_timestamp = chrono::Local::now().format("%Y-%m-%dT%H:%M:%S").to_string();
+    let history = history
+        .map(|entries| {
+            if entries.len() > DEFAULT_HISTORY_MAX_ENTRIES as usize {
+                return Err("backup_history_too_large".to_string());
+            }
+            entries
+                .into_iter()
+                .map(|entry| entry.into_storage(&fallback_timestamp))
+                .collect::<Result<Vec<_>, _>>()
+        })
+        .transpose()?;
+    let (dictionary, correction_rules) = match dictionary {
+        Some(DictionaryBackupPayload::Legacy(entries)) => {
+            (Some(entries.into_iter().map(Into::into).collect()), None)
+        }
+        Some(DictionaryBackupPayload::Current {
+            entries,
+            correction_rules,
+        }) => (
+            Some(entries.into_iter().map(Into::into).collect()),
+            Some(correction_rules.into_iter().map(Into::into).collect()),
+        ),
+        None => (None, None),
+    };
+
+    Ok(PreparedBackupPayload {
+        history,
+        dictionary,
+        correction_rules,
+        fallback_timestamp,
+    })
+}
+
+#[tauri::command]
+pub async fn validate_backup_data(
+    history: Option<Vec<BackupHistoryEntry>>,
+    dictionary: Option<DictionaryBackupPayload>,
+) -> Result<(), String> {
+    let prepared = prepare_backup_payload(history, dictionary)?;
+    storage::validate_backup_restore_data(
+        prepared.history.as_deref(),
+        prepared.dictionary.as_deref(),
+        prepared.correction_rules.as_deref(),
+    )
+    .map_err(|error| error.to_string())
+}
+
 #[tauri::command]
 pub async fn export_backup_data(
     history_state: tauri::State<'_, storage::HistoryStore>,
@@ -246,61 +305,46 @@ pub async fn restore_backup_data(
     history: Option<Vec<BackupHistoryEntry>>,
     dictionary: Option<DictionaryBackupPayload>,
 ) -> Result<RestoreBackupResult, String> {
-    let fallback_timestamp = chrono::Local::now().format("%Y-%m-%dT%H:%M:%S").to_string();
-    let history = history
-        .map(|entries| {
-            if entries.len() > DEFAULT_HISTORY_MAX_ENTRIES as usize {
-                return Err("backup_history_too_large".to_string());
-            }
-            entries
-                .into_iter()
-                .map(|entry| entry.into_storage(&fallback_timestamp))
-                .collect::<Result<Vec<_>, _>>()
-        })
-        .transpose()?;
-    let (dictionary, correction_rules) = match dictionary {
-        Some(DictionaryBackupPayload::Legacy(entries)) => {
-            (Some(entries.into_iter().map(Into::into).collect()), None)
-        }
-        Some(DictionaryBackupPayload::Current {
-            entries,
-            correction_rules,
-        }) => (
-            Some(entries.into_iter().map(Into::into).collect()),
-            Some(correction_rules.into_iter().map(Into::into).collect()),
-        ),
-        None => (None, None),
-    };
+    let prepared = prepare_backup_payload(history, dictionary)?;
+    storage::validate_backup_restore_data(
+        prepared.history.as_deref(),
+        prepared.dictionary.as_deref(),
+        prepared.correction_rules.as_deref(),
+    )
+    .map_err(|error| error.to_string())?;
+
     let policy = config_state
         .load()
         .await
-        .map_err(|error| error.to_string())?
-        .history_retention_policy();
+        .map_err(|error| error.to_string())?;
 
     history_state
         .restore_backup_data(
-            history,
-            dictionary,
-            correction_rules,
-            &policy,
-            &fallback_timestamp,
+            prepared.history,
+            prepared.dictionary,
+            prepared.correction_rules,
+            &policy.history_retention_policy(),
+            &prepared.fallback_timestamp,
         )
         .await
-        .map_err(|error| error.to_string())?;
+        .map_err(|error| format!("backup_restore_not_committed:{error}"))?;
 
+    // The write transaction has committed at this point. Distinguish a rare
+    // refresh/read failure so the UI does not roll settings back while leaving
+    // the newly restored database in place.
     Ok(RestoreBackupResult {
         history: history_state
             .list(DEFAULT_HISTORY_MAX_ENTRIES, 0)
             .await
-            .map_err(|error| error.to_string())?,
+            .map_err(|error| format!("backup_restore_committed_refresh_failed:{error}"))?,
         dictionary: dictionary_state
             .list()
             .await
-            .map_err(|error| error.to_string())?,
+            .map_err(|error| format!("backup_restore_committed_refresh_failed:{error}"))?,
         correction_rules: dictionary_state
             .correction_rules()
             .await
-            .map_err(|error| error.to_string())?,
+            .map_err(|error| format!("backup_restore_committed_refresh_failed:{error}"))?,
     })
 }
 
@@ -417,6 +461,27 @@ mod tests {
         assert_eq!(entries.len(), 1);
         assert_eq!(correction_rules.len(), 1);
         assert!(!correction_rules[0].enabled);
+    }
+
+    #[test]
+    fn validation_only_path_reuses_restore_dictionary_validators() {
+        let dictionary = DictionaryBackupPayload::Current {
+            entries: vec![BackupDictionaryEntry {
+                word: "x".repeat(101),
+                pronunciation: None,
+            }],
+            correction_rules: Vec::new(),
+        };
+        let prepared = prepare_backup_payload(None, Some(dictionary)).unwrap();
+
+        let error = storage::validate_backup_restore_data(
+            prepared.history.as_deref(),
+            prepared.dictionary.as_deref(),
+            prepared.correction_rules.as_deref(),
+        )
+        .unwrap_err();
+
+        assert_eq!(error.to_string(), "dictionary_word_too_long");
     }
 
     #[test]

@@ -1,8 +1,16 @@
 use crate::credentials::{resolve_config_secret, SystemCredentialVault};
+use crate::managed_service::SubscriptionStatus;
 use crate::stt;
 use crate::stt::SttProvider;
 use crate::SessionTokenStore;
 use crate::{api_base_url, with_desktop_client_version};
+
+const STT_REQUEST_PREPARATION_ERROR: &str = "Could not prepare the STT connection check";
+const STT_PROVIDER_NETWORK_ERROR: &str = "STT provider network request failed";
+
+fn sanitized_reqwest_error(message: &'static str, _error: reqwest::Error) -> String {
+    message.to_string()
+}
 
 fn build_upload_test_request(
     client: &reqwest::Client,
@@ -15,7 +23,7 @@ fn build_upload_test_request(
     let file_part = reqwest::multipart::Part::bytes(wav)
         .file_name("test.wav")
         .mime_str("audio/wav")
-        .map_err(|e| e.to_string())?;
+        .map_err(|error| sanitized_reqwest_error(STT_REQUEST_PREPARATION_ERROR, error))?;
     let mut form = reqwest::multipart::Form::new()
         .text(cfg.model_field, cfg.model.clone())
         .part("file", file_part);
@@ -51,34 +59,12 @@ async fn check_volcengine_doubao_connection(
         resource_id,
         operation_id: None,
     };
-    provider.connect(&config).await.map_err(|e| e.to_string())?;
+    provider
+        .connect(&config)
+        .await
+        .map_err(|_| STT_PROVIDER_NETWORK_ERROR.to_string())?;
     let _ = provider.disconnect().await;
     Ok(())
-}
-
-fn has_managed_cloud_access(body: &serde_json::Value) -> bool {
-    if matches!(
-        body["licenseStatus"].as_str(),
-        Some("refunded") | Some("deactivated")
-    ) {
-        return false;
-    }
-
-    let source = body["source"].as_str().unwrap_or_default();
-    let plan = body["plan"].as_str().unwrap_or_default();
-    let cloud_words_limit = body["cloudWordsLimit"].as_i64().unwrap_or_default();
-    let display_words_limit = body["displayWordsLimit"].as_i64().unwrap_or_default();
-    if source == "appsumo" {
-        return cloud_words_limit > 0 && body["licenseStatus"].as_str() == Some("active");
-    }
-    if source == "lifetime" {
-        return cloud_words_limit > 0 || display_words_limit > 0 || plan == "lifetime_starter";
-    }
-    if source == "creem" && (cloud_words_limit > 0 || display_words_limit > 0) {
-        return true;
-    }
-
-    matches!(plan, "pro" | "lifetime_starter")
 }
 
 fn resolve_whisper_test_config(
@@ -95,6 +81,20 @@ fn resolve_whisper_test_config(
 
     stt::config::build_known_whisper_config(provider)
         .ok_or_else(|| format!("Unknown STT provider: {}", provider))
+}
+
+fn validate_custom_whisper_target_before_secret(
+    provider: &str,
+    custom_base_url: Option<&str>,
+    custom_model: Option<&str>,
+) -> Result<(), String> {
+    if provider == stt::config::CUSTOM_WHISPER_PROVIDER {
+        stt::config::build_custom_whisper_config(
+            custom_base_url.unwrap_or_default(),
+            custom_model.unwrap_or_default(),
+        )?;
+    }
+    Ok(())
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
@@ -210,16 +210,26 @@ fn build_stt_provider_diagnostics(
                 "No STT provider selected",
             )],
         },
-        "cloud" => SttProviderDiagnostics {
-            provider: provider.to_string(),
-            kind: "cloudManaged".to_string(),
-            endpoint: None,
-            model: None,
-            requires_api_key: false,
-            api_key_configured: false,
-            ready: true,
-            issues: Vec::new(),
-        },
+        "cloud" => {
+            let ready = crate::managed_service_configured();
+            SttProviderDiagnostics {
+                provider: provider.to_string(),
+                kind: "cloudManaged".to_string(),
+                endpoint: ready.then(crate::api_base_url),
+                model: None,
+                requires_api_key: false,
+                api_key_configured: false,
+                ready,
+                issues: if ready {
+                    Vec::new()
+                } else {
+                    vec![diagnostic_issue(
+                        "managed_service_unconfigured",
+                        "Managed service is not configured in this build; choose a BYOK or local provider.",
+                    )]
+                },
+            }
+        }
         stt::config::APPLE_SPEECH_PROVIDER => build_apple_speech_diagnostics(
             provider,
             stt::apple_speech::apple_speech_availability(None),
@@ -284,7 +294,7 @@ async fn check_openai_whisper_model(client: &reqwest::Client, api_key: &str) -> 
         .timeout(std::time::Duration::from_secs(10))
         .send()
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|error| sanitized_reqwest_error(STT_PROVIDER_NETWORK_ERROR, error))?;
 
     if !resp.status().is_success() {
         return Err(format!("HTTP {}", resp.status()));
@@ -300,6 +310,11 @@ pub fn get_stt_provider_diagnostics(
     custom_base_url: Option<String>,
     custom_model: Option<String>,
 ) -> Result<SttProviderDiagnostics, String> {
+    validate_custom_whisper_target_before_secret(
+        &provider,
+        custom_base_url.as_deref(),
+        custom_model.as_deref(),
+    )?;
     let resolved_api_key = if provider == "cloud" {
         String::new()
     } else {
@@ -331,6 +346,9 @@ pub async fn test_stt_connection(
 
     // Cloud provider: verify session token + managed cloud entitlement via API.
     if provider == "cloud" {
+        if !crate::managed_service_configured() {
+            return Err(crate::managed_service_unconfigured_error().to_string());
+        }
         let token = token_store
             .0
             .lock()
@@ -347,14 +365,22 @@ pub async fn test_stt_connection(
         .timeout(std::time::Duration::from_secs(10))
         .send()
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|error| sanitized_reqwest_error(STT_PROVIDER_NETWORK_ERROR, error))?;
         if !resp.status().is_success() {
             return Ok(false);
         }
-        let body: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
-        return Ok(has_managed_cloud_access(&body));
+        let status: SubscriptionStatus = resp
+            .json()
+            .await
+            .map_err(|_| "Managed service returned an invalid subscription status".to_string())?;
+        return Ok(status.has_cloud_access());
     }
 
+    validate_custom_whisper_target_before_secret(
+        &provider,
+        custom_base_url.as_deref(),
+        custom_model.as_deref(),
+    )?;
     let api_key = resolve_config_secret(&api_key, "stt", &provider, &SystemCredentialVault)
         .map_err(|e| e.to_string())?;
 
@@ -370,7 +396,7 @@ pub async fn test_stt_connection(
                 .timeout(std::time::Duration::from_secs(10))
                 .send()
                 .await
-                .map_err(|e| e.to_string())?;
+                .map_err(|error| sanitized_reqwest_error(STT_PROVIDER_NETWORK_ERROR, error))?;
             Ok(resp.status().is_success())
         }
         "assemblyai" => {
@@ -380,7 +406,7 @@ pub async fn test_stt_connection(
                 .timeout(std::time::Duration::from_secs(10))
                 .send()
                 .await
-                .map_err(|e| e.to_string())?;
+                .map_err(|error| sanitized_reqwest_error(STT_PROVIDER_NETWORK_ERROR, error))?;
             Ok(resp.status().is_success())
         }
         stt::volcengine::VOLCENGINE_DOUBAO_PROVIDER => Ok(check_volcengine_doubao_connection(
@@ -403,7 +429,7 @@ pub async fn test_stt_connection(
             let resp = build_upload_test_request(&client, &cfg, &api_key)?
                 .send()
                 .await
-                .map_err(|e| e.to_string())?;
+                .map_err(|error| sanitized_reqwest_error(STT_PROVIDER_NETWORK_ERROR, error))?;
             Ok(resp.status().is_success())
         }
     }
@@ -535,46 +561,31 @@ mod tests {
     }
 
     #[test]
-    fn managed_cloud_access_requires_active_appsumo_license() {
-        let active = serde_json::json!({
-            "plan": "appsumo_tier1",
-            "source": "appsumo",
-            "cloudWordsLimit": 200000,
-            "licenseStatus": "active"
-        });
-        let pending = serde_json::json!({
-            "plan": "appsumo_tier1",
-            "source": "appsumo",
-            "cloudWordsLimit": 200000,
-            "licenseStatus": "pending"
-        });
-        let missing = serde_json::json!({
-            "plan": "appsumo_tier1",
-            "source": "appsumo",
-            "cloudWordsLimit": 200000
-        });
-
-        assert!(has_managed_cloud_access(&active));
-        assert!(!has_managed_cloud_access(&pending));
-        assert!(!has_managed_cloud_access(&missing));
+    fn unconfigured_managed_cloud_diagnostics_fail_closed() {
+        if crate::managed_service_configured() {
+            return;
+        }
+        let diagnostics = build_stt_provider_diagnostics("cloud", "", None, None);
+        assert!(!diagnostics.ready);
+        assert_eq!(diagnostics.endpoint, None);
+        assert_eq!(diagnostics.issues[0].code, "managed_service_unconfigured");
     }
 
     #[test]
-    fn managed_cloud_access_allows_direct_lifetime_license() {
-        let lifetime_legacy_quota = serde_json::json!({
-            "plan": "lifetime_starter",
-            "source": "lifetime",
-            "cloudWordsLimit": 0,
-            "licenseStatus": "active"
-        });
-        let lifetime_cloud_words = serde_json::json!({
-            "plan": "lifetime_starter",
-            "source": "lifetime",
-            "cloudWordsLimit": 100000
-        });
+    fn reqwest_errors_never_echo_custom_url_credentials_or_query() {
+        let secret = "do-not-echo-this-token";
+        let hostile_url = format!("http://user:{secret}@[::1?api_key={secret}");
+        let source_error = reqwest::Client::new()
+            .get(hostile_url)
+            .build()
+            .expect_err("the hostile URL must be rejected");
 
-        assert!(has_managed_cloud_access(&lifetime_legacy_quota));
-        assert!(has_managed_cloud_access(&lifetime_cloud_words));
+        let message = sanitized_reqwest_error(STT_PROVIDER_NETWORK_ERROR, source_error);
+
+        assert_eq!(message, STT_PROVIDER_NETWORK_ERROR);
+        assert!(!message.contains(secret));
+        assert!(!message.contains("user:"));
+        assert!(!message.contains("api_key"));
     }
 }
 
@@ -593,6 +604,9 @@ pub async fn bench_stt_connection(
     }
 
     if provider == "cloud" {
+        if !crate::managed_service_configured() {
+            return Err(crate::managed_service_unconfigured_error().to_string());
+        }
         let token = token_store
             .0
             .lock()
@@ -610,18 +624,26 @@ pub async fn bench_stt_connection(
         .timeout(std::time::Duration::from_secs(10))
         .send()
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|error| sanitized_reqwest_error(STT_PROVIDER_NETWORK_ERROR, error))?;
         let elapsed = t0.elapsed().as_millis() as u32;
         if !resp.status().is_success() {
             return Err("Request failed".to_string());
         }
-        let body: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
-        if !has_managed_cloud_access(&body) {
+        let status: SubscriptionStatus = resp
+            .json()
+            .await
+            .map_err(|_| "Managed service returned an invalid subscription status".to_string())?;
+        if !status.has_cloud_access() {
             return Err("Cloud plan required".to_string());
         }
         return Ok(elapsed);
     }
 
+    validate_custom_whisper_target_before_secret(
+        &provider,
+        custom_base_url.as_deref(),
+        custom_model.as_deref(),
+    )?;
     let api_key = resolve_config_secret(&api_key, "stt", &provider, &SystemCredentialVault)
         .map_err(|e| e.to_string())?;
 
@@ -638,7 +660,7 @@ pub async fn bench_stt_connection(
                 .timeout(std::time::Duration::from_secs(10))
                 .send()
                 .await
-                .map_err(|e| e.to_string())?;
+                .map_err(|error| sanitized_reqwest_error(STT_PROVIDER_NETWORK_ERROR, error))?;
             let elapsed = t0.elapsed().as_millis() as u32;
             if !resp.status().is_success() {
                 return Err(format!("HTTP {}", resp.status()));
@@ -653,7 +675,7 @@ pub async fn bench_stt_connection(
                 .timeout(std::time::Duration::from_secs(10))
                 .send()
                 .await
-                .map_err(|e| e.to_string())?;
+                .map_err(|error| sanitized_reqwest_error(STT_PROVIDER_NETWORK_ERROR, error))?;
             let elapsed = t0.elapsed().as_millis() as u32;
             if !resp.status().is_success() {
                 return Err(format!("HTTP {}", resp.status()));
@@ -683,7 +705,7 @@ pub async fn bench_stt_connection(
             let resp = build_upload_test_request(&client, &cfg, &api_key)?
                 .send()
                 .await
-                .map_err(|e| e.to_string())?;
+                .map_err(|error| sanitized_reqwest_error(STT_PROVIDER_NETWORK_ERROR, error))?;
             let elapsed = t0.elapsed().as_millis() as u32;
             if !resp.status().is_success() {
                 return Err(format!("HTTP {}", resp.status()));

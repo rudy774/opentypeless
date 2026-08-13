@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
+import fs from 'node:fs'
+import path from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 
@@ -25,7 +27,14 @@ function ownedSnapshot() {
     rustRuntime:
       'pub const DEFAULT_API_BASE_URL: &str = "https://api.rudyproduct.invalid";\n' +
       '// Updater intentionally disabled until the release feed is owned.',
-    releaseAutomation: 'owner: rudy774\nrepo: rudyproduct',
+    releaseAutomation:
+      'owner: rudy774\nrepo: rudyproduct\nreleaseDraft: true\n' +
+      'verify-and-publish:\n  needs: [resolve-source, build]\n' +
+      "  unsafe_asset_pattern='unsigned-test'\n  Get-AuthenticodeSignature artifact\n" +
+      '  gh release edit "$RELEASE_TAG" --draft=false',
+    translatedDocumentCount: 1,
+    publicDocumentation:
+      '> [!IMPORTANT]\n> **Fork status:** Rudy fork; releases and support: https://github.com/rudy774/opentypeless',
   }
 }
 
@@ -62,6 +71,58 @@ test('rejects upstream runtime identity and updater wiring', () => {
   assert.ok(errors.some((error) => error.includes('release automation')))
 })
 
+test('rejects unsafe release bypasses and active upstream public routes', () => {
+  const snapshot = ownedSnapshot()
+  snapshot.releaseAutomation +=
+    '\nallow_unsigned_windows: true\nargs: --skip-stapling\nreleaseCommitish: main\n' +
+    'releaseDraft: false\nTAG_VERSION="${{ github.event.inputs.tag }}"\n' +
+    'node -e "p.version=\\"$VERSION\\""'
+  snapshot.publicDocumentation =
+    '> [!IMPORTANT]\n> **Fork status:** fork\n' +
+    '[Download](https://github.com/tover0314-w/opentypeless/releases)\n' +
+    '[Chat](https://discord.gg/example)\n' +
+    'Click **Run anyway** or run xattr -cr /Applications/OpenTypeless.app'
+
+  const errors = auditCommercialStaticSnapshot(snapshot)
+  assert.ok(errors.some((error) => error.includes('unsigned or notarization bypass')))
+  assert.ok(errors.some((error) => error.includes('publish its release directly')))
+  assert.ok(errors.some((error) => error.includes('mutable branch or interpolates tag data')))
+  assert.ok(errors.some((error) => error.includes('active upstream or Discord route')))
+  assert.ok(errors.some((error) => error.includes('bypass OS artifact verification')))
+})
+
+test('requires draft-only platform uploads and a guarded final publication job', () => {
+  const directPublish = ownedSnapshot()
+  directPublish.releaseAutomation = directPublish.releaseAutomation.replace(
+    'releaseDraft: true',
+    'releaseDraft: false',
+  )
+  assert.ok(
+    auditCommercialStaticSnapshot(directPublish).some((error) =>
+      error.includes('publish its release directly'),
+    ),
+  )
+
+  const missingGate = ownedSnapshot()
+  missingGate.releaseAutomation = 'owner: rudy774\nrepo: rudyproduct\nreleaseDraft: true'
+  const missingGateErrors = auditCommercialStaticSnapshot(missingGate)
+  assert.ok(missingGateErrors.some((error) => error.includes('final job')))
+  assert.ok(missingGateErrors.some((error) => error.includes('reject unsigned or test-labeled')))
+})
+
+test('requires exactly one fork-status banner per translated README', () => {
+  const snapshot = ownedSnapshot()
+  snapshot.translatedDocumentCount = 2
+
+  assert.ok(
+    auditCommercialStaticSnapshot(snapshot).some((error) =>
+      error.includes('Every translated README'),
+    ),
+  )
+
+  snapshot.publicDocumentation += '\n> [!IMPORTANT]\n> **Fork status:** second translated README'
+  assert.deepEqual(auditCommercialStaticSnapshot(snapshot), [])
+})
 test('strict CLI cannot be bypassed with plausible environment values', () => {
   const repositoryRoot = fileURLToPath(new URL('../', import.meta.url))
   const updaterPublicKey = 'R'.repeat(96)
@@ -84,6 +145,120 @@ test('strict CLI cannot be bypassed with plausible environment values', () => {
   })
 
   assert.equal(result.status, 1)
-  assert.match(result.stderr, /tauri\.conf\.json still uses the upstream application identifier/i)
+  assert.match(result.stderr, /VITE_MANAGED_API_BASE_URL is required/i)
   assert.doesNotMatch(result.stderr, new RegExp(updaterPublicKey))
+})
+
+test('rejects upstream managed origins with a trailing DNS dot', () => {
+  const repositoryRoot = fileURLToPath(new URL('../', import.meta.url))
+  const generatedRelativePath = 'src-tauri/tauri.commercial.generated.json'
+  const generatedPath = path.join(repositoryRoot, generatedRelativePath)
+  const env = {
+    ...process.env,
+    COMMERCIAL_BUILD: 'true',
+    COMMERCIAL_API_ORIGIN: 'https://api.opentypeless.com.',
+    VITE_MANAGED_API_BASE_URL: 'https://api.opentypeless.com.',
+    OPENTYPELESS_MANAGED_API_BASE_URL: 'https://api.opentypeless.com.',
+    COMMERCIAL_WEBSITE_URL: 'https://rudyproduct.test',
+    COMMERCIAL_REPOSITORY_URL: 'https://github.com/rudy774/opentypeless',
+    COMMERCIAL_SUPPORT_URL: 'https://github.com/rudy774/opentypeless/issues',
+    COMMERCIAL_PRIVACY_URL: 'https://rudyproduct.test/privacy',
+    COMMERCIAL_TERMS_URL: 'https://rudyproduct.test/terms',
+    COMMERCIAL_PRODUCT_NAME: 'Rudy Product',
+    COMMERCIAL_APP_IDENTIFIER: 'com.rudy774.rudyproduct',
+    COMMERCIAL_DEEP_LINK_SCHEME: 'rudyproduct',
+    VITE_APP_DEEP_LINK_SCHEME: 'rudyproduct',
+    COMMERCIAL_TAURI_CONFIG_PATH: generatedRelativePath,
+  }
+
+  try {
+    const generated = spawnSync(
+      process.execPath,
+      ['scripts/generate-commercial-tauri-config.mjs'],
+      { cwd: repositoryRoot, encoding: 'utf8', env },
+    )
+    assert.equal(generated.status, 1)
+    assert.match(generated.stderr, /must not use the upstream OpenTypeless service/i)
+
+    const checked = spawnSync(process.execPath, ['scripts/check-commercial-release.mjs'], {
+      cwd: repositoryRoot,
+      encoding: 'utf8',
+      env,
+    })
+    assert.equal(checked.status, 1)
+    assert.match(checked.stderr, /upstream OpenTypeless default/i)
+  } finally {
+    fs.rmSync(generatedPath, { force: true })
+  }
+})
+test('legacy source identity is allowed only with an owned commercial overlay', () => {
+  const snapshot = ownedSnapshot()
+  snapshot.tauriConfig.identifier = 'com.opentypeless.app'
+  snapshot.allowLegacyBaseIdentifier = true
+  snapshot.commercialTauriConfig = {
+    identifier: 'com.rudy774.rudyproduct',
+    app: { security: { csp: 'connect-src https://api.rudyproduct.invalid' } },
+    plugins: { 'deep-link': { desktop: { schemes: ['rudyproduct'] } } },
+    bundle: { createUpdaterArtifacts: false },
+  }
+
+  assert.deepEqual(auditCommercialStaticSnapshot(snapshot), [])
+
+  snapshot.commercialTauriConfig.identifier = 'com.opentypeless.app'
+  assert.ok(
+    auditCommercialStaticSnapshot(snapshot).some((error) =>
+      error.includes('Generated commercial Tauri configuration uses the upstream identifier'),
+    ),
+  )
+})
+
+test('strict CLI passes with a generated owned overlay and matching build origins', () => {
+  const repositoryRoot = fileURLToPath(new URL('../', import.meta.url))
+  const generatedRelativePath = 'src-tauri/tauri.commercial.generated.json'
+  const generatedPath = path.join(repositoryRoot, generatedRelativePath)
+  const env = {
+    ...process.env,
+    COMMERCIAL_BUILD: 'true',
+    COMMERCIAL_API_ORIGIN: 'https://api.rudyproduct.test',
+    VITE_MANAGED_API_BASE_URL: 'https://api.rudyproduct.test',
+    OPENTYPELESS_MANAGED_API_BASE_URL: 'https://api.rudyproduct.test',
+    COMMERCIAL_WEBSITE_URL: 'https://rudyproduct.test',
+    COMMERCIAL_REPOSITORY_URL: 'https://github.com/rudy774/opentypeless',
+    COMMERCIAL_SUPPORT_URL: 'https://github.com/rudy774/opentypeless/issues',
+    COMMERCIAL_PRIVACY_URL: 'https://rudyproduct.test/privacy',
+    COMMERCIAL_TERMS_URL: 'https://rudyproduct.test/terms',
+    COMMERCIAL_PRODUCT_NAME: 'Rudy Product',
+    COMMERCIAL_APP_IDENTIFIER: 'com.rudy774.rudyproduct',
+    COMMERCIAL_DEEP_LINK_SCHEME: 'rudyproduct',
+    VITE_APP_DEEP_LINK_SCHEME: 'rudyproduct',
+    COMMERCIAL_TAURI_CONFIG_PATH: generatedRelativePath,
+  }
+
+  try {
+    const generated = spawnSync(
+      process.execPath,
+      ['scripts/generate-commercial-tauri-config.mjs'],
+      {
+        cwd: repositoryRoot,
+        encoding: 'utf8',
+        env,
+      },
+    )
+    assert.equal(generated.status, 0, generated.stderr)
+
+    const checked = spawnSync(process.execPath, ['scripts/check-commercial-release.mjs'], {
+      cwd: repositoryRoot,
+      encoding: 'utf8',
+      env,
+    })
+    assert.equal(checked.status, 0, checked.stderr)
+    assert.match(checked.stdout, /passed the local ownership\/default checks/i)
+
+    const overlay = JSON.parse(fs.readFileSync(generatedPath, 'utf8'))
+    assert.equal(overlay.identifier, env.COMMERCIAL_APP_IDENTIFIER)
+    assert.equal(overlay.bundle.createUpdaterArtifacts, false)
+    assert.equal(overlay.plugins.updater, undefined)
+  } finally {
+    fs.rmSync(generatedPath, { force: true })
+  }
 })

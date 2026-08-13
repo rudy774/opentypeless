@@ -1,10 +1,27 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Check, CreditCard, Loader2, Sparkles } from 'lucide-react'
+import { Check, CreditCard, Loader2 } from 'lucide-react'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { hasManagedCloudAccess, useAuthStore } from '../../stores/authStore'
-import { CHECKOUT_PLANS, PRO_PLAN, type CheckoutProduct } from '../../lib/constants'
-import { createCheckout } from '../../lib/api'
+import {
+  CHECKOUT_PRODUCT_COPY,
+  CLOUD_PLAN_BENEFITS,
+  MANAGED_SERVICE_CONFIGURED,
+  type CheckoutProduct,
+} from '../../lib/constants'
+import { createCheckout, getPlans, type ManagedServicePlan } from '../../lib/api'
+
+function formatPlanPrice(
+  plan: Pick<ManagedServicePlan, 'currency' | 'priceMinor'>,
+  locale?: string,
+): string {
+  const formatter = new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency: plan.currency,
+  })
+  const fractionDigits = formatter.resolvedOptions().maximumFractionDigits ?? 2
+  return formatter.format(plan.priceMinor / 10 ** fractionDigits)
+}
 
 export function UpgradePage() {
   const {
@@ -25,17 +42,19 @@ export function UpgradePage() {
   const { t } = useTranslation()
   const [loadingProduct, setLoadingProduct] = useState<CheckoutProduct | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [catalogueStatus, setCatalogueStatus] = useState<'loading' | 'ready' | 'unavailable'>(
+    MANAGED_SERVICE_CONFIGURED ? 'loading' : 'unavailable',
+  )
+  const [catalogue, setCatalogue] = useState<ManagedServicePlan[]>([])
 
   const hasCloudAccess = useAuthStore(hasManagedCloudAccess)
   const hasLifetimeAccess =
     plan === 'lifetime_starter' || source === 'lifetime' || source === 'appsumo'
   const hasMonthlyAccess = !hasLifetimeAccess && (plan === 'pro' || source === 'creem')
-  const hasLifetimeCheckoutPlan = CHECKOUT_PLANS.some(
-    (checkoutPlan) => checkoutPlan.product === 'lifetime_starter',
-  )
   const visiblePlans = hasMonthlyAccess
-    ? CHECKOUT_PLANS.filter((checkoutPlan) => checkoutPlan.product === 'lifetime_starter')
-    : CHECKOUT_PLANS
+    ? catalogue.filter((offer) => offer.product === 'lifetime_starter')
+    : catalogue
+  const hasLifetimeCheckoutPlan = catalogue.some((offer) => offer.product === 'lifetime_starter')
   const wordsUsed =
     quotaModel === 'legacy_dual_meter' && displayWordsLimit > 0
       ? displayWordsUsedEstimate
@@ -44,8 +63,36 @@ export function UpgradePage() {
     quotaModel === 'legacy_dual_meter' && displayWordsLimit > 0
       ? displayWordsLimit
       : cloudWordsLimit
+
+  useEffect(() => {
+    if (!MANAGED_SERVICE_CONFIGURED) {
+      setCatalogue([])
+      setCatalogueStatus('unavailable')
+      return
+    }
+
+    let cancelled = false
+    setCatalogueStatus('loading')
+    getPlans()
+      .then((plans) => {
+        if (cancelled) return
+        setCatalogue(plans.filter((offer) => offer.active))
+        setCatalogueStatus('ready')
+      })
+      .catch((catalogueError) => {
+        if (cancelled) return
+        console.error('[plans] managed pricing catalogue unavailable', catalogueError)
+        setCatalogue([])
+        setCatalogueStatus('unavailable')
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   const canStartCheckout = (product: CheckoutProduct) => {
-    if (hasLifetimeAccess) return false
+    if (catalogueStatus !== 'ready' || hasLifetimeAccess) return false
     if (product === 'lifetime_starter') return true
     return !hasCloudAccess
   }
@@ -57,8 +104,12 @@ export function UpgradePage() {
       const { url } = await createCheckout('desktop', product)
       useAuthStore.setState({ checkoutPending: true })
       await openUrl(url)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t('account.toast.subscriptionFail'))
+    } catch (checkoutError) {
+      setError(
+        checkoutError instanceof Error
+          ? checkoutError.message
+          : t('account.toast.subscriptionFail'),
+      )
     } finally {
       setLoadingProduct(null)
     }
@@ -82,58 +133,58 @@ export function UpgradePage() {
         </span>
       </header>
 
-      {/* Pricing cards */}
-      {visiblePlans.length > 0 && (
+      {catalogueStatus === 'loading' ? (
+        <div className="mb-4 flex items-center justify-center gap-2 rounded-[14px] border border-border bg-bg-secondary/40 px-4 py-6 text-text-secondary">
+          <Loader2 size={15} className="animate-spin" />
+          <span>{t('upgrade.pricingLoading')}</span>
+        </div>
+      ) : catalogueStatus !== 'ready' || visiblePlans.length === 0 ? (
+        <div className="mb-4 rounded-[14px] border border-border bg-bg-secondary/40 px-4 py-4">
+          <p className="text-[13px] font-medium text-text-primary">
+            {t('upgrade.pricingUnavailableTitle')}
+          </p>
+          <p className="mt-1 text-[12px] leading-5 text-text-secondary">
+            {t('upgrade.pricingUnavailable')}
+          </p>
+        </div>
+      ) : (
         <div className={`grid gap-3 mb-4 ${hasMonthlyAccess ? '' : 'min-[620px]:grid-cols-2'}`}>
-          {visiblePlans.map((checkoutPlan) => {
-            const isLoading = loadingProduct === checkoutPlan.product
-            const isLifetime = checkoutPlan.product === 'lifetime_starter'
-            const price =
-              hasMonthlyAccess && isLifetime && checkoutPlan.upgradePrice
-                ? checkoutPlan.upgradePrice
-                : checkoutPlan.price
-            const sublineKey =
-              hasMonthlyAccess && isLifetime && checkoutPlan.upgradeSublineKey
-                ? checkoutPlan.upgradeSublineKey
-                : checkoutPlan.sublineKey
+          {visiblePlans.map((offer) => {
+            const isLoading = loadingProduct === offer.product
+            const copy = CHECKOUT_PRODUCT_COPY[offer.product]
+            const formattedAllowance = new Intl.NumberFormat().format(
+              offer.allowances.cloudWordsPerMonth,
+            )
             return (
               <section
-                key={checkoutPlan.product}
+                key={offer.product}
                 className={`jelly-card flex rounded-[18px] p-4 ${
-                  isLifetime ? 'ring-1 ring-accent/30' : ''
+                  offer.product === 'lifetime_starter' ? 'ring-1 ring-accent/30' : ''
                 }`}
               >
                 <div className="relative z-[1] flex h-full w-full flex-col">
-                  <div className="flex min-h-6 items-start justify-between gap-2">
-                    <h2 className="text-[14px] font-semibold text-text-primary">
-                      {t(checkoutPlan.nameKey)}
-                    </h2>
-                    {checkoutPlan.badgeKey && (
-                      <span className="shrink-0 rounded-full border border-accent/20 bg-accent-light px-2 py-0.5 text-[10px] font-semibold text-accent">
-                        {t(checkoutPlan.badgeKey)}
-                      </span>
-                    )}
-                  </div>
+                  <h2 className="text-[14px] font-semibold text-text-primary">
+                    {offer.displayName}
+                  </h2>
                   <p className="mt-3 text-[24px] font-semibold leading-none text-text-primary">
-                    {price}
+                    {formatPlanPrice(offer)}
                     <span className="text-[13px] font-normal text-text-secondary">
                       {' '}
-                      / {t(checkoutPlan.periodKey)}
+                      / {t(offer.billingInterval === 'month' ? 'upgrade.month' : 'upgrade.oneTime')}
                     </span>
                   </p>
                   <p className="mt-2 min-h-[36px] text-[12px] leading-5 text-text-secondary">
-                    {t(checkoutPlan.descriptionKey)}
+                    {t(copy.descriptionKey)}
                   </p>
-                  {sublineKey && (
-                    <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-bg-secondary/70 px-2 py-1 text-[11px] font-medium text-text-secondary">
-                      <Sparkles size={12} />
-                      {t(sublineKey)}
+                  {offer.allowances.cloudWordsPerMonth > 0 && (
+                    <p className="mt-2 text-[11px] font-medium text-text-secondary">
+                      {t('upgrade.cloudWordsAllowance', { amount: formattedAllowance })}
                     </p>
                   )}
-                  {canStartCheckout(checkoutPlan.product) && (
+                  {canStartCheckout(offer.product) && (
                     <div className="mt-auto pt-4">
                       <button
-                        onClick={() => handleSubscribe(checkoutPlan.product)}
+                        onClick={() => handleSubscribe(offer.product)}
                         disabled={loadingProduct !== null || !user}
                         className="jelly-btn-accent flex w-full items-center justify-center gap-2 rounded-full bg-accent px-4 py-2.5 text-[13px] font-medium text-on-accent transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
                       >
@@ -142,7 +193,7 @@ export function UpgradePage() {
                         ) : (
                           <CreditCard size={14} />
                         )}
-                        {t(checkoutPlan.ctaKey)}
+                        {t(copy.ctaKey)}
                       </button>
                     </div>
                   )}
@@ -153,14 +204,13 @@ export function UpgradePage() {
         </div>
       )}
 
-      {/* Cloud plan benefits */}
       <section className="mb-4 rounded-[18px] p-4 jelly-card">
         <div className="relative z-[1]">
           <h2 className="text-[12px] font-semibold text-text-primary">
             {t('upgrade.benefits.title')}
           </h2>
           <div className="mt-3 grid gap-2 min-[560px]:grid-cols-3">
-            {PRO_PLAN.benefits.map((benefit) => (
+            {CLOUD_PLAN_BENEFITS.map((benefit) => (
               <div key={benefit.labelKey} className="flex items-start gap-2.5">
                 <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent-light text-accent">
                   <Check size={12} />
@@ -174,7 +224,6 @@ export function UpgradePage() {
         </div>
       </section>
 
-      {/* Pro quota progress */}
       {hasCloudAccess && (
         <section className="mb-4 overflow-hidden rounded-[10px] border border-border">
           <div className="border-b border-border bg-bg-secondary/50 px-4 py-2.5">
@@ -213,7 +262,6 @@ export function UpgradePage() {
         </section>
       )}
 
-      {/* Action */}
       {hasLifetimeAccess ? (
         <div className="py-3 text-center">
           <p className="text-text-secondary flex items-center justify-center gap-1.5">
@@ -226,17 +274,14 @@ export function UpgradePage() {
           <p className="text-text-secondary flex items-center justify-center gap-1.5">
             <Check size={14} className="text-accent" />
             {hasLifetimeCheckoutPlan
-              ? t(
-                  'upgrade.monthlyActiveLifetimeHint',
-                  'Pro is active. Lifetime is available as a one-time upgrade.',
-                )
-              : t('upgrade.monthlyActive', 'Pro is active.')}
+              ? t('upgrade.monthlyActiveLifetimeHint')
+              : t('upgrade.monthlyActive')}
           </p>
           {error && <p className="text-red-500 text-[12px] mt-2 text-center">{error}</p>}
         </div>
       ) : (
         <>
-          {!user && (
+          {!user && catalogueStatus === 'ready' && visiblePlans.length > 0 && (
             <p className="text-text-tertiary text-[12px] text-center mb-3">
               {t('upgrade.signInFirst')}
             </p>
@@ -247,7 +292,6 @@ export function UpgradePage() {
     </div>
   )
 }
-
 function QuotaBar({
   label,
   used,

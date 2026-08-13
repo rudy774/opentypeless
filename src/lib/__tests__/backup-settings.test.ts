@@ -1,82 +1,152 @@
 import { describe, expect, it } from 'vitest'
-import type { AppConfig } from '../../stores/appStore'
 import { useAppStore } from '../../stores/appStore'
-import { createBackupSettings, mergeBackupSettings } from '../backup-settings'
+import {
+  createBackupSettings,
+  InvalidBackupSettingsError,
+  mergeBackupSettings,
+  parseBackupSettings,
+} from '../backup-settings'
 
-describe('createBackupSettings', () => {
-  it('uses an explicit allow list and keeps only sync-safe family scene assignments', () => {
-    const malicious = {
-      stt_provider: 'glm-asr',
+const providerRoutingKeys = [
+  'stt_provider',
+  'stt_custom_preset',
+  'stt_custom_base_url',
+  'stt_custom_model',
+  'stt_volcengine_resource_id',
+  'llm_provider',
+  'llm_model',
+  'llm_base_url',
+] as const
+
+describe('managed backup settings boundary', () => {
+  it('uploads only portable preferences and never provider routing or credentials', () => {
+    const current = {
+      ...useAppStore.getState().config,
+      stt_provider: 'custom-whisper' as const,
       stt_api_key: 'stt-secret',
       stt_custom_api_key: 'custom-secret',
-      stt_language: 'multi',
-      llm_provider: 'openrouter',
+      stt_custom_preset: 'custom' as const,
+      stt_custom_base_url:
+        'https://test-user:test-password@provider.example/v1?api_key=test-query-secret',
+      stt_custom_model: 'private-model',
+      stt_volcengine_resource_id: 'private-resource',
+      llm_provider: 'gemini' as const,
       llm_api_key: 'llm-secret',
-      llm_model: 'test-model',
-      llm_base_url: 'https://example.com/v1',
-      context_adaptation_enabled: true,
+      llm_model: 'gemini-private',
+      llm_base_url: 'https://llm.example/v1#test-fragment-secret',
       custom_scenes: [],
       system_scene_overrides: [{ id: 'system_email', prompt_template: 'Use a warm email body.' }],
-      active_scene: null,
-      family_scene_assignments: [{ family: 'email', scene_id: 'builtin_professional_email' }],
-      custom_app_mappings: [{ matcher: { exactWebHost: 'private.example.com' } }],
-      customAppMappings: [{ nativeBundleId: 'com.private.writer' }],
-      matcher: { executable: 'private.exe' },
-      windowTitle: 'Private document title',
-      browserHost: 'private.example.com',
-    } as unknown as AppConfig
+      family_scene_assignments: [
+        { family: 'email' as const, scene_id: 'builtin_professional_email' },
+      ],
+    }
 
-    const settings = createBackupSettings(malicious)
+    const settings = createBackupSettings(current)
     const serialized = JSON.stringify(settings)
 
     expect(settings.family_scene_assignments).toEqual([
       { family: 'email', scene_id: 'builtin_professional_email' },
     ])
-    expect(settings.context_adaptation_enabled).toBe(true)
     expect(settings.system_scene_overrides).toEqual([
       { id: 'system_email', prompt_template: 'Use a warm email body.' },
     ])
+    for (const key of providerRoutingKeys) expect(settings).not.toHaveProperty(key)
     for (const forbidden of [
       'stt-secret',
       'custom-secret',
       'llm-secret',
-      'custom_app_mappings',
-      'customAppMappings',
-      'matcher',
-      'exactWebHost',
-      'nativeBundleId',
-      'executable',
-      'windowTitle',
-      'browserHost',
-      'private.example.com',
-      'com.private.writer',
-      'private.exe',
+      'test-user',
+      'test-password',
+      'test-query-secret',
+      'test-fragment-secret',
+      'private-model',
+      'private-resource',
+      'provider.example',
+      'llm.example',
     ]) {
       expect(serialized).not.toContain(forbidden)
     }
   })
 
-  it('merges only allow-listed settings and preserves local credentials and app matchers', () => {
+  it('round-trips the complete portable shape and rejects unknown or malformed nested fields', () => {
+    const valid = createBackupSettings(useAppStore.getState().config)
+    expect(parseBackupSettings(valid)).toEqual(valid)
+
+    expect(() => parseBackupSettings({ ...valid, future_field: true })).toThrow(
+      InvalidBackupSettingsError,
+    )
+    expect(() =>
+      parseBackupSettings({
+        ...valid,
+        hotkeys: { ...valid.hotkeys, dictationMode: 'sometimes' },
+      }),
+    ).toThrow(InvalidBackupSettingsError)
+    expect(() =>
+      parseBackupSettings({
+        ...valid,
+        hotkeys: {
+          ...valid.hotkeys,
+          dictationBindings: Array.from({ length: 4 }, () => valid.hotkeys.dictation),
+        },
+      }),
+    ).toThrow(InvalidBackupSettingsError)
+    expect(() =>
+      parseBackupSettings({
+        ...valid,
+        custom_scenes: [
+          {
+            id: 'scene',
+            name: 'Scene',
+            description: '',
+            prompt_template: '',
+            created_at: '',
+            updated_at: '',
+            injected: true,
+          },
+        ],
+      }),
+    ).toThrow(InvalidBackupSettingsError)
+  })
+
+  it('restores portable preferences while preserving the whole local provider-routing trust unit', () => {
     const current = {
       ...useAppStore.getState().config,
-      llm_api_key: 'local-secret',
+      stt_provider: 'custom-whisper' as const,
       stt_api_key: 'local-stt-secret',
+      stt_custom_api_key: 'local-custom-secret',
+      stt_custom_preset: 'custom' as const,
+      stt_custom_base_url: 'https://local-stt.example/v1',
+      stt_custom_model: 'local-stt-model',
+      stt_volcengine_resource_id: 'local-resource',
+      llm_provider: 'gemini' as const,
+      llm_api_key: 'local-llm-secret',
+      llm_model: 'local-llm-model',
+      llm_base_url: 'https://local-llm.example/v1',
+      polish_enabled: true,
+    }
+    const portable = {
+      ...createBackupSettings(current),
+      polish_enabled: false,
     }
 
-    const merged = mergeBackupSettings(current, {
-      polish_enabled: false,
-      system_scene_overrides: [{ id: 'system_email', prompt_template: 'Use concise paragraphs.' }],
-      llm_api_key: 'cloud-secret',
-      stt_api_key: 'cloud-stt-secret',
-      custom_app_mappings: [{ matcher: 'private.example.com' }],
-    })
+    const merged = mergeBackupSettings(current, portable)
 
     expect(merged.polish_enabled).toBe(false)
-    expect(merged.system_scene_overrides).toEqual([
-      { id: 'system_email', prompt_template: 'Use concise paragraphs.' },
-    ])
-    expect(merged.llm_api_key).toBe('local-secret')
     expect(merged.stt_api_key).toBe('local-stt-secret')
-    expect(merged).not.toHaveProperty('custom_app_mappings')
+    expect(merged.stt_custom_api_key).toBe('local-custom-secret')
+    expect(merged.llm_api_key).toBe('local-llm-secret')
+    for (const key of providerRoutingKeys) expect(merged[key]).toBe(current[key])
+  })
+
+  it('rejects an injected provider endpoint before returning any merged config', () => {
+    const current = useAppStore.getState().config
+    const hostile = {
+      ...createBackupSettings(current),
+      llm_provider: 'gemini',
+      llm_base_url: 'https://attacker.example/v1',
+    }
+
+    expect(() => mergeBackupSettings(current, hostile)).toThrow(InvalidBackupSettingsError)
+    expect(useAppStore.getState().config).toEqual(current)
   })
 })

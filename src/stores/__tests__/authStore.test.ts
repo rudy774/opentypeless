@@ -1,6 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import packageJson from '../../../package.json'
 import { hasManagedCloudAccess, useAuthStore } from '../authStore'
+import {
+  getCloudSessionToken,
+  persistSessionToken,
+  resetCloudSessionCoordinatorForTests,
+} from '../../lib/cloud-session'
+
+vi.mock('../../lib/constants', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../lib/constants')>()
+  return {
+    ...actual,
+    MANAGED_SERVICE_CONFIGURED: true,
+  }
+})
 
 // Mock external dependencies
 vi.mock('@tauri-apps/api/core', () => ({
@@ -22,6 +35,7 @@ vi.mock('../../lib/auth-client', () => ({
 }))
 
 vi.mock('../../lib/api', () => ({
+  exchangeDesktopAuthCode: vi.fn(),
   getSubscriptionStatus: vi.fn(),
 }))
 
@@ -32,19 +46,27 @@ vi.mock('../../components/toast-service', () => ({
 import { invoke } from '@tauri-apps/api/core'
 import { authClient } from '../../lib/auth-client'
 import { requestOpenTypelessPasswordReset, setOpenTypelessPassword } from '../../lib/auth-client'
-import { getSubscriptionStatus } from '../../lib/api'
+import { exchangeDesktopAuthCode, getSubscriptionStatus } from '../../lib/api'
 import { toast } from '../../components/toast-service'
 
 function getState() {
   return useAuthStore.getState()
 }
 
+function mockNativeSessionToken(token: string) {
+  vi.mocked(invoke).mockImplementation(
+    (command) => Promise.resolve(command === 'get_session_token' ? token : undefined) as never,
+  )
+}
+
 describe('authStore', () => {
   it('pins the Better Auth desktop client version', () => {
-    expect(packageJson.dependencies['better-auth']).toBe('1.6.17')
+    expect(packageJson.dependencies['better-auth']).toBe('1.6.27')
   })
 
   beforeEach(() => {
+    localStorage.clear()
+    resetCloudSessionCoordinatorForTests()
     vi.clearAllMocks()
 
     // Reset store state
@@ -87,6 +109,7 @@ describe('authStore', () => {
     vi.mocked(authClient.signOut).mockResolvedValue(undefined as never)
     vi.mocked(requestOpenTypelessPasswordReset).mockResolvedValue(undefined)
     vi.mocked(setOpenTypelessPassword).mockResolvedValue(undefined)
+    vi.mocked(exchangeDesktopAuthCode).mockResolvedValue({ token: 'exchanged-token-12345' })
     vi.mocked(getSubscriptionStatus).mockResolvedValue({
       plan: 'pro',
       source: 'creem',
@@ -339,6 +362,58 @@ describe('authStore', () => {
       expect(getState().user).toBeNull()
     })
 
+    it('migrates then clears a legacy browser token when no service session exists', async () => {
+      localStorage.setItem('session_token', 'legacy-token')
+
+      await getState().initialize()
+
+      expect(invoke).toHaveBeenCalledWith('set_session_token', { token: 'legacy-token' })
+      expect(invoke).toHaveBeenCalledWith('set_session_token', { token: '' })
+      expect(getCloudSessionToken()).toBeNull()
+      expect(localStorage.getItem('session_token')).toBeNull()
+      expect(authClient.getSession).toHaveBeenCalledTimes(1)
+    })
+
+    it('keeps a restored bearer only after the service verifies its user', async () => {
+      mockNativeSessionToken('verified-restored-token')
+      vi.mocked(authClient.getSession).mockResolvedValue({
+        data: {
+          user: {
+            id: 'user-1',
+            email: 'person@example.com',
+            name: 'Person',
+            emailVerified: true,
+          },
+        },
+      } as never)
+
+      await getState().initialize()
+
+      expect(getCloudSessionToken()).toBe('verified-restored-token')
+      expect(getState().user?.id).toBe('user-1')
+      expect(invoke).not.toHaveBeenCalledWith('set_session_token', { token: '' })
+    })
+
+    it('clears a restored bearer when the service returns no user', async () => {
+      mockNativeSessionToken('stale-restored-token')
+
+      await getState().initialize()
+
+      expect(getCloudSessionToken()).toBeNull()
+      expect(getState().user).toBeNull()
+      expect(invoke).toHaveBeenCalledWith('set_session_token', { token: '' })
+    })
+
+    it('clears a restored bearer when service validation fails', async () => {
+      mockNativeSessionToken('unverifiable-restored-token')
+      vi.mocked(authClient.getSession).mockRejectedValue(new Error('service unavailable'))
+
+      await getState().initialize()
+
+      expect(getCloudSessionToken()).toBeNull()
+      expect(getState().user).toBeNull()
+      expect(invoke).toHaveBeenCalledWith('set_session_token', { token: '' })
+    })
     it('propagates email verification and credential capability from Better Auth', async () => {
       vi.mocked(authClient.getSession).mockResolvedValue({
         data: {
@@ -362,6 +437,73 @@ describe('authStore', () => {
     })
   })
 
+  describe('deep-link authorization-code validation', () => {
+    const code = 'desktop-code-123456'
+    const verifier = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+
+    it('does not persist an exchanged bearer when it resolves to no user', async () => {
+      const authenticated = await getState().handleDeepLinkCode(code, verifier)
+
+      expect(exchangeDesktopAuthCode).toHaveBeenCalledWith(code, verifier)
+      expect(authenticated).toBe(false)
+      expect(getCloudSessionToken()).toBeNull()
+      expect(invoke).not.toHaveBeenCalledWith('set_session_token', {
+        token: 'exchanged-token-12345',
+      })
+    })
+
+    it('does not persist an exchanged bearer when validation throws', async () => {
+      vi.mocked(authClient.getSession).mockRejectedValue(new Error('validation failed'))
+
+      const authenticated = await getState().handleDeepLinkCode(code, verifier)
+
+      expect(authenticated).toBe(false)
+      expect(getCloudSessionToken()).toBeNull()
+      expect(invoke).not.toHaveBeenCalledWith('set_session_token', {
+        token: 'exchanged-token-12345',
+      })
+    })
+
+    it('does not persist anything when authorization-code exchange fails', async () => {
+      vi.mocked(exchangeDesktopAuthCode).mockRejectedValue(new Error('expired code'))
+
+      const authenticated = await getState().handleDeepLinkCode(code, verifier)
+
+      expect(authenticated).toBe(false)
+      expect(authClient.getSession).not.toHaveBeenCalled()
+      expect(getCloudSessionToken()).toBeNull()
+      expect(invoke).not.toHaveBeenCalledWith('set_session_token', expect.anything())
+    })
+
+    it('persists the exchanged bearer only after the service verifies its user', async () => {
+      vi.mocked(authClient.getSession).mockResolvedValue({
+        data: {
+          user: {
+            id: 'user-1',
+            email: 'person@example.com',
+            name: 'Person',
+            emailVerified: true,
+          },
+        },
+      } as never)
+
+      const authenticated = await getState().handleDeepLinkCode(code, verifier)
+
+      expect(authenticated).toBe(true)
+      expect(getCloudSessionToken()).toBe('exchanged-token-12345')
+      expect(authClient.getSession).toHaveBeenCalledWith({
+        fetchOptions: {
+          headers: { Authorization: 'Bearer exchanged-token-12345' },
+        },
+      })
+      expect(invoke).toHaveBeenCalledWith('set_session_token', {
+        token: 'exchanged-token-12345',
+      })
+      expect(vi.mocked(authClient.getSession).mock.invocationCallOrder[0]).toBeLessThan(
+        vi.mocked(invoke).mock.invocationCallOrder[0]!,
+      )
+    })
+  })
   describe('password actions', () => {
     it('requests a reset through the canonical wrapper', async () => {
       await getState().requestPasswordReset('person@example.com', 'zh')
@@ -405,7 +547,8 @@ describe('authStore', () => {
         },
         expect.objectContaining({ onSuccess: expect.any(Function) }),
       )
-      expect(localStorage.getItem('session_token')).toBe('rotated-token')
+      expect(getCloudSessionToken()).toBe('rotated-token')
+      expect(localStorage.getItem('session_token')).toBeNull()
       expect(invoke).toHaveBeenCalledWith('set_session_token', { token: 'rotated-token' })
       expect(vi.mocked(invoke).mock.invocationCallOrder[0]).toBeLessThan(
         vi.mocked(getSubscriptionStatus).mock.invocationCallOrder[0]!,
@@ -413,7 +556,7 @@ describe('authStore', () => {
     })
 
     it('sets a password for a verified OAuth-only account without rotating its token', async () => {
-      localStorage.setItem('session_token', 'existing-token')
+      await persistSessionToken('existing-token')
       useAuthStore.setState({
         user: {
           id: 'user-1',
@@ -432,7 +575,8 @@ describe('authStore', () => {
 
       expect(setOpenTypelessPassword).toHaveBeenCalledWith('new-password')
       expect(authClient.changePassword).not.toHaveBeenCalled()
-      expect(localStorage.getItem('session_token')).toBe('existing-token')
+      expect(getCloudSessionToken()).toBe('existing-token')
+      expect(localStorage.getItem('session_token')).toBeNull()
       expect(getState().credentialCapability).toBe('present')
     })
 
@@ -458,7 +602,8 @@ describe('authStore', () => {
 
   describe('cloud session invalidation', () => {
     it('clears only cloud identity and keeps local data and BYOK values', async () => {
-      localStorage.setItem('session_token', 'expired-token')
+      await persistSessionToken('expired-token')
+      localStorage.setItem('session_token', 'stale-legacy-token')
       localStorage.setItem('talkmore_history', '[{"id":"local"}]')
       localStorage.setItem('talkmore_dictionary', '["OpenTypeless"]')
       localStorage.setItem('byok_api_key', 'local-provider-key')
@@ -478,6 +623,7 @@ describe('authStore', () => {
       expect(getState().user).toBeNull()
       expect(getState().plan).toBe('free')
       expect(localStorage.getItem('session_token')).toBeNull()
+      expect(getCloudSessionToken()).toBeNull()
       expect(localStorage.getItem('talkmore_history')).toBe('[{"id":"local"}]')
       expect(localStorage.getItem('talkmore_dictionary')).toBe('["OpenTypeless"]')
       expect(localStorage.getItem('byok_api_key')).toBe('local-provider-key')

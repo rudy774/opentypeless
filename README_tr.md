@@ -2,6 +2,9 @@
   <a href="README.md">English</a> | <a href="README_zh.md">中文</a> | <a href="README_ja.md">日本語</a> | <a href="README_ko.md">한국어</a> | <a href="README_es.md">Español</a> | <a href="README_fr.md">Français</a> | <a href="README_de.md">Deutsch</a> | <a href="README_pt.md">Português</a> | <a href="README_ru.md">Русский</a> | <a href="README_ar.md">العربية</a> | <a href="README_hi.md">हिन्दी</a> | <a href="README_it.md">Italiano</a> | <strong>Türkçe</strong> | <a href="README_vi.md">Tiếng Việt</a> | <a href="README_th.md">ภาษาไทย</a> | <a href="README_id.md">Bahasa Indonesia</a> | <a href="README_pl.md">Polski</a> | <a href="README_nl.md">Nederlands</a>
 </p>
 
+> [!IMPORTANT]
+> **Fork status:** This is the **Rudy774 fork**, which differs from the original OpenTypeless project. Source code, releases, and support are provided only through [github.com/rudy774/opentypeless](https://github.com/rudy774/opentypeless). This fork does **not** currently provide a hosted paid service, and automatic updates are disabled.
+
 <p align="center">
   <img src="src-tauri/icons/128x128@2x.png" width="128" height="128" alt="OpenTypeless Logo" />
 </p>
@@ -19,11 +22,10 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/tover0314-w/opentypeless/actions/workflows/ci.yml"><img src="https://github.com/tover0314-w/opentypeless/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
-  <a href="https://github.com/tover0314-w/opentypeless/releases"><img src="https://img.shields.io/github/v/release/tover0314-w/opentypeless?color=2ABBA7" alt="Sürüm" /></a>
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/tover0314-w/opentypeless" alt="Lisans" /></a>
-  <a href="https://github.com/tover0314-w/opentypeless/stargazers"><img src="https://img.shields.io/github/stars/tover0314-w/opentypeless?style=social" alt="Yıldızlar" /></a>
-  <a href="https://discord.gg/V6rRpJ4RGD"><img src="https://img.shields.io/badge/Discord-Join%20us-5865F2?logo=discord&logoColor=white" alt="Discord" /></a>
+  <a href="https://github.com/rudy774/opentypeless/actions/workflows/ci.yml"><img src="https://github.com/rudy774/opentypeless/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="https://github.com/rudy774/opentypeless/releases"><img src="https://img.shields.io/github/v/release/rudy774/opentypeless?color=2ABBA7" alt="Sürüm" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/rudy774/opentypeless" alt="Lisans" /></a>
+  <a href="https://github.com/rudy774/opentypeless/stargazers"><img src="https://img.shields.io/github/stars/rudy774/opentypeless?style=social" alt="Yıldızlar" /></a>
 </p>
 
 <p align="center">
@@ -34,7 +36,9 @@
   <img src="docs/images/voice-flow-demo.gif" width="720" alt="OpenTypeless Demo" />
 </p>
 
-## v1.1.49'daki yenilikler
+## Inherited upstream capabilities
+
+The capabilities below originated in the upstream project before this fork. This is historical attribution, not a release-version or support claim.
 
 - **Uygulamaya duyarlı yazma** etkin uygulamayı yerel olarak algılar ve e-posta, sohbet, belge, sorun takip sistemi, geliştirme aracı ve diğer ortamlara göre yapı ile tonu uyarlar.
 - **Sesli niyet yönlendirme** dikte, seçili metni düzenleme, çeviri, Ask Anything ve desteklenen sesli işlemleri İngilizce, Basitleştirilmiş Çince ve Geleneksel Çince dillerinde ayırt eder.
@@ -47,7 +51,7 @@ Uygulama algılama, eşlemeler, sözlük ve düzeltme kuralları yerel olarak sa
 
 | Uygulamaya duyarlı AI düzenleme | Yerel sözlük ve düzeltmeler |
 | --- | --- |
-| <img src="docs/images/v1.1.49-app-aware-polish.jpg" width="420" alt="OpenTypeless v1.1.49 uygulamaya duyarlı AI düzenleme" /> | <img src="docs/images/v1.1.49-dictionary.jpg" width="420" alt="OpenTypeless v1.1.49 yerel sözlük ve düzeltmeler" /> |
+| <img src="docs/images/v1.1.49-app-aware-polish.jpg" width="420" alt="OpenTypeless inherited upstream uygulamaya duyarlı AI düzenleme" /> | <img src="docs/images/v1.1.49-dictionary.jpg" width="420" alt="OpenTypeless inherited upstream yerel sözlük ve düzeltmeler" /> |
 
 <details>
 <summary>Daha fazla ekran görüntüsü</summary>
@@ -107,7 +111,7 @@ Uygulama algılama, eşlemeler, sözlük ve düzeltme kuralları yerel olarak sa
 
 Platformunuz için en son sürümü indirin:
 
-**[Releases'dan İndirin](https://github.com/tover0314-w/opentypeless/releases)**
+**[Releases'dan İndirin](https://github.com/rudy774/opentypeless/releases)**
 
 | Platform | Dosya |
 |----------|-------|
@@ -149,43 +153,11 @@ Tüm ayarlara uygulama içi Ayarlar panelinden erişilebilir:
 
 API anahtarları `tauri-plugin-store` aracılığıyla yerel olarak saklanır. Hiçbir anahtar OpenTypeless sunucularına gönderilmez — tüm STT/LLM istekleri doğrudan yapılandırdığınız sağlayıcıya gider.
 
-### Cloud (Pro) Seçeneği
+### Managed service status for this fork
 
-OpenTypeless ayrıca kendi API anahtarlarınıza ihtiyaç duymamanız için yönetilen STT ve LLM kotası sağlayan isteğe bağlı bir Pro aboneliği sunar. Bu tamamen isteğe bağlıdır — uygulama kendi anahtarlarınızla tam işlevseldir.
+This fork currently supports bring-your-own-key and local providers. It does not include a hosted paid service. Account, entitlement, checkout, backup, and managed transcription features remain disabled unless you build and operate a compatible backend yourself.
 
-[Pro hakkında daha fazla bilgi](https://www.opentypeless.com)
-
-### BYOK (Kendi Anahtarını Getir) vs Cloud
-
-| | BYOK Modu | Cloud (Pro) Modu |
-|---|---|---|
-| STT | Kendi API anahtarınız (Deepgram, AssemblyAI, vb.) | Yönetilen kota (10 saat/ay) |
-| LLM | Kendi API anahtarınız (OpenAI, DeepSeek, vb.) | Yönetilen kota (~5M token/ay) |
-| Bulut bağımlılığı | Yok — tüm istekler doğrudan sağlayıcınıza gider | www.opentypeless.com bağlantısı gerekir |
-| Maliyet | Sağlayıcınıza doğrudan ödeyin | $4,99/ay abonelik |
-
-Tüm temel özellikler — kayıt, transkripsiyon, AI cilalama, klavye/pano çıktısı, sözlük, geçmiş — BYOK modunda OpenTypeless sunucularından tamamen bağımsız çalışır.
-
-### Kendi Sunucunda Barındırma / Bulutsuz
-
-OpenTypeless'ı bulut bağımlılığı olmadan çalıştırmak için:
-
-1. Ayarlarda Cloud olmayan herhangi bir STT ve LLM sağlayıcı seçin
-2. Kendi API anahtarlarınızı girin
-3. Bu kadar — www.opentypeless.com'a hesap veya internet bağlantısı gerekmez
-
-İsteğe bağlı bulut özelliklerini kendi arka ucunuza yönlendirmek istiyorsanız, derlemeden önce bu ortam değişkenlerini ayarlayın:
-
-| Değişken | Varsayılan | Açıklama |
-|---|---|---|
-| `VITE_API_BASE_URL` | `https://www.opentypeless.com` | Ön uç bulut API temel URL'si |
-| `API_BASE_URL` | `https://www.opentypeless.com` | Rust arka uç bulut API temel URL'si |
-
-```bash
-# Örnek: özel arka uçla derleme
-VITE_API_BASE_URL=https://my-server.example.com API_BASE_URL=https://my-server.example.com npm run tauri build
-```
-
+A self-hosted managed backend must be configured explicitly at build time with both `VITE_MANAGED_API_BASE_URL` and `OPENTYPELESS_MANAGED_API_BASE_URL`. There is no production default. Both values must be the same owned HTTPS origin; see `docs/MANAGED_SERVICE_API.md` and `docs/COMMERCIALIZATION.md`.
 ## Mimari
 
 **Veri Akışı Pipeline:**
@@ -237,9 +209,8 @@ Evet. Uygulama kendi API anahtarlarınızla (BYOK) tam işlevseldir. Cloud Pro a
 
 ## Topluluk
 
-- 💬 [Discord](https://discord.gg/V6rRpJ4RGD) — Sohbet, yardım, geri bildirim
-- 🗣️ [GitHub Discussions](https://github.com/tover0314-w/opentypeless/discussions) — Özellik önerileri, soru-cevap
-- 🐛 [Issue Tracker](https://github.com/tover0314-w/opentypeless/issues) — Hata raporları ve özellik istekleri
+- 🗣️ [GitHub Discussions](https://github.com/rudy774/opentypeless/discussions) — Özellik önerileri, soru-cevap
+- 🐛 [Issue Tracker](https://github.com/rudy774/opentypeless/issues) — Hata raporları ve özellik istekleri
 - 📖 [Katkı Rehberi](CONTRIBUTING.md) — Geliştirme kurulumu ve kurallar
 - 🔒 [Güvenlik Politikası](SECURITY.md) — Güvenlik açıklarını sorumlu bir şekilde bildirin
 - 🧭 [Vizyon](VISION.md) — Proje ilkeleri ve yol haritası yönü
@@ -248,15 +219,15 @@ Evet. Uygulama kendi API anahtarlarınızla (BYOK) tam işlevseldir. Cloud Pro a
 
 Katkılar memnuniyetle karşılanır! Geliştirme kurulumu ve kurallar için [CONTRIBUTING.md](CONTRIBUTING.md) sayfasına bakın.
 
-Nereden başlayacağınızı mı arıyorsunuz? [`good first issue`](https://github.com/tover0314-w/opentypeless/labels/good%20first%20issue) etiketli sorunlara göz atın.
+Nereden başlayacağınızı mı arıyorsunuz? [`good first issue`](https://github.com/rudy774/opentypeless/labels/good%20first%20issue) etiketli sorunlara göz atın.
 
 ## Star History
 
-<a href="https://star-history.com/#tover0314-w/opentypeless&Date">
+<a href="https://star-history.com/#rudy774/opentypeless&Date">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=tover0314-w/opentypeless&type=Date&theme=dark" />
-    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=tover0314-w/opentypeless&type=Date" />
-    <img alt="Star History Grafiği" src="https://api.star-history.com/svg?repos=tover0314-w/opentypeless&type=Date" />
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=rudy774/opentypeless&type=Date&theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=rudy774/opentypeless&type=Date" />
+    <img alt="Star History Grafiği" src="https://api.star-history.com/svg?repos=rudy774/opentypeless&type=Date" />
   </picture>
 </a>
 

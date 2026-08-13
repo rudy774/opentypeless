@@ -3,7 +3,6 @@ import i18n from '../i18n'
 import { useTheme } from '../hooks/useTheme'
 import { getConfig } from '../lib/tauri'
 import { useAppStore } from '../stores/appStore'
-import { useAuthStore } from '../stores/authStore'
 import { AskPanel } from '../components/AskPanel'
 import { ToastContainer } from '../components/Toast'
 
@@ -12,7 +11,6 @@ export default function AskApp() {
   const setConfig = useAppStore((state) => state.setConfig)
 
   useEffect(() => {
-    useAuthStore.getState().initialize()
     getConfig()
       .then((config) => {
         setConfig(config)

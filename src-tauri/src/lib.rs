@@ -9,17 +9,20 @@ pub mod hotkey;
 #[cfg(target_os = "linux")]
 mod linux_x11;
 pub mod llm;
+pub mod managed_service;
 pub mod native_hotkey;
 pub mod output;
 pub mod pipeline;
 pub mod platform;
 pub mod selection;
+pub mod session;
 pub mod storage;
 pub mod stt;
 pub mod tray;
 pub mod voice_intent;
 
 pub use hotkey::{default_ask_shortcut, default_shortcut, parse_hotkey};
+pub use session::SessionTokenStore;
 pub use tray::{refresh_tray, TrayHandle};
 
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
@@ -31,13 +34,73 @@ use tracing_subscriber::EnvFilter;
 
 use std::sync::{Arc, Mutex};
 
-/// Default cloud API base URL. Override with the `API_BASE_URL` environment variable.
-pub const DEFAULT_API_BASE_URL: &str = "https://www.opentypeless.com";
+/// Managed API origin compiled into an explicitly configured distribution.
+///
+/// Source/BYOK builds deliberately default to an empty value so they can never
+/// inherit or send credentials to the upstream OpenTypeless service.
+pub const DEFAULT_API_BASE_URL: &str = match option_env!("OPENTYPELESS_MANAGED_API_BASE_URL") {
+    Some(value) => value,
+    None => "",
+};
+pub const MANAGED_SERVICE_DISABLED_URL: &str = "managed-service-disabled://unconfigured";
 pub const CLIENT_VERSION_HEADER: &str = "X-OpenTypeless-Version";
 
-/// Read the cloud API base URL from the environment, falling back to the compiled default.
+fn normalize_managed_api_origin(value: &str) -> Option<String> {
+    let parsed = url::Url::parse(value.trim()).ok()?;
+    let host = parsed
+        .host_str()?
+        .trim_end_matches('.')
+        .to_ascii_lowercase();
+
+    if parsed.scheme() != "https"
+        || !parsed.username().is_empty()
+        || parsed.password().is_some()
+        || parsed.path() != "/"
+        || parsed.query().is_some()
+        || parsed.fragment().is_some()
+        || host == "opentypeless.com"
+        || host.ends_with(".opentypeless.com")
+    {
+        return None;
+    }
+
+    Some(parsed.origin().ascii_serialization())
+}
+
+fn resolve_api_base_url(runtime_override: Option<String>, build_default: &str) -> String {
+    runtime_override
+        .as_deref()
+        .and_then(normalize_managed_api_origin)
+        .or_else(|| normalize_managed_api_origin(build_default))
+        .unwrap_or_else(|| MANAGED_SERVICE_DISABLED_URL.to_string())
+}
+
+// A runtime override is useful while developing an owned backend, but a
+// packaged release must use the audited origin compiled into the binary.
+#[cfg(debug_assertions)]
+fn runtime_managed_api_override() -> Option<String> {
+    std::env::var("API_BASE_URL").ok()
+}
+
+#[cfg(not(debug_assertions))]
+fn runtime_managed_api_override() -> Option<String> {
+    None
+}
+
+pub fn managed_service_unconfigured_error() -> crate::error::AppError {
+    crate::error::AppError::Config(
+        "Managed service is not configured in this build; choose a BYOK or local provider."
+            .to_string(),
+    )
+}
+
+pub fn managed_service_configured() -> bool {
+    api_base_url() != MANAGED_SERVICE_DISABLED_URL
+}
+
+/// Resolve the audited build-time origin (or a debug-only local override).
 pub fn api_base_url() -> String {
-    std::env::var("API_BASE_URL").unwrap_or_else(|_| DEFAULT_API_BASE_URL.to_string())
+    resolve_api_base_url(runtime_managed_api_override(), DEFAULT_API_BASE_URL)
 }
 
 pub fn desktop_client_version() -> &'static str {
@@ -127,10 +190,6 @@ pub struct CloseToTrayCache(pub Arc<Mutex<bool>>);
 
 /// Last global-hotkey registration error, if startup or settings registration failed.
 pub struct HotkeyRegistrationError(pub Arc<Mutex<Option<String>>>);
-
-/// Session token for cloud providers. Set by the frontend after Better Auth login.
-/// The Rust pipeline reads this when creating cloud STT/LLM providers.
-pub struct SessionTokenStore(pub Arc<Mutex<String>>);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct AutoStartSyncOutcome {
@@ -325,6 +384,42 @@ mod tests {
     #[test]
     fn dock_reopen_restores_main_window_even_when_capsule_is_visible() {
         assert!(should_restore_main_window_on_reopen(true));
+    }
+
+    #[test]
+    fn managed_api_origin_fails_closed_and_normalizes_explicit_configuration() {
+        assert_eq!(resolve_api_base_url(None, ""), MANAGED_SERVICE_DISABLED_URL);
+        assert_eq!(
+            resolve_api_base_url(Some("  https://api.rudy.example/  ".to_string()), ""),
+            "https://api.rudy.example"
+        );
+        assert_eq!(
+            resolve_api_base_url(Some("  ".to_string()), "https://build.rudy.example/"),
+            "https://build.rudy.example"
+        );
+
+        for rejected in [
+            "http://api.rudy.example",
+            "https://user@api.rudy.example",
+            "https://api.rudy.example/v1",
+            "https://api.rudy.example?region=us",
+            "https://www.opentypeless.com",
+            "https://api.opentypeless.com",
+        ] {
+            assert_eq!(
+                resolve_api_base_url(Some(rejected.to_string()), ""),
+                MANAGED_SERVICE_DISABLED_URL,
+                "unexpectedly trusted {rejected}"
+            );
+        }
+
+        assert_eq!(
+            resolve_api_base_url(
+                Some("https://api.rudy.example/v1".to_string()),
+                "https://build.rudy.example/"
+            ),
+            "https://build.rudy.example"
+        );
     }
 
     #[test]
@@ -887,7 +982,7 @@ pub fn run() {
             app.manage(CloseToTrayCache(Arc::new(Mutex::new(
                 initial_config.close_to_tray,
             ))));
-            app.manage(SessionTokenStore(Arc::new(Mutex::new(String::new()))));
+            app.manage(SessionTokenStore::from_system_vault(&api_base_url()));
 
             // Register global shortcut from config
             let handler = hotkey::build_shortcut_handler(app_handle.clone());
@@ -1161,6 +1256,7 @@ pub fn run() {
             commands::history::get_local_activity_metrics,
             commands::history::clear_history,
             commands::backup::export_backup_data,
+            commands::backup::validate_backup_data,
             commands::backup::restore_backup_data,
             commands::dictionary::get_dictionary,
             commands::dictionary::add_dictionary_entry,
@@ -1185,6 +1281,7 @@ pub fn run() {
             commands::misc::get_hotkey_status,
             commands::misc::get_system_diagnostics,
             commands::config::set_auto_start,
+            commands::config::get_session_token,
             commands::config::set_capsule_auto_hide,
             commands::config::set_session_token,
         ])

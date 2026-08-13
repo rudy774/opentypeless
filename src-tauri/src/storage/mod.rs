@@ -569,6 +569,21 @@ impl AppConfig {
         self.normalize_history_settings();
     }
 
+    pub(crate) fn validate_provider_endpoints(&self) -> Result<(), String> {
+        if self.stt_provider == crate::stt::config::CUSTOM_WHISPER_PROVIDER {
+            crate::stt::config::normalize_custom_whisper_endpoint(&self.stt_custom_base_url)?;
+        } else if self.stt_provider != "cloud"
+            && self.stt_provider != crate::stt::config::APPLE_SPEECH_PROVIDER
+            && self.stt_provider != crate::stt::volcengine::VOLCENGINE_DOUBAO_PROVIDER
+            && self.stt_provider != "deepgram"
+            && self.stt_provider != "assemblyai"
+            && crate::stt::config::get_whisper_config(&self.stt_provider).is_none()
+        {
+            return Err("Unsupported STT provider".to_string());
+        }
+        crate::llm::validate_provider_base_url(&self.llm_provider, &self.llm_base_url)
+    }
+
     fn normalize_recording_limit(&mut self) {
         // Zero means recording continues until the user explicitly stops it.
         if self.max_recording_seconds != 0 {
@@ -1131,6 +1146,9 @@ impl ConfigManager {
     pub async fn save(&self, config: &AppConfig) -> Result<()> {
         let mut config = config.clone();
         config.normalize_values();
+        config
+            .validate_provider_endpoints()
+            .map_err(anyhow::Error::msg)?;
         let report = migrate_legacy_config_secrets(&mut config, &SystemCredentialVault)?;
         if !report.migrated.is_empty() {
             tracing::info!(
@@ -1211,14 +1229,33 @@ pub struct HistoryEntry {
 pub struct ActivityRangeMetrics {
     pub recording_ms: i64,
     pub saved_transcriptions: u64,
-    /// Unicode code points in polished output, including whitespace.
+    /// Unicode code points, including whitespace, in retained output that was
+    /// classified as automatically inserted or delivered through a fallback.
     pub output_chars: i64,
     pub active_days: u64,
+    /// Non-empty output with an explicit inserted/completed/success status
+    /// and no recorded error. Legacy null statuses remain unclassified.
+    pub successful_automatic_insertions: u64,
     pub recorded_fallbacks: u64,
+    /// Explicit failed/prevented/cancelled outcomes, or a diagnostic outcome
+    /// that produced no application output.
+    pub recorded_failures: u64,
+    /// Rows whose stored output fields are sufficient to classify as an
+    /// automatic insertion, fallback, or failure.
+    pub output_outcome_sample_count: u64,
     pub transformed_outputs: u64,
+    /// Saved History rows with a positive duration no longer than the
+    /// implausible-duration ceiling.
+    pub valid_duration_sample_count: u64,
+    /// Saved History rows whose duration is missing, non-positive, or longer
+    /// than the implausible-duration ceiling.
     pub excluded_duration_count: u64,
     pub average_total_ms: Option<f64>,
+    /// Nearest-rank percentiles of bounded stop-to-output latency samples.
+    pub p50_total_ms: Option<i64>,
+    pub p95_total_ms: Option<i64>,
     pub timing_sample_count: u64,
+    pub excluded_timing_count: u64,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Serialize)]
@@ -1228,7 +1265,11 @@ pub struct LocalActivityMetricsSummary {
     pub week: ActivityRangeMetrics,
     pub month: ActivityRangeMetrics,
     pub total_recordings: u64,
-    /// Count across all retained history, not only the current month.
+    /// Valid duration samples across all retained History, not only the
+    /// current month.
+    pub valid_duration_sample_count: u64,
+    /// Missing, non-positive, and implausibly long durations across all
+    /// retained History, not only the current month.
     pub excluded_duration_count: u64,
 }
 
@@ -1245,6 +1286,10 @@ pub struct TranscriptionTimeStats {
 /// excluded from the homepage aggregate. A background or stuck session must
 /// not turn one recording into an implausible multi-day usage total.
 pub const MAX_COUNTED_TRANSCRIPTION_DURATION_MS: i64 = 12 * 60 * 60 * 1_000;
+
+/// Stop-to-output timing values above one hour remain in History for
+/// diagnostics, but are not allowed to distort Home latency percentiles.
+pub const MAX_COUNTED_TURNAROUND_MS: i64 = 60 * 60 * 1_000;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -1299,6 +1344,25 @@ pub struct BackupSnapshot {
     pub history: Vec<HistoryEntry>,
     pub dictionary: Vec<DictionaryEntry>,
     pub correction_rules: Vec<CorrectionRule>,
+}
+
+/// Runs the exact size and dictionary/rule validators used by restore without
+/// opening a write transaction or mutating any persisted data.
+pub fn validate_backup_restore_data(
+    history: Option<&[HistoryEntry]>,
+    dictionary: Option<&[DictionaryEntry]>,
+    correction_rules: Option<&[CorrectionRule]>,
+) -> Result<()> {
+    if history.is_some_and(|entries| entries.len() > DEFAULT_HISTORY_MAX_ENTRIES as usize) {
+        anyhow::bail!("backup_history_too_large");
+    }
+    if let Some(entries) = dictionary {
+        prepare_backup_dictionary(entries.to_vec())?;
+    }
+    if let Some(entries) = correction_rules {
+        prepare_backup_correction_rules(entries.to_vec())?;
+    }
+    Ok(())
 }
 
 impl HistoryStore {
@@ -1544,20 +1608,35 @@ impl HistoryStore {
         let day = activity_range_metrics(&conn, day_start, now)?;
         let week = activity_range_metrics(&conn, week_start, now)?;
         let month = activity_range_metrics(&conn, month_start, now)?;
-        let (total_recordings, excluded_duration_count) = conn.query_row(
-            "SELECT
-                COUNT(*),
-                COALESCE(SUM(CASE WHEN duration_ms > ?1 THEN 1 ELSE 0 END), 0)
-             FROM history",
-            rusqlite::params![MAX_COUNTED_TRANSCRIPTION_DURATION_MS],
-            |row| Ok((row.get::<_, u64>(0)?, row.get::<_, u64>(1)?)),
-        )?;
+        let (total_recordings, valid_duration_sample_count, excluded_duration_count) = conn
+            .query_row(
+                "SELECT
+                    COUNT(*),
+                    COALESCE(SUM(CASE
+                        WHEN duration_ms > 0 AND duration_ms <= ?1 THEN 1
+                        ELSE 0
+                    END), 0),
+                    COALESCE(SUM(CASE
+                        WHEN duration_ms IS NULL OR duration_ms <= 0 OR duration_ms > ?1 THEN 1
+                        ELSE 0
+                    END), 0)
+                 FROM history",
+                rusqlite::params![MAX_COUNTED_TRANSCRIPTION_DURATION_MS],
+                |row| {
+                    Ok((
+                        row.get::<_, u64>(0)?,
+                        row.get::<_, u64>(1)?,
+                        row.get::<_, u64>(2)?,
+                    ))
+                },
+            )?;
 
         Ok(LocalActivityMetricsSummary {
             day,
             week,
             month,
             total_recordings,
+            valid_duration_sample_count,
             excluded_duration_count,
         })
     }
@@ -1574,7 +1653,11 @@ impl HistoryStore {
                 COALESCE(SUM(CASE WHEN created_at >= ?1 AND duration_ms > 0 AND duration_ms <= ?4 THEN duration_ms ELSE 0 END), 0),
                 COALESCE(SUM(CASE WHEN created_at >= ?2 AND duration_ms > 0 AND duration_ms <= ?4 THEN duration_ms ELSE 0 END), 0),
                 COALESCE(SUM(CASE WHEN created_at >= ?3 AND duration_ms > 0 AND duration_ms <= ?4 THEN duration_ms ELSE 0 END), 0),
-                COALESCE(SUM(CASE WHEN created_at >= ?3 AND duration_ms > ?4 THEN 1 ELSE 0 END), 0)
+                COALESCE(SUM(CASE
+                    WHEN created_at >= ?3
+                        AND (duration_ms IS NULL OR duration_ms <= 0 OR duration_ms > ?4)
+                    THEN 1 ELSE 0
+                END), 0)
              FROM history",
             rusqlite::params![
                 day_start,
@@ -1595,7 +1678,7 @@ impl HistoryStore {
             tracing::warn!(
                 excluded_count = stats.excluded_count,
                 maximum_counted_ms = MAX_COUNTED_TRANSCRIPTION_DURATION_MS,
-                "Excluded implausible recording durations from transcription-time statistics"
+                "Excluded missing, invalid, or implausibly long durations from transcription-time statistics"
             );
         }
         Ok(stats)
@@ -1618,12 +1701,11 @@ impl HistoryStore {
         policy: &HistoryRetentionPolicy,
         now_iso: &str,
     ) -> Result<()> {
-        if history
-            .as_ref()
-            .is_some_and(|entries| entries.len() > DEFAULT_HISTORY_MAX_ENTRIES as usize)
-        {
-            anyhow::bail!("backup_history_too_large");
-        }
+        validate_backup_restore_data(
+            history.as_deref(),
+            dictionary.as_deref(),
+            correction_rules.as_deref(),
+        )?;
         let dictionary = dictionary.map(prepare_backup_dictionary).transpose()?;
         let correction_rules = correction_rules
             .map(prepare_backup_correction_rules)
@@ -1879,55 +1961,168 @@ fn activity_range_metrics(
     start: &str,
     now: &str,
 ) -> Result<ActivityRangeMetrics> {
-    conn.query_row(
-        "SELECT
+    let mut metrics = conn.query_row(
+        "WITH classified AS (
+            SELECT
+                *,
+                CASE
+                    WHEN length(trim(polished_text)) > 0
+                        AND output_error IS NULL
+                        AND (
+                            lower(trim(output_status)) IN ('inserted', 'completed', 'success')
+                        ) THEN 1
+                    ELSE 0
+                END AS automatic_success,
+                CASE
+                    WHEN lower(trim(COALESCE(output_status, ''))) IN (
+                            'failed', 'prevented', 'cancelled'
+                        )
+                        OR (
+                            length(trim(polished_text)) = 0
+                            AND (output_status IS NOT NULL OR output_error IS NOT NULL)
+                        ) THEN 1
+                    ELSE 0
+                END AS recorded_failure
+            FROM history
+            WHERE created_at >= ?1 AND created_at <= ?2
+         ), outcomes AS (
+            SELECT
+                *,
+                CASE
+                    WHEN length(trim(polished_text)) > 0
+                        AND automatic_success = 0
+                        AND recorded_failure = 0
+                        AND (output_status IS NOT NULL OR output_error IS NOT NULL) THEN 1
+                    ELSE 0
+                END AS recorded_fallback
+            FROM classified
+         )
+         SELECT
             COALESCE(SUM(CASE
                 WHEN duration_ms > 0 AND duration_ms <= ?3 THEN duration_ms
                 ELSE 0
             END), 0),
             COUNT(*),
-            COALESCE(SUM(length(polished_text)), 0),
-            COUNT(DISTINCT substr(created_at, 1, 10)),
             COALESCE(SUM(CASE
-                WHEN output_status IS NOT NULL OR output_error IS NOT NULL THEN 1
+                WHEN automatic_success = 1 OR recorded_fallback = 1
+                    THEN length(polished_text)
                 ELSE 0
             END), 0),
+            COUNT(DISTINCT substr(created_at, 1, 10)),
+            COALESCE(SUM(automatic_success), 0),
+            COALESCE(SUM(recorded_fallback), 0),
+            COALESCE(SUM(recorded_failure), 0),
+            COALESCE(SUM(automatic_success + recorded_fallback + recorded_failure), 0),
             COALESCE(SUM(CASE
-                WHEN output_status IS NULL
-                    AND output_error IS NULL
+                WHEN automatic_success = 1
                     AND length(trim(polished_text)) > 0
                     AND trim(raw_text) <> trim(polished_text) THEN 1
                 ELSE 0
             END), 0),
             COALESCE(SUM(CASE
-                WHEN duration_ms > ?3 THEN 1
+                WHEN duration_ms > 0 AND duration_ms <= ?3 THEN 1
+                ELSE 0
+            END), 0),
+            COALESCE(SUM(CASE
+                WHEN duration_ms IS NULL OR duration_ms <= 0 OR duration_ms > ?3 THEN 1
                 ELSE 0
             END), 0),
             AVG(CASE
-                WHEN total_ms IS NOT NULL AND total_ms >= 0 THEN total_ms
+                WHEN length(trim(polished_text)) > 0
+                    AND recorded_failure = 0
+                    AND total_ms >= 0
+                    AND total_ms <= ?4 THEN total_ms
             END),
             COALESCE(SUM(CASE
-                WHEN total_ms IS NOT NULL AND total_ms >= 0 THEN 1
+                WHEN length(trim(polished_text)) > 0
+                    AND recorded_failure = 0
+                    AND total_ms >= 0
+                    AND total_ms <= ?4 THEN 1
+                ELSE 0
+            END), 0),
+            COALESCE(SUM(CASE
+                WHEN length(trim(polished_text)) > 0
+                    AND recorded_failure = 0
+                    AND total_ms IS NOT NULL
+                    AND (total_ms < 0 OR total_ms > ?4) THEN 1
                 ELSE 0
             END), 0)
-         FROM history
-         WHERE created_at >= ?1 AND created_at <= ?2",
-        rusqlite::params![start, now, MAX_COUNTED_TRANSCRIPTION_DURATION_MS],
+         FROM outcomes",
+        rusqlite::params![
+            start,
+            now,
+            MAX_COUNTED_TRANSCRIPTION_DURATION_MS,
+            MAX_COUNTED_TURNAROUND_MS
+        ],
         |row| {
             Ok(ActivityRangeMetrics {
                 recording_ms: row.get(0)?,
                 saved_transcriptions: row.get(1)?,
                 output_chars: row.get(2)?,
                 active_days: row.get(3)?,
-                recorded_fallbacks: row.get(4)?,
-                transformed_outputs: row.get(5)?,
-                excluded_duration_count: row.get(6)?,
-                average_total_ms: row.get(7)?,
-                timing_sample_count: row.get(8)?,
+                successful_automatic_insertions: row.get(4)?,
+                recorded_fallbacks: row.get(5)?,
+                recorded_failures: row.get(6)?,
+                output_outcome_sample_count: row.get(7)?,
+                transformed_outputs: row.get(8)?,
+                valid_duration_sample_count: row.get(9)?,
+                excluded_duration_count: row.get(10)?,
+                average_total_ms: row.get(11)?,
+                p50_total_ms: None,
+                p95_total_ms: None,
+                timing_sample_count: row.get(12)?,
+                excluded_timing_count: row.get(13)?,
             })
         },
-    )
-    .map_err(Into::into)
+    )?;
+
+    (metrics.p50_total_ms, metrics.p95_total_ms) =
+        bounded_turnaround_percentiles(conn, start, now)?;
+    Ok(metrics)
+}
+
+fn bounded_turnaround_percentiles(
+    conn: &Connection,
+    start: &str,
+    now: &str,
+) -> Result<(Option<i64>, Option<i64>)> {
+    let mut statement = conn.prepare(
+        "SELECT total_ms
+         FROM history
+         WHERE created_at >= ?1
+            AND created_at <= ?2
+            AND length(trim(polished_text)) > 0
+            AND lower(trim(COALESCE(output_status, ''))) NOT IN (
+                'failed', 'prevented', 'cancelled'
+            )
+            AND total_ms >= 0
+            AND total_ms <= ?3
+         ORDER BY total_ms ASC",
+    )?;
+    let samples = statement
+        .query_map(
+            rusqlite::params![start, now, MAX_COUNTED_TURNAROUND_MS],
+            |row| row.get::<_, i64>(0),
+        )?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+
+    Ok((
+        nearest_rank_percentile(&samples, 50),
+        nearest_rank_percentile(&samples, 95),
+    ))
+}
+
+fn nearest_rank_percentile(sorted_samples: &[i64], percentile: usize) -> Option<i64> {
+    if sorted_samples.is_empty() {
+        return None;
+    }
+
+    let rank = sorted_samples
+        .len()
+        .saturating_mul(percentile)
+        .saturating_add(99)
+        / 100;
+    sorted_samples.get(rank.saturating_sub(1)).copied()
 }
 
 fn prepare_backup_dictionary(
@@ -3011,18 +3206,24 @@ mod tests {
 
     #[test]
     fn app_config_normalizes_recording_limit_and_preserves_manual_stop() {
-        let mut manual = AppConfig::default();
-        manual.max_recording_seconds = 0;
+        let mut manual = AppConfig {
+            max_recording_seconds: 0,
+            ..Default::default()
+        };
         manual.normalize_values();
         assert_eq!(manual.max_recording_seconds, 0);
 
-        let mut too_short = AppConfig::default();
-        too_short.max_recording_seconds = 1;
+        let mut too_short = AppConfig {
+            max_recording_seconds: 1,
+            ..Default::default()
+        };
         too_short.normalize_values();
         assert_eq!(too_short.max_recording_seconds, 5);
 
-        let mut too_long = AppConfig::default();
-        too_long.max_recording_seconds = 10_000;
+        let mut too_long = AppConfig {
+            max_recording_seconds: 10_000,
+            ..Default::default()
+        };
         too_long.normalize_values();
         assert_eq!(too_long.max_recording_seconds, 720);
     }
@@ -3594,7 +3795,7 @@ mod tests {
                 day_ms: 3_000,
                 week_ms: 5_000,
                 month_ms: 6_000,
-                excluded_count: 0,
+                excluded_count: 1,
             }
         );
     }
@@ -3640,6 +3841,7 @@ mod tests {
         month_only.polished_text = "a b".to_string();
         month_only.duration_ms = Some(1_000);
         month_only.total_ms = Some(100);
+        month_only.output_status = Some("inserted".to_string());
         store.add(month_only).await.unwrap();
 
         let mut week = test_history_entry(2, "2026-07-14T09:00:00");
@@ -3655,6 +3857,7 @@ mod tests {
         day.polished_text = "Hello!".to_string();
         day.duration_ms = Some(3_000);
         day.total_ms = Some(500);
+        day.output_status = Some("inserted".to_string());
         store.add(day).await.unwrap();
 
         let mut invalid_duration = test_history_entry(4, "2026-07-19T10:00:00");
@@ -3669,6 +3872,7 @@ mod tests {
         current_outlier.polished_text = "x".to_string();
         current_outlier.duration_ms = Some(MAX_COUNTED_TRANSCRIPTION_DURATION_MS + 1);
         current_outlier.total_ms = Some(700);
+        current_outlier.output_status = Some("inserted".to_string());
         store.add(current_outlier).await.unwrap();
 
         let mut prior_outlier = test_history_entry(6, "2026-06-30T11:00:00");
@@ -3680,6 +3884,38 @@ mod tests {
         future.duration_ms = Some(9_000);
         future.total_ms = Some(900);
         store.add(future).await.unwrap();
+
+        let mut failed = test_history_entry(8, "2026-07-19T12:00:00");
+        failed.raw_text = "failure raw".to_string();
+        failed.polished_text = String::new();
+        failed.output_status = Some("failed".to_string());
+        failed.output_error = Some("Automatic output failed".to_string());
+        failed.total_ms = Some(450);
+        store.add(failed).await.unwrap();
+
+        let mut timing_outlier = test_history_entry(9, "2026-07-19T13:00:00");
+        timing_outlier.raw_text = "lag".to_string();
+        timing_outlier.polished_text = "lag".to_string();
+        timing_outlier.duration_ms = Some(0);
+        timing_outlier.total_ms = Some(MAX_COUNTED_TURNAROUND_MS + 1);
+        timing_outlier.output_status = Some("inserted".to_string());
+        store.add(timing_outlier).await.unwrap();
+
+        let mut legacy_unclassified = test_history_entry(10, "2026-07-19T14:00:00");
+        legacy_unclassified.raw_text = "legacy".to_string();
+        legacy_unclassified.polished_text = "legacy".to_string();
+        legacy_unclassified.total_ms = Some(600);
+        store.add(legacy_unclassified).await.unwrap();
+
+        let mut cancelled = test_history_entry(11, "2026-07-19T15:00:00");
+        cancelled.raw_text = "cancelled".to_string();
+        cancelled.polished_text = "cancelled".to_string();
+        cancelled.total_ms = Some(650);
+        cancelled.output_status = Some("cancelled".to_string());
+        cancelled.output_error =
+            Some("Dictation was cancelled before automatic output".to_string());
+        store.add(cancelled).await.unwrap();
+
         let summary = store
             .local_activity_metrics(
                 "2026-07-19T00:00:00",
@@ -3690,48 +3926,70 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(summary.total_recordings, 7);
-        assert_eq!(summary.excluded_duration_count, 2);
+        assert_eq!(summary.total_recordings, 11);
+        assert_eq!(summary.valid_duration_sample_count, 4);
+        assert_eq!(summary.excluded_duration_count, 7);
         assert_eq!(
             summary.day,
             ActivityRangeMetrics {
                 recording_ms: 3_000,
-                saved_transcriptions: 3,
-                output_chars: 10,
+                saved_transcriptions: 7,
+                output_chars: 13,
                 active_days: 1,
+                successful_automatic_insertions: 3,
                 recorded_fallbacks: 1,
+                recorded_failures: 2,
+                output_outcome_sample_count: 6,
                 transformed_outputs: 1,
+                valid_duration_sample_count: 1,
                 average_total_ms: Some(600.0),
-                timing_sample_count: 2,
-                excluded_duration_count: 1,
+                p50_total_ms: Some(600),
+                p95_total_ms: Some(700),
+                timing_sample_count: 3,
+                excluded_timing_count: 1,
+                excluded_duration_count: 6,
             }
         );
         assert_eq!(
             summary.week,
             ActivityRangeMetrics {
                 recording_ms: 5_000,
-                saved_transcriptions: 4,
-                output_chars: 14,
+                saved_transcriptions: 8,
+                output_chars: 17,
                 active_days: 2,
+                successful_automatic_insertions: 3,
                 recorded_fallbacks: 2,
+                recorded_failures: 2,
+                output_outcome_sample_count: 7,
                 transformed_outputs: 1,
-                average_total_ms: Some(500.0),
-                timing_sample_count: 3,
-                excluded_duration_count: 1,
+                valid_duration_sample_count: 2,
+                average_total_ms: Some(525.0),
+                p50_total_ms: Some(500),
+                p95_total_ms: Some(700),
+                timing_sample_count: 4,
+                excluded_timing_count: 1,
+                excluded_duration_count: 6,
             }
         );
         assert_eq!(
             summary.month,
             ActivityRangeMetrics {
                 recording_ms: 6_000,
-                saved_transcriptions: 5,
-                output_chars: 17,
+                saved_transcriptions: 9,
+                output_chars: 20,
                 active_days: 3,
+                successful_automatic_insertions: 4,
                 recorded_fallbacks: 2,
+                recorded_failures: 2,
+                output_outcome_sample_count: 8,
                 transformed_outputs: 1,
-                average_total_ms: Some(400.0),
-                timing_sample_count: 4,
-                excluded_duration_count: 1,
+                valid_duration_sample_count: 3,
+                average_total_ms: Some(440.0),
+                p50_total_ms: Some(500),
+                p95_total_ms: Some(700),
+                timing_sample_count: 5,
+                excluded_timing_count: 1,
+                excluded_duration_count: 6,
             }
         );
     }
@@ -3744,29 +4002,59 @@ mod tests {
                 saved_transcriptions: 2,
                 output_chars: 3,
                 active_days: 4,
+                successful_automatic_insertions: 5,
                 recorded_fallbacks: 5,
+                recorded_failures: 6,
+                output_outcome_sample_count: 7,
                 transformed_outputs: 6,
+                valid_duration_sample_count: 8,
                 average_total_ms: Some(8.5),
+                p50_total_ms: Some(8),
+                p95_total_ms: Some(9),
                 timing_sample_count: 9,
+                excluded_timing_count: 2,
                 excluded_duration_count: 7,
             },
             total_recordings: 9,
+            valid_duration_sample_count: 8,
             excluded_duration_count: 10,
             ..LocalActivityMetricsSummary::default()
         })
         .unwrap();
 
         assert_eq!(value["totalRecordings"], 9);
+        assert_eq!(value["validDurationSampleCount"], 8);
         assert_eq!(value["excludedDurationCount"], 10);
         assert_eq!(value["day"]["recordingMs"], 1);
         assert_eq!(value["day"]["savedTranscriptions"], 2);
         assert_eq!(value["day"]["outputChars"], 3);
         assert_eq!(value["day"]["activeDays"], 4);
+        assert_eq!(value["day"]["successfulAutomaticInsertions"], 5);
         assert_eq!(value["day"]["recordedFallbacks"], 5);
+        assert_eq!(value["day"]["recordedFailures"], 6);
+        assert_eq!(value["day"]["outputOutcomeSampleCount"], 7);
         assert_eq!(value["day"]["transformedOutputs"], 6);
+        assert_eq!(value["day"]["validDurationSampleCount"], 8);
         assert_eq!(value["day"]["excludedDurationCount"], 7);
         assert_eq!(value["day"]["averageTotalMs"], 8.5);
+        assert_eq!(value["day"]["p50TotalMs"], 8);
+        assert_eq!(value["day"]["p95TotalMs"], 9);
         assert_eq!(value["day"]["timingSampleCount"], 9);
+        assert_eq!(value["day"]["excludedTimingCount"], 2);
+    }
+
+    #[test]
+    fn nearest_rank_percentiles_are_deterministic_for_small_samples() {
+        assert_eq!(nearest_rank_percentile(&[], 50), None);
+        assert_eq!(nearest_rank_percentile(&[100], 95), Some(100));
+        assert_eq!(
+            nearest_rank_percentile(&[100, 300, 500, 700], 50),
+            Some(300)
+        );
+        assert_eq!(
+            nearest_rank_percentile(&[100, 300, 500, 700], 95),
+            Some(700)
+        );
     }
 
     #[tokio::test]

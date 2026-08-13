@@ -2,6 +2,9 @@
   <a href="README.md">English</a> | <a href="README_zh.md">中文</a> | <a href="README_ja.md">日本語</a> | <a href="README_ko.md">한국어</a> | <a href="README_es.md">Español</a> | <a href="README_fr.md">Français</a> | <a href="README_de.md">Deutsch</a> | <a href="README_pt.md">Português</a> | <a href="README_ru.md">Русский</a> | <a href="README_ar.md">العربية</a> | <a href="README_hi.md">हिन्दी</a> | <a href="README_it.md">Italiano</a> | <a href="README_tr.md">Türkçe</a> | <a href="README_vi.md">Tiếng Việt</a> | <a href="README_th.md">ภาษาไทย</a> | <strong>Bahasa Indonesia</strong> | <a href="README_pl.md">Polski</a> | <a href="README_nl.md">Nederlands</a>
 </p>
 
+> [!IMPORTANT]
+> **Fork status:** This is the **Rudy774 fork**, which differs from the original OpenTypeless project. Source code, releases, and support are provided only through [github.com/rudy774/opentypeless](https://github.com/rudy774/opentypeless). This fork does **not** currently provide a hosted paid service, and automatic updates are disabled.
+
 <p align="center">
   <img src="src-tauri/icons/128x128@2x.png" width="128" height="128" alt="Logo OpenTypeless" />
 </p>
@@ -19,11 +22,10 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/tover0314-w/opentypeless/actions/workflows/ci.yml"><img src="https://github.com/tover0314-w/opentypeless/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
-  <a href="https://github.com/tover0314-w/opentypeless/releases"><img src="https://img.shields.io/github/v/release/tover0314-w/opentypeless?color=2ABBA7" alt="Rilis" /></a>
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/tover0314-w/opentypeless" alt="Lisensi" /></a>
-  <a href="https://github.com/tover0314-w/opentypeless/stargazers"><img src="https://img.shields.io/github/stars/tover0314-w/opentypeless?style=social" alt="Bintang" /></a>
-  <a href="https://discord.gg/V6rRpJ4RGD"><img src="https://img.shields.io/badge/Discord-Bergabung-5865F2?logo=discord&logoColor=white" alt="Discord" /></a>
+  <a href="https://github.com/rudy774/opentypeless/actions/workflows/ci.yml"><img src="https://github.com/rudy774/opentypeless/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="https://github.com/rudy774/opentypeless/releases"><img src="https://img.shields.io/github/v/release/rudy774/opentypeless?color=2ABBA7" alt="Rilis" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/rudy774/opentypeless" alt="Lisensi" /></a>
+  <a href="https://github.com/rudy774/opentypeless/stargazers"><img src="https://img.shields.io/github/stars/rudy774/opentypeless?style=social" alt="Bintang" /></a>
 </p>
 
 <p align="center">
@@ -34,7 +36,9 @@
   <img src="docs/images/voice-flow-demo.gif" width="720" alt="Demo OpenTypeless" />
 </p>
 
-## Yang baru di v1.1.49
+## Inherited upstream capabilities
+
+The capabilities below originated in the upstream project before this fork. This is historical attribution, not a release-version or support claim.
 
 - **Penulisan berbasis aplikasi** mendeteksi aplikasi aktif secara lokal dan menyesuaikan struktur serta nada untuk email, obrolan, dokumen, pelacak isu, alat pengembangan, dan lingkungan lainnya.
 - **Perutean maksud suara** membedakan dikte, penyuntingan teks terpilih, terjemahan, Ask Anything, dan tindakan suara yang didukung dalam bahasa Inggris, Mandarin Sederhana, dan Mandarin Tradisional.
@@ -47,7 +51,7 @@ Deteksi aplikasi, pemetaan, entri kamus, dan aturan koreksi disimpan secara loka
 
 | Pemolesan AI berbasis aplikasi | Kamus lokal dan koreksi |
 | --- | --- |
-| <img src="docs/images/v1.1.49-app-aware-polish.jpg" width="420" alt="Pemolesan AI berbasis aplikasi di OpenTypeless v1.1.49" /> | <img src="docs/images/v1.1.49-dictionary.jpg" width="420" alt="Kamus lokal dan koreksi di OpenTypeless v1.1.49" /> |
+| <img src="docs/images/v1.1.49-app-aware-polish.jpg" width="420" alt="Pemolesan AI berbasis aplikasi di OpenTypeless inherited upstream" /> | <img src="docs/images/v1.1.49-dictionary.jpg" width="420" alt="Kamus lokal dan koreksi di OpenTypeless inherited upstream" /> |
 
 <details>
 <summary>Lihat lebih banyak tangkapan layar</summary>
@@ -107,7 +111,7 @@ Deteksi aplikasi, pemetaan, entri kamus, dan aturan koreksi disimpan secara loka
 
 Unduh versi terbaru untuk platform Anda:
 
-**[Unduh dari Releases](https://github.com/tover0314-w/opentypeless/releases)**
+**[Unduh dari Releases](https://github.com/rudy774/opentypeless/releases)**
 
 | Platform | File |
 |----------|------|
@@ -149,43 +153,11 @@ Semua pengaturan dapat diakses dari panel Pengaturan dalam aplikasi:
 
 API key disimpan secara lokal melalui `tauri-plugin-store`. Tidak ada key yang dikirim ke server OpenTypeless — semua permintaan STT/LLM langsung menuju penyedia yang Anda konfigurasi.
 
-### Opsi Cloud (Pro)
+### Managed service status for this fork
 
-OpenTypeless juga menawarkan langganan Pro opsional yang menyediakan kuota STT dan LLM terkelola sehingga Anda tidak memerlukan API key sendiri. Ini sepenuhnya opsional — aplikasi berfungsi penuh dengan key Anda sendiri.
+This fork currently supports bring-your-own-key and local providers. It does not include a hosted paid service. Account, entitlement, checkout, backup, and managed transcription features remain disabled unless you build and operate a compatible backend yourself.
 
-[Pelajari lebih lanjut tentang Pro](https://www.opentypeless.com)
-
-### BYOK (Bawa Key Sendiri) vs Cloud
-
-| | Mode BYOK | Mode Cloud (Pro) |
-|---|---|---|
-| STT | API key Anda (Deepgram, AssemblyAI, dll.) | Kuota terkelola (10 jam/bulan) |
-| LLM | API key Anda (OpenAI, DeepSeek, dll.) | Kuota terkelola (~5M token/bulan) |
-| Ketergantungan cloud | Tidak ada — semua permintaan langsung ke penyedia Anda | Memerlukan koneksi ke www.opentypeless.com |
-| Biaya | Bayar langsung ke penyedia Anda | Langganan $4.99/bulan |
-
-Semua fitur inti — perekaman, transkripsi, AI polish, output keyboard/clipboard, kamus, riwayat — bekerja sepenuhnya secara independen dari server OpenTypeless dalam mode BYOK.
-
-### Hosting Mandiri / Tanpa Cloud
-
-Untuk menjalankan OpenTypeless tanpa ketergantungan cloud:
-
-1. Pilih penyedia STT dan LLM non-Cloud di Pengaturan
-2. Masukkan API key Anda sendiri
-3. Selesai — tidak perlu akun atau koneksi internet ke www.opentypeless.com
-
-Jika Anda ingin mengarahkan fitur cloud opsional ke backend Anda sendiri, atur variabel lingkungan berikut sebelum build:
-
-| Variabel | Default | Deskripsi |
-|---|---|---|
-| `VITE_API_BASE_URL` | `https://www.opentypeless.com` | URL dasar API cloud untuk frontend |
-| `API_BASE_URL` | `https://www.opentypeless.com` | URL dasar API cloud untuk Rust backend |
-
-```bash
-# Contoh: build dengan backend kustom
-VITE_API_BASE_URL=https://my-server.example.com API_BASE_URL=https://my-server.example.com npm run tauri build
-```
-
+A self-hosted managed backend must be configured explicitly at build time with both `VITE_MANAGED_API_BASE_URL` and `OPENTYPELESS_MANAGED_API_BASE_URL`. There is no production default. Both values must be the same owned HTTPS origin; see `docs/MANAGED_SERVICE_API.md` and `docs/COMMERCIALIZATION.md`.
 ## Arsitektur
 
 **Pipeline Aliran Data:**
@@ -237,9 +209,8 @@ Ya. Aplikasi berfungsi penuh dengan API key Anda sendiri (BYOK). Langganan Cloud
 
 ## Komunitas
 
-- 💬 [Discord](https://discord.gg/V6rRpJ4RGD) — Mengobrol, mendapatkan bantuan, berbagi umpan balik
-- 🗣️ [GitHub Discussions](https://github.com/tover0314-w/opentypeless/discussions) — Proposal fitur, Tanya Jawab
-- 🐛 [Issue Tracker](https://github.com/tover0314-w/opentypeless/issues) — Laporan bug dan permintaan fitur
+- 🗣️ [GitHub Discussions](https://github.com/rudy774/opentypeless/discussions) — Proposal fitur, Tanya Jawab
+- 🐛 [Issue Tracker](https://github.com/rudy774/opentypeless/issues) — Laporan bug dan permintaan fitur
 - 📖 [Panduan Kontribusi](CONTRIBUTING.md) — Setup pengembangan dan panduan
 - 🔒 [Kebijakan Keamanan](SECURITY.md) — Laporkan kerentanan secara bertanggung jawab
 - 🧭 [Visi](VISION.md) — Prinsip proyek dan arah peta jalan
@@ -248,15 +219,15 @@ Ya. Aplikasi berfungsi penuh dengan API key Anda sendiri (BYOK). Langganan Cloud
 
 Kontribusi sangat diterima! Lihat [CONTRIBUTING.md](CONTRIBUTING.md) untuk setup pengembangan dan panduan.
 
-Mencari tempat untuk memulai? Lihat issue berlabel [`good first issue`](https://github.com/tover0314-w/opentypeless/labels/good%20first%20issue).
+Mencari tempat untuk memulai? Lihat issue berlabel [`good first issue`](https://github.com/rudy774/opentypeless/labels/good%20first%20issue).
 
 ## Riwayat Star
 
-<a href="https://star-history.com/#tover0314-w/opentypeless&Date">
+<a href="https://star-history.com/#rudy774/opentypeless&Date">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=tover0314-w/opentypeless&type=Date&theme=dark" />
-    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=tover0314-w/opentypeless&type=Date" />
-    <img alt="Grafik Riwayat Star" src="https://api.star-history.com/svg?repos=tover0314-w/opentypeless&type=Date" />
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=rudy774/opentypeless&type=Date&theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=rudy774/opentypeless&type=Date" />
+    <img alt="Grafik Riwayat Star" src="https://api.star-history.com/svg?repos=rudy774/opentypeless&type=Date" />
   </picture>
 </a>
 

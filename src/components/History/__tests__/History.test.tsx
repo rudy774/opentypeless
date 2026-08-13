@@ -134,4 +134,21 @@ describe('History correction creation', () => {
     })
     confirmSpy.mockRestore()
   })
+
+  it('shows diagnostics for explicit failure states without a legacy status label', async () => {
+    const cancelled = {
+      ...entry,
+      polished_text: 'Uninserted text',
+      output_status: 'cancelled',
+      output_error: 'Dictation was cancelled before automatic output',
+    }
+    useAppStore.setState({ history: [cancelled] })
+    vi.mocked(getHistory).mockResolvedValue([cancelled])
+
+    render(<History />)
+
+    expect(
+      await screen.findByText(/Cancelled.*Dictation was cancelled before automatic output/),
+    ).toBeInTheDocument()
+  })
 })

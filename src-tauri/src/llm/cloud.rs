@@ -118,6 +118,9 @@ impl LlmProvider for CloudLlmProvider {
         req: &PolishRequest,
         on_chunk: Option<&ChunkCallback>,
     ) -> Result<PolishResponse, AppError> {
+        if !crate::managed_service_configured() {
+            return Err(crate::managed_service_unconfigured_error());
+        }
         if config.api_key.is_empty() {
             return Err(AppError::Auth(
                 "Cloud LLM: session token is missing. Please sign in first.".to_string(),

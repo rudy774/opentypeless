@@ -3,6 +3,13 @@ import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/re
 import { SttPane } from '../SttPane'
 import * as tauri from '../../../lib/tauri'
 
+const managedService = vi.hoisted(() => ({ configured: true }))
+vi.mock('../../../lib/constants', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../lib/constants')>()),
+  get MANAGED_SERVICE_CONFIGURED() {
+    return managedService.configured
+  },
+}))
 // Mock Tauri
 vi.mock('../../../lib/tauri')
 
@@ -24,6 +31,8 @@ vi.mock('react-i18next', () => ({
         'settings.sttSignInHint': 'Sign in to use cloud STT',
         'settings.sttUpgradeHint': 'Upgrade to Pro to use cloud STT',
         'settings.sttProActive': 'Cloud STT active',
+        'settings.managedServiceUnavailableByok':
+          'Managed cloud is not configured. Choose a BYOK or local provider.',
         'settings.customSttPreset': 'Preset',
         'settings.customSttPresetSpeaches': 'Speaches',
         'settings.customSttPresetCustom': 'Custom OpenAI-compatible',
@@ -115,6 +124,7 @@ vi.mock('../../../stores/authStore', () => ({
 
 describe('SttPane', () => {
   beforeEach(() => {
+    managedService.configured = true
     // Reset mock store state
     mockAppStore.config = {
       stt_provider: 'deepgram',
@@ -266,6 +276,21 @@ describe('SttPane', () => {
   })
 
   describe('Cloud provider UI', () => {
+    it('removes cloud and migrates stale saved cloud config when the service is unconfigured', () => {
+      managedService.configured = false
+      mockAppStore.config.stt_provider = 'cloud'
+
+      render(<SttPane />)
+
+      const providerSelect = screen.getAllByRole('combobox')[0]
+      expect(providerSelect).toHaveValue('glm-asr')
+      expect(providerSelect.querySelector('option[value="cloud"]')).toBeNull()
+      expect(mockAppStore.updateConfig).toHaveBeenCalledWith({ stt_provider: 'glm-asr' })
+      expect(
+        screen.getByText('Managed cloud is not configured. Choose a BYOK or local provider.'),
+      ).toBeInTheDocument()
+      expect(screen.queryByText('Sign in to use cloud STT')).not.toBeInTheDocument()
+    })
     it('shows cloud info when provider is cloud and user not signed in', () => {
       mockAppStore.config.stt_provider = 'cloud'
       render(<SttPane />)

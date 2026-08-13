@@ -80,7 +80,11 @@ impl AppError {
 
     pub fn to_user_error(&self) -> UserError {
         let (code, details) = match self {
-            AppError::Network(msg) => ("stt_timeout".to_string(), Some(msg.clone())),
+            // Network libraries commonly include the full request URL in their
+            // error text. Do not send that text across the Tauri boundary: a
+            // custom provider URL may contain userinfo, query credentials, or
+            // other sensitive request metadata.
+            AppError::Network(_) => ("stt_timeout".to_string(), None),
             AppError::Timeout(_) => ("stt_timeout".to_string(), None),
             AppError::Api { status, body: _ } => {
                 if *status == 401 || *status == 403 {
@@ -113,7 +117,9 @@ impl AppError {
 impl std::fmt::Display for AppError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            AppError::Network(msg) => write!(f, "Network error: {}", msg),
+            // Keep Display safe because it is reused by retry events, logs, and
+            // persisted failure descriptions throughout the pipeline.
+            AppError::Network(_) => write!(f, "Network request failed"),
             AppError::Timeout(d) => write!(f, "Timeout after {:.1}s", d.as_secs_f64()),
             AppError::Api { status, .. } => write!(f, "API error {}", status),
             AppError::Auth(_) => write!(f, "Authentication failed"),
@@ -135,10 +141,15 @@ impl From<reqwest::Error> for AppError {
         } else if let Some(status) = e.status() {
             AppError::Api {
                 status: status.as_u16(),
-                body: e.to_string(),
+                // A reqwest error can retain the request URL. The response body
+                // is not available here, so retaining Display text adds no
+                // managed-error parsing value and can leak URL credentials.
+                body: String::new(),
             }
         } else {
-            AppError::Network(e.to_string())
+            // Never retain reqwest's Display text: it can include the complete
+            // request URL, including userinfo and query parameters.
+            AppError::Network("request failed".to_string())
         }
     }
 }
@@ -353,6 +364,7 @@ mod tests {
         let err = AppError::Network("timeout".to_string());
         let ue = err.to_user_error();
         assert_eq!(ue.code, "stt_timeout");
+        assert_eq!(ue.details, None);
     }
 
     #[test]
@@ -379,7 +391,7 @@ mod tests {
     #[test]
     fn test_display_format() {
         let err = AppError::Network("timeout".to_string());
-        assert!(err.to_string().contains("Network error"));
+        assert!(err.to_string().contains("Network request failed"));
 
         let err = AppError::Timeout(Duration::from_secs(5));
         assert!(err.to_string().contains("Timeout"));
@@ -390,5 +402,68 @@ mod tests {
         };
         assert!(err.to_string().contains("429"));
         assert!(!err.to_string().contains("rate limited"));
+    }
+
+    #[test]
+    fn network_error_hides_sensitive_request_details() {
+        let sensitive =
+            "request failed for https://user:password@example.test/stt?api_key=secret-token";
+        let err = AppError::Network(sensitive.to_string());
+
+        let displayed = err.to_string();
+        assert_eq!(displayed, "Network request failed");
+        assert!(!displayed.contains("example.test"));
+        assert!(!displayed.contains("password"));
+        assert!(!displayed.contains("secret-token"));
+
+        let user_error = err.to_user_error();
+        assert_eq!(user_error.code, "stt_timeout");
+        assert_eq!(user_error.details, None);
+        let serialized = serde_json::to_string(&user_error).unwrap();
+        assert!(!serialized.contains("example.test"));
+        assert!(!serialized.contains("password"));
+        assert!(!serialized.contains("secret-token"));
+    }
+
+    #[test]
+    fn reqwest_conversion_discards_sensitive_builder_error_text() {
+        let sensitive = "https://user:password@example.test:not-a-port/stt?api_key=secret-token";
+        let reqwest_error = reqwest::Client::new().get(sensitive).build().unwrap_err();
+        let err = AppError::from(reqwest_error);
+
+        match &err {
+            AppError::Network(message) => assert_eq!(message, "request failed"),
+            other => panic!("expected network error, got {other}"),
+        }
+        let displayed = err.to_string();
+        assert_eq!(displayed, "Network request failed");
+        let serialized = serde_json::to_string(&err.to_user_error()).unwrap();
+        for secret in ["example.test", "password", "secret-token"] {
+            assert!(!displayed.contains(secret));
+            assert!(!serialized.contains(secret));
+        }
+    }
+
+    #[test]
+    fn api_error_hides_provider_body_from_display_and_user_error() {
+        let sensitive = "provider rejected https://user:password@example.test?token=secret-token";
+        let err = AppError::Api {
+            status: 503,
+            body: sensitive.to_string(),
+        };
+
+        let displayed = err.to_string();
+        assert_eq!(displayed, "API error 503");
+        assert!(!displayed.contains("example.test"));
+        assert!(!displayed.contains("password"));
+        assert!(!displayed.contains("secret-token"));
+
+        let user_error = err.to_user_error();
+        assert_eq!(user_error.code, "stt_failed");
+        assert_eq!(user_error.details.as_deref(), Some("HTTP 503"));
+        let serialized = serde_json::to_string(&user_error).unwrap();
+        assert!(!serialized.contains("example.test"));
+        assert!(!serialized.contains("password"));
+        assert!(!serialized.contains("secret-token"));
     }
 }

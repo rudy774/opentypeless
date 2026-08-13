@@ -34,6 +34,10 @@ export function auditCommercialStaticSnapshot(snapshot) {
   const frontendConstants = snapshot.frontendConstants ?? ''
   const rustRuntime = snapshot.rustRuntime ?? ''
   const releaseAutomation = snapshot.releaseAutomation ?? ''
+  const operationalIdentity = snapshot.operationalIdentity ?? ''
+  const certifiedModels = snapshot.certifiedModels ?? ''
+  const publicDocumentation = snapshot.publicDocumentation ?? ''
+  const commercialTauriConfig = snapshot.commercialTauriConfig
 
   if (
     containsUpstreamRepository(repositoryUrl(packageJson)) ||
@@ -43,8 +47,9 @@ export function auditCommercialStaticSnapshot(snapshot) {
     errors.push('package.json still publishes upstream repository, homepage, or support metadata.')
   }
 
-  if (stringValue(tauriConfig.identifier) === UPSTREAM_IDENTIFIER) {
-    errors.push('src-tauri/tauri.conf.json still uses the upstream application identifier.')
+  const allowLegacyBaseIdentifier = snapshot.allowLegacyBaseIdentifier === true
+  if (!allowLegacyBaseIdentifier && stringValue(tauriConfig.identifier) === UPSTREAM_IDENTIFIER) {
+    errors.push('Commercial Tauri configuration still uses the upstream application identifier.')
   }
 
   const csp = tauriConfig.app?.security?.csp
@@ -103,6 +108,41 @@ export function auditCommercialStaticSnapshot(snapshot) {
     errors.push('src-tauri/src/lib.rs still defaults managed requests to the upstream API origin.')
   }
 
+  if (commercialTauriConfig) {
+    if (stringValue(commercialTauriConfig.identifier) === UPSTREAM_IDENTIFIER) {
+      errors.push('Generated commercial Tauri configuration uses the upstream identifier.')
+    }
+    if (containsUpstreamOrigin(commercialTauriConfig.app?.security?.csp)) {
+      errors.push('Generated commercial Tauri CSP permits the upstream service origin.')
+    }
+    const schemes = commercialTauriConfig.plugins?.['deep-link']?.desktop?.schemes
+    if (
+      Array.isArray(schemes) &&
+      schemes.some((scheme) => stringValue(scheme) === UPSTREAM_DEEP_LINK_SCHEME)
+    ) {
+      errors.push('Generated commercial Tauri configuration claims the upstream URI scheme.')
+    }
+    if (
+      commercialTauriConfig.plugins?.updater ||
+      commercialTauriConfig.bundle?.createUpdaterArtifacts
+    ) {
+      errors.push('Generated commercial Tauri configuration enables the updater.')
+    }
+  }
+
+  if (
+    containsUpstreamRepository(operationalIdentity) ||
+    containsUpstreamOrigin(operationalIdentity)
+  ) {
+    errors.push(
+      'Operational ownership, funding, support, or release documentation still targets upstream.',
+    )
+  }
+
+  if (containsUpstreamOrigin(certifiedModels)) {
+    errors.push('Certified model metadata still trusts the upstream managed service.')
+  }
+
   const normalizedReleaseAutomation = stringValue(releaseAutomation)
   if (
     containsUpstreamRepository(normalizedReleaseAutomation) ||
@@ -110,6 +150,64 @@ export function auditCommercialStaticSnapshot(snapshot) {
       /repo:\s*opentypeless/i.test(normalizedReleaseAutomation))
   ) {
     errors.push('GitHub release automation still publishes to the upstream repository.')
+  }
+
+  if (/allow_unsigned_windows|skip_stapling|--skip-stapling/i.test(releaseAutomation)) {
+    errors.push('Release automation or scripts still contain an unsigned or notarization bypass.')
+  }
+
+  if (/releaseDraft:\s*false/i.test(releaseAutomation)) {
+    errors.push(
+      'A platform build can publish its release directly instead of uploading to a draft.',
+    )
+  }
+
+  const hasDraftUpload = /releaseDraft:\s*true/i.test(releaseAutomation)
+  const hasFinalPublishGate =
+    /verify-and-publish:[\s\S]*needs:\s*\[[^\]]*\bbuild\b[^\]]*\][\s\S]*gh\s+release\s+edit[^\n]*--draft=false/i.test(
+      releaseAutomation,
+    )
+  if (!hasDraftUpload || !hasFinalPublishGate) {
+    errors.push(
+      'Release automation must upload to a draft and publish only from a final job that needs every selected build.',
+    )
+  }
+
+  if (
+    !/Get-AuthenticodeSignature/i.test(releaseAutomation) ||
+    !/unsafe_asset_pattern[^\n]*(?:unsigned[^\n]*test|test[^\n]*unsigned)/i.test(releaseAutomation)
+  ) {
+    errors.push(
+      'Release automation must verify Windows signatures and reject unsigned or test-labeled public assets.',
+    )
+  }
+
+  if (
+    /releaseCommitish:\s*main/i.test(releaseAutomation) ||
+    /TAG_VERSION="\$\{\{[^\n]+\}\}"/i.test(releaseAutomation) ||
+    /node\s+-e[^\n]*\$VERSION/i.test(releaseAutomation)
+  ) {
+    errors.push(
+      'Release automation still uses a mutable branch or interpolates tag data into code.',
+    )
+  }
+
+  if (
+    /(?:tover0314-w\/opentypeless|discord\.gg|https?:\/\/(?:www\.)?opentypeless\.com)/i.test(
+      publicDocumentation,
+    )
+  ) {
+    errors.push('Public fork documentation still contains an active upstream or Discord route.')
+  }
+
+  const translatedBannerCount = (publicDocumentation.match(/\*\*fork status:\*\*/gi) ?? []).length
+  const translatedDocumentCount = snapshot.translatedDocumentCount ?? 0
+  if (translatedDocumentCount > 0 && translatedBannerCount !== translatedDocumentCount) {
+    errors.push('Every translated README must contain exactly one prominent fork-status banner.')
+  }
+
+  if (/run anyway|xattr\s+-cr|click\s+\*\*unblock\*\*/i.test(publicDocumentation)) {
+    errors.push('Public installation docs still tell users to bypass OS artifact verification.')
   }
 
   return [...new Set(errors)]
@@ -123,12 +221,28 @@ function readText(repositoryRoot, relativePath) {
   return fs.readFileSync(path.join(repositoryRoot, relativePath), 'utf8')
 }
 
+function readExistingTexts(repositoryRoot, paths) {
+  return paths
+    .filter((relativePath) => fs.existsSync(path.join(repositoryRoot, relativePath)))
+    .map((relativePath) => readText(repositoryRoot, relativePath))
+    .join('\n')
+}
+
+function readTranslatedReadmes(repositoryRoot) {
+  const translatedReadmes = fs
+    .readdirSync(repositoryRoot)
+    .filter((name) => /^README_[^.]+\.md$/i.test(name))
+    .sort()
+  return {
+    count: translatedReadmes.length,
+    text: readExistingTexts(repositoryRoot, translatedReadmes),
+  }
+}
+
 function readReleaseAutomation(repositoryRoot) {
   const paths = [
     '.github/workflows/release.yml',
-    '.github/workflows/release-windows-signpath.yml',
-    '.github/workflows/staple-macos-release.yml',
-    '.github/scripts/publish-signpath-windows-release.ps1',
+    '.github/scripts/import-windows-certificate.ps1',
     '.github/scripts/upload-linux-verification-artifacts.sh',
   ]
   return paths
@@ -139,6 +253,7 @@ function readReleaseAutomation(repositoryRoot) {
 
 export function auditCommercialRepository(repositoryRoot) {
   try {
+    const translatedReadmes = readTranslatedReadmes(repositoryRoot)
     return auditCommercialStaticSnapshot({
       packageJson: readJson(repositoryRoot, 'package.json'),
       tauriConfig: readJson(repositoryRoot, 'src-tauri/tauri.conf.json'),
@@ -146,6 +261,27 @@ export function auditCommercialRepository(repositoryRoot) {
       frontendConstants: readText(repositoryRoot, 'src/lib/constants.ts'),
       rustRuntime: readText(repositoryRoot, 'src-tauri/src/lib.rs'),
       releaseAutomation: readReleaseAutomation(repositoryRoot),
+      allowLegacyBaseIdentifier: true,
+      operationalIdentity: readExistingTexts(repositoryRoot, [
+        '.github/CODEOWNERS',
+        '.github/FUNDING.yml',
+        '.github/ISSUE_TEMPLATE/config.yml',
+        '.github/workflows/welcome.yml',
+        'scripts/create-labels.sh',
+        'docs/release-signing.md',
+      ]),
+      certifiedModels: readText(repositoryRoot, 'src-tauri/tests/fixtures/certified_models.json'),
+      translatedDocumentCount: translatedReadmes.count + 1,
+      publicDocumentation: [
+        translatedReadmes.text,
+        readExistingTexts(repositoryRoot, [
+          'README.md',
+          'CONTRIBUTING.md',
+          'SUPPORT.md',
+          'SECURITY.md',
+          '.github/workflows/welcome.yml',
+        ]),
+      ].join('\n'),
     })
   } catch {
     return [

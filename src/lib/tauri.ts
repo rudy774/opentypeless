@@ -186,7 +186,12 @@ export interface HotkeyBindingStatus {
 export type HotkeyAdapter = 'tauriGlobalShortcut' | 'nativeHook' | 'unavailable'
 export type HotkeyInstallState = 'starting' | 'installed' | 'failed' | 'disabled'
 export type HotkeyRole =
-  'dictation' | 'ask' | 'translate' | 'editSelection' | 'switchScene' | 'openApp'
+  | 'dictation'
+  | 'ask'
+  | 'translate'
+  | 'editSelection'
+  | 'switchScene'
+  | 'openApp'
 
 export interface HotkeyStatusError {
   code: string
@@ -381,7 +386,10 @@ export type VoiceIntentKind =
   | 'search'
 
 export type VoiceOutputPlacement =
-  'insert_at_cursor' | 'replace_selection' | 'popup_answer' | 'open_url'
+  | 'insert_at_cursor'
+  | 'replace_selection'
+  | 'popup_answer'
+  | 'open_url'
 
 export type VoiceExecutionFallbackReason =
   | 'feature_disabled'
@@ -461,11 +469,18 @@ export interface ActivityRangeMetrics {
   savedTranscriptions: number
   outputChars: number
   activeDays: number
+  successfulAutomaticInsertions: number
   recordedFallbacks: number
+  recordedFailures: number
+  outputOutcomeSampleCount: number
   transformedOutputs: number
+  validDurationSampleCount: number
   excludedDurationCount: number
   averageTotalMs: number | null
+  p50TotalMs: number | null
+  p95TotalMs: number | null
   timingSampleCount: number
+  excludedTimingCount: number
 }
 
 export interface LocalActivityMetricsSummary {
@@ -473,6 +488,7 @@ export interface LocalActivityMetricsSummary {
   week: ActivityRangeMetrics
   month: ActivityRangeMetrics
   totalRecordings: number
+  validDurationSampleCount: number
   excludedDurationCount: number
 }
 
@@ -500,6 +516,13 @@ export interface RestoreBackupResult {
   history: HistoryEntry[]
   dictionary: DictionaryEntry[]
   correctionRules: CorrectionRule[]
+}
+
+export async function validateBackupData(
+  history: unknown | null,
+  dictionary: unknown | null,
+): Promise<void> {
+  return invoke('validate_backup_data', { history, dictionary })
 }
 
 export async function restoreBackupData(

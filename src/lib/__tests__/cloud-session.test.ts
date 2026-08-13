@@ -1,6 +1,8 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { invoke } from '@tauri-apps/api/core'
 import {
+  getCloudSessionToken,
+  initializeCloudSessionToken,
   invalidateCloudSessionOnce,
   markCloudSessionAuthenticated,
   persistSessionToken,
@@ -14,24 +16,88 @@ describe('cloud session coordinator', () => {
   beforeEach(() => {
     localStorage.clear()
     vi.clearAllMocks()
-    vi.mocked(invoke).mockResolvedValue(undefined)
+    vi.mocked(invoke).mockImplementation((command) => {
+      if (command === 'get_session_token') return Promise.resolve('')
+      return Promise.resolve('os-vault')
+    })
     resetCloudSessionCoordinatorForTests()
   })
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
 
-  it('writes the bearer token to browser and Rust storage', async () => {
+  it('keeps a new bearer token in module memory and native storage only', async () => {
     await persistSessionToken('session-token')
 
-    expect(localStorage.getItem('session_token')).toBe('session-token')
+    expect(getCloudSessionToken()).toBe('session-token')
+    expect(localStorage.getItem('session_token')).toBeNull()
     expect(invoke).toHaveBeenCalledWith('set_session_token', { token: 'session-token' })
   })
 
-  it('restores the browser token when Rust rejects a token rotation', async () => {
-    localStorage.setItem('session_token', 'previous-token')
+  it('hydrates module memory from native storage without browser persistence', async () => {
+    vi.mocked(invoke).mockResolvedValueOnce('native-token')
+
+    await expect(initializeCloudSessionToken()).resolves.toBe('native-token')
+
+    expect(getCloudSessionToken()).toBe('native-token')
+    expect(invoke).toHaveBeenCalledWith('get_session_token')
+    expect(localStorage.getItem('session_token')).toBeNull()
+  })
+
+  it('migrates and removes a legacy localStorage token before native persistence', async () => {
+    localStorage.setItem('session_token', 'legacy-token')
+
+    await expect(initializeCloudSessionToken()).resolves.toBe('legacy-token')
+
+    expect(getCloudSessionToken()).toBe('legacy-token')
+    expect(localStorage.getItem('session_token')).toBeNull()
+    expect(invoke).toHaveBeenCalledWith('set_session_token', { token: 'legacy-token' })
+    expect(invoke).not.toHaveBeenCalledWith('get_session_token')
+  })
+
+  it('hydrates from native storage when browser storage access is blocked', async () => {
+    const getItem = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('Web Storage disabled')
+    })
+    vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {
+      throw new Error('Web Storage disabled')
+    })
+    vi.mocked(invoke).mockResolvedValueOnce('native-token')
+
+    await expect(initializeCloudSessionToken()).resolves.toBe('native-token')
+    expect(getCloudSessionToken()).toBe('native-token')
+    expect(getItem).toHaveBeenCalledWith('session_token')
+  })
+  it('deduplicates concurrent native hydration', async () => {
+    vi.mocked(invoke).mockResolvedValueOnce('native-token')
+
+    const first = initializeCloudSessionToken()
+    const second = initializeCloudSessionToken()
+
+    expect(first).toBe(second)
+    await Promise.all([first, second])
+    expect(invoke).toHaveBeenCalledTimes(1)
+  })
+
+  it('restores the prior in-memory token when native rotation fails', async () => {
+    await persistSessionToken('previous-token')
     vi.mocked(invoke).mockRejectedValueOnce(new Error('Rust unavailable'))
 
     await expect(persistSessionToken('rotated-token')).rejects.toThrow('Rust unavailable')
 
-    expect(localStorage.getItem('session_token')).toBe('previous-token')
+    expect(getCloudSessionToken()).toBe('previous-token')
+    expect(localStorage.getItem('session_token')).toBeNull()
+  })
+
+  it('clears in-memory and browser tokens even when native sign-out fails', async () => {
+    await persistSessionToken('previous-token')
+    localStorage.setItem('session_token', 'stale-token')
+    vi.mocked(invoke).mockRejectedValueOnce(new Error('Vault unavailable'))
+
+    await expect(persistSessionToken(null)).rejects.toThrow('Vault unavailable')
+
+    expect(getCloudSessionToken()).toBeNull()
+    expect(localStorage.getItem('session_token')).toBeNull()
   })
 
   it('shares one invalidation across concurrent managed-cloud failures', async () => {

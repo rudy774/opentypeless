@@ -5,18 +5,21 @@ import {
   setOpenTypelessPassword,
 } from '../lib/auth-client'
 import {
+  clearLegacyBrowserSessionToken,
+  initializeCloudSessionToken,
   markCloudSessionAuthenticated,
   persistSessionToken,
   registerCloudSessionInvalidation,
 } from '../lib/cloud-session'
 import {
+  exchangeDesktopAuthCode,
   getSubscriptionStatus,
   type LicenseStatus,
   type QuotaModel,
   type SubscriptionPlan,
   type SubscriptionSource,
 } from '../lib/api'
-import { isActiveCloudPlan } from '../lib/constants'
+import { isActiveCloudPlan, MANAGED_SERVICE_CONFIGURED } from '../lib/constants'
 import { toast } from '../components/toast-service'
 import i18n from '../i18n'
 
@@ -87,7 +90,7 @@ interface AuthState {
   invalidateCloudSession: () => Promise<void>
   signOut: () => Promise<void>
   refreshSubscription: () => Promise<void>
-  handleDeepLinkToken: (token: string) => Promise<void>
+  handleDeepLinkCode: (code: string, codeVerifier: string) => Promise<boolean>
 }
 
 export function hasManagedCloudAccess(
@@ -169,28 +172,46 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   checkoutPending: false,
 
   initialize: async () => {
+    if (!MANAGED_SERVICE_CONFIGURED) {
+      clearLegacyBrowserSessionToken()
+      set({ ...signedOutCloudState(), loading: false })
+      return
+    }
+
     try {
       set({ loading: true, error: null })
-      const { data: session } = await authClient.getSession()
-      if (session?.user) {
-        set({
-          user: {
-            id: session.user.id,
-            email: session.user.email,
-            name: session.user.name ?? null,
-            emailVerified: session.user.emailVerified === true,
-          },
-        })
-        const savedToken = localStorage.getItem('session_token')
-        if (savedToken) {
-          await persistSessionToken(savedToken)
-          markCloudSessionAuthenticated()
-        }
-        await get().refreshCredentialCapability()
-        await get().refreshSubscription()
+      await initializeCloudSessionToken()
+      const sessionResult = await authClient.getSession()
+      if (sessionResult.error) {
+        throw new Error(sessionResult.error.message ?? 'Failed to validate cloud session')
       }
+      const session = sessionResult.data
+      if (!session?.user) {
+        await persistSessionToken(null).catch(() => undefined)
+        set(signedOutCloudState())
+        return
+      }
+
+      // A restored bearer is authenticated only after the service verifies it.
+      markCloudSessionAuthenticated()
+      set({
+        user: {
+          id: session.user.id,
+          email: session.user.email,
+          name: session.user.name ?? null,
+          emailVerified: session.user.emailVerified === true,
+        },
+      })
+      await get()
+        .refreshCredentialCapability()
+        .catch(() => set({ credentialCapability: 'unknown' }))
+      await get().refreshSubscription()
     } catch {
-      // Not logged in — that's fine
+      // A stale or unverifiable bearer must not be retried indefinitely.
+      // persistSessionToken clears module memory before invoking native storage,
+      // so a vault error cannot keep this WebView authenticated.
+      await persistSessionToken(null).catch(() => undefined)
+      set(signedOutCloudState())
     } finally {
       set({ loading: false })
     }
@@ -387,7 +408,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       await persistSessionToken(null)
     } catch (e) {
-      localStorage.removeItem('session_token')
       console.error('Failed to clear session token in backend:', e)
     }
     set(signedOutCloudState())
@@ -402,7 +422,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       await authClient.signOut()
     } finally {
       await persistSessionToken(null).catch((e: unknown) => {
-        localStorage.removeItem('session_token')
         console.error('Failed to clear session token in backend:', e)
       })
       set(signedOutCloudState())
@@ -478,30 +497,42 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 
-  handleDeepLinkToken: async (token: string) => {
+  handleDeepLinkCode: async (code: string, codeVerifier: string) => {
     try {
       set({ loading: true, error: null })
-      await persistSessionToken(token)
-      markCloudSessionAuthenticated()
-      const { data: session } = await authClient.getSession({
+      const { token } = await exchangeDesktopAuthCode(code, codeVerifier)
+      const sessionResult = await authClient.getSession({
         fetchOptions: {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { Authorization: 'Bearer ' + token },
         },
       })
-      if (session?.user) {
-        set({
-          user: {
-            id: session.user.id,
-            email: session.user.email,
-            name: session.user.name ?? null,
-            emailVerified: session.user.emailVerified === true,
-          },
-        })
-        await get().refreshCredentialCapability()
-        await get().refreshSubscription()
+      if (sessionResult.error || !sessionResult.data?.user) {
+        throw new Error(sessionResult.error?.message ?? 'Session did not resolve to a user')
       }
+
+      // The exchanged bearer enters module memory and the OS vault only after
+      // the service independently proves that it belongs to a valid user.
+      const user = sessionResult.data.user
+      await persistSessionToken(token)
+      markCloudSessionAuthenticated()
+      set({
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name ?? null,
+          emailVerified: user.emailVerified === true,
+        },
+      })
+
+      // Account metadata failure does not make an already verified bearer invalid.
+      await get()
+        .refreshCredentialCapability()
+        .catch(() => set({ credentialCapability: 'unknown' }))
+      await get().refreshSubscription()
+      return true
     } catch {
-      set({ error: 'Failed to authenticate with token' })
+      set({ error: 'Failed to complete desktop sign in' })
+      return false
     } finally {
       set({ loading: false })
     }

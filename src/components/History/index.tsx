@@ -131,8 +131,16 @@ export function History() {
         return t('history.outputStatus.partial')
       case 'fallback':
         return t('history.outputStatus.fallback')
+      case 'popup_fallback':
+        return t('history.outputStatus.fallback')
       case 'clipboard_fallback':
         return t('history.outputStatus.clipboardFallback')
+      case 'prevented':
+        return 'Prevented'
+      case 'failed':
+        return 'Failed'
+      case 'cancelled':
+        return 'Cancelled'
       default:
         return null
     }
@@ -300,10 +308,9 @@ export function History() {
                               providerKind={entry.provider_kind}
                               browserAccessStatus={entry.browser_access_status}
                             />
-                            {statusLabel && (
+                            {(statusLabel || entry.output_error) && (
                               <p className="mt-1 break-words text-[11px] leading-snug text-warning">
-                                {statusLabel}
-                                {entry.output_error ? ` · ${entry.output_error}` : ''}
+                                {[statusLabel, entry.output_error].filter(Boolean).join(' · ')}
                               </p>
                             )}
                           </div>

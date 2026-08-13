@@ -13,8 +13,8 @@ Thanks for your interest in contributing! This guide covers everything you need 
 | Type | Process |
 |------|---------|
 | Bug fix / small improvement | Open a PR directly |
-| New feature / architecture change | Start a [Discussion](https://github.com/tover0314-w/opentypeless/discussions/categories/ideas) first |
-| Question / help | Post in [Q&A Discussions](https://github.com/tover0314-w/opentypeless/discussions/categories/q-a) |
+| New feature / architecture change | Start a [Discussion](https://github.com/rudy774/opentypeless/discussions/categories/ideas) first |
+| Question / help | Post in [Q&A Discussions](https://github.com/rudy774/opentypeless/discussions/categories/q-a) |
 
 ## Making Changes
 
@@ -30,11 +30,15 @@ Thanks for your interest in contributing! This guide covers everything you need 
 Run these checks before opening a PR:
 
 ```bash
-# Frontend
-npx tsc --noEmit
-npx eslint src/
-npx prettier --check src/
-npx vitest run
+# Frontend and release/service contracts
+npm run service:contract:check
+npm run service:contract:test
+npm run commercial:check:test
+npm run release:version:test
+npm run build
+npm run lint
+npm run format:check
+npm test
 
 # Rust
 cargo fmt --check --manifest-path src-tauri/Cargo.toml

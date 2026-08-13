@@ -80,6 +80,11 @@ libloading = "0.8"
 [dev-dependencies]
 plist = "1"
 
+# Temporary security pin until wayland-scanner publishes the quick-xml 0.41 fix.
+# Upstream: https://github.com/Smithay/wayland-rs/commit/d07c4f91f28b42e5a485823ffd9d8d5a210b1053
+[patch.crates-io]
+wayland-scanner = { git = "https://github.com/Smithay/wayland-rs", rev = "d07c4f91f28b42e5a485823ffd9d8d5a210b1053" }
+
 [profile.release]
 codegen-units = 1
 opt-level = "s"

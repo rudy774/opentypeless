@@ -1,65 +1,26 @@
 import { onOpenUrl } from '@tauri-apps/plugin-deep-link'
 import { useAuthStore } from '../stores/authStore'
+import { APP_DEEP_LINK_SCHEME } from './constants'
+import {
+  EMAIL_VERIFICATION_STATE_TTL_MS,
+  OAUTH_STATE_TTL_MS,
+  clearDesktopAuthTransaction,
+  consumeDesktopAuthTransaction,
+} from './desktop-auth-callback'
 
-/** Pending OAuth state for CSRF validation. */
-let pendingOAuthState: string | null = null
-let pendingOAuthTimer: ReturnType<typeof setTimeout> | null = null
-const OAUTH_STATE_STORAGE_KEY = 'opentypeless.pendingOAuthState'
-export const OAUTH_STATE_TTL_MS = 5 * 60 * 1000
-export const EMAIL_VERIFICATION_STATE_TTL_MS = 30 * 60 * 1000
+export { EMAIL_VERIFICATION_STATE_TTL_MS, OAUTH_STATE_TTL_MS }
 
-function persistOAuthState(state: string, ttlMs: number): void {
-  try {
-    localStorage.setItem(
-      OAUTH_STATE_STORAGE_KEY,
-      JSON.stringify({ state, expiresAt: Date.now() + ttlMs }),
-    )
-  } catch {
-    // localStorage may be unavailable in some webview/test contexts.
-  }
+type SafeDeepLinkPath = 'auth/callback' | 'checkout/success' | 'unknown'
+
+function logDeepLinkResult(scheme: string, path: SafeDeepLinkPath, result: string): void {
+  // Never log the raw URL: callback query parameters contain an authorization
+  // code and anti-CSRF state. These fields are static or protocol-only metadata.
+  console.info('[deep-link]', { scheme, path, result })
 }
 
-function loadPersistedOAuthState(): string | null {
-  try {
-    const raw = localStorage.getItem(OAUTH_STATE_STORAGE_KEY)
-    if (!raw) return null
-    const parsed = JSON.parse(raw) as { state?: unknown; expiresAt?: unknown }
-    if (typeof parsed.state !== 'string' || typeof parsed.expiresAt !== 'number') {
-      localStorage.removeItem(OAUTH_STATE_STORAGE_KEY)
-      return null
-    }
-    if (Date.now() > parsed.expiresAt) {
-      localStorage.removeItem(OAUTH_STATE_STORAGE_KEY)
-      return null
-    }
-    return parsed.state
-  } catch {
-    return null
-  }
-}
-
-/** Generate and store a random state string for OAuth CSRF protection. */
-export function generateOAuthState(ttlMs = OAUTH_STATE_TTL_MS): string {
-  clearOAuthState()
-  const state = crypto.randomUUID()
-  pendingOAuthState = state
-  persistOAuthState(state, ttlMs)
-  pendingOAuthTimer = setTimeout(clearOAuthState, ttlMs)
-  return state
-}
-
-/** Clear pending OAuth state (e.g. user cancelled or timed out). */
+/** Clear the pending state and PKCE verifier when the user cancels or times out. */
 export function clearOAuthState(): void {
-  pendingOAuthState = null
-  try {
-    localStorage.removeItem(OAUTH_STATE_STORAGE_KEY)
-  } catch {
-    // localStorage may be unavailable in some webview/test contexts.
-  }
-  if (pendingOAuthTimer) {
-    clearTimeout(pendingOAuthTimer)
-    pendingOAuthTimer = null
-  }
+  clearDesktopAuthTransaction()
 }
 
 export async function initDeepLinkListener() {
@@ -74,57 +35,76 @@ export async function initDeepLinkListener() {
   }
 }
 
-/** Basic sanity check: token must be a non-empty alphanumeric/JWT-like string. */
-function isValidToken(token: string): boolean {
-  return /^[\w\-._~+/]+=*$/.test(token) && token.length >= 10 && token.length <= 4096
+function isValidAuthorizationCode(code: string): boolean {
+  return /^[A-Za-z0-9\-._~]+$/.test(code) && code.length >= 16 && code.length <= 2048
+}
+
+function hasExactCallbackQuery(params: URLSearchParams): boolean {
+  const keys = [...params.keys()]
+  return (
+    keys.length === 2 && params.getAll('code').length === 1 && params.getAll('state').length === 1
+  )
 }
 
 export async function handleDeepLinkUrl(rawUrl: string): Promise<boolean> {
-  console.log('[deep-link] received URL:', rawUrl.replace(/token=[^&]+/, 'token=***'))
   let url: URL
   try {
     url = new URL(rawUrl)
   } catch {
+    logDeepLinkResult('invalid', 'unknown', 'rejected-malformed')
     return false
   }
 
-  // Only accept our custom scheme
-  if (url.protocol !== 'opentypeless:') return false
+  const scheme = url.protocol.replace(/:$/, '')
+  if (url.protocol !== `${APP_DEEP_LINK_SCHEME}:`) {
+    logDeepLinkResult(scheme, 'unknown', 'rejected-scheme')
+    return false
+  }
 
   const path = url.hostname ? url.hostname + url.pathname : url.pathname.replace(/^\/+/, '')
   const params = url.searchParams
 
-  // opentypeless://auth/callback?token=xxx&state=yyy
+  // <configured-scheme>://auth/callback?code=<one-time-code>&state=<client-state>
   if (path === 'auth/callback' || path === 'auth/callback/') {
-    const token = params.get('token')
-    const state = params.get('state')
-    const expectedState = pendingOAuthState ?? loadPersistedOAuthState()
-
-    // Reject tokens when no OAuth flow was initiated (prevents external injection)
-    if (!expectedState) {
+    if (url.hash || !hasExactCallbackQuery(params)) {
+      logDeepLinkResult(scheme, 'auth/callback', 'rejected-query')
       return false
     }
-    // Validate CSRF state
-    if (state !== expectedState) {
-      clearOAuthState()
+
+    const code = params.get('code') ?? ''
+    const state = params.get('state') ?? ''
+    if (!isValidAuthorizationCode(code)) {
+      logDeepLinkResult(scheme, 'auth/callback', 'rejected-code-shape')
       return false
     }
-    clearOAuthState()
 
-    if (token && isValidToken(token)) {
-      await useAuthStore.getState().handleDeepLinkToken(token)
-      window.location.hash = '#/account'
-      return true
+    // A matching transaction is consumed before the exchange, making callback
+    // handling single-use even if the service or network later rejects it.
+    const codeVerifier = consumeDesktopAuthTransaction(state)
+    if (!codeVerifier) {
+      logDeepLinkResult(scheme, 'auth/callback', 'rejected-state')
+      return false
     }
-    return false
-  }
 
-  // opentypeless://checkout/success
-  if (path === 'checkout/success' || path === 'checkout/success/') {
-    await useAuthStore.getState().refreshSubscription()
-    window.location.hash = '#/upgrade'
+    const authenticated = await useAuthStore.getState().handleDeepLinkCode(code, codeVerifier)
+    if (!authenticated) {
+      logDeepLinkResult(scheme, 'auth/callback', 'rejected-authentication')
+      return false
+    }
+
+    window.location.hash = '#/account'
+    logDeepLinkResult(scheme, 'auth/callback', 'authenticated')
     return true
   }
 
+  // <configured-scheme>://checkout/success
+  if (path === 'checkout/success' || path === 'checkout/success/') {
+    await useAuthStore.getState().refreshSubscription()
+    window.location.hash = '#/upgrade'
+    logDeepLinkResult(scheme, 'checkout/success', 'refreshed')
+    return true
+  }
+
+  logDeepLinkResult(scheme, 'unknown', 'rejected-path')
   return false
 }

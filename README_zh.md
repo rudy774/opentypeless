@@ -2,6 +2,9 @@
   <a href="README.md">English</a> | <strong>中文</strong> | <a href="README_ja.md">日本語</a> | <a href="README_ko.md">한국어</a> | <a href="README_es.md">Español</a> | <a href="README_fr.md">Français</a> | <a href="README_de.md">Deutsch</a> | <a href="README_pt.md">Português</a> | <a href="README_ru.md">Русский</a> | <a href="README_ar.md">العربية</a> | <a href="README_hi.md">हिन्दी</a> | <a href="README_it.md">Italiano</a> | <a href="README_tr.md">Türkçe</a> | <a href="README_vi.md">Tiếng Việt</a> | <a href="README_th.md">ภาษาไทย</a> | <a href="README_id.md">Bahasa Indonesia</a> | <a href="README_pl.md">Polski</a> | <a href="README_nl.md">Nederlands</a>
 </p>
 
+> [!IMPORTANT]
+> **Fork status:** This is the **Rudy774 fork**, which differs from the original OpenTypeless project. Source code, releases, and support are provided only through [github.com/rudy774/opentypeless](https://github.com/rudy774/opentypeless). This fork does **not** currently provide a hosted paid service, and automatic updates are disabled.
+
 <p align="center">
   <img src="src-tauri/icons/128x128@2x.png" width="128" height="128" alt="OpenTypeless Logo" />
 </p>
@@ -27,11 +30,10 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/tover0314-w/opentypeless/actions/workflows/ci.yml"><img src="https://github.com/tover0314-w/opentypeless/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
-  <a href="https://github.com/tover0314-w/opentypeless/releases"><img src="https://img.shields.io/github/v/release/tover0314-w/opentypeless?color=2ABBA7" alt="Release" /></a>
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/tover0314-w/opentypeless" alt="License" /></a>
-  <a href="https://github.com/tover0314-w/opentypeless/stargazers"><img src="https://img.shields.io/github/stars/tover0314-w/opentypeless?style=social" alt="Stars" /></a>
-  <a href="https://discord.gg/V6rRpJ4RGD"><img src="https://img.shields.io/badge/Discord-Join%20us-5865F2?logo=discord&logoColor=white" alt="Discord" /></a>
+  <a href="https://github.com/rudy774/opentypeless/actions/workflows/ci.yml"><img src="https://github.com/rudy774/opentypeless/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="https://github.com/rudy774/opentypeless/releases"><img src="https://img.shields.io/github/v/release/rudy774/opentypeless?color=2ABBA7" alt="Release" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/rudy774/opentypeless" alt="License" /></a>
+  <a href="https://github.com/rudy774/opentypeless/stargazers"><img src="https://img.shields.io/github/stars/rudy774/opentypeless?style=social" alt="Stars" /></a>
 </p>
 
 <p align="center">
@@ -42,7 +44,9 @@
   <img src="docs/images/voice-flow-demo.gif" width="720" alt="OpenTypeless 演示" />
 </p>
 
-## v1.1.49 新功能
+## Inherited upstream capabilities
+
+The capabilities below originated in the upstream project before this fork. This is historical attribution, not a release-version or support claim.
 
 - **应用感知写作**会在本地识别当前应用，并针对邮件、聊天、文档、Issue 跟踪、开发工具等场景调整结构和语气。
 - **语音意图路由**可区分普通听写、选中文本编辑、翻译、Ask Anything 和受支持的语音操作，并支持简体中文、繁体中文和英文。
@@ -55,7 +59,7 @@
 
 | 应用感知 AI 润色 | 本地词典与纠错规则 |
 | --- | --- |
-| <img src="docs/images/v1.1.49-app-aware-polish.jpg" width="420" alt="OpenTypeless v1.1.49 应用感知 AI 润色" /> | <img src="docs/images/v1.1.49-dictionary.jpg" width="420" alt="OpenTypeless v1.1.49 本地词典与纠错规则" /> |
+| <img src="docs/images/v1.1.49-app-aware-polish.jpg" width="420" alt="OpenTypeless inherited upstream 应用感知 AI 润色" /> | <img src="docs/images/v1.1.49-dictionary.jpg" width="420" alt="OpenTypeless inherited upstream 本地词典与纠错规则" /> |
 
 <details>
 <summary>更多截图</summary>
@@ -139,7 +143,7 @@ Linux 暂时保持 `Ctrl+/` 和 `Ctrl+.` 作为默认热键，因为不同桌面
 
 下载适用于你平台的最新版本：
 
-**[前往 Releases 下载](https://github.com/tover0314-w/opentypeless/releases)**
+**[前往 Releases 下载](https://github.com/rudy774/opentypeless/releases)**
 
 | 平台 | 文件 |
 |------|------|
@@ -147,32 +151,17 @@ Linux 暂时保持 `Ctrl+/` 和 `Ctrl+.` 作为默认热键，因为不同桌面
 | macOS | Apple Silicon 和 Intel 通用 `.dmg` |
 | Linux | `.AppImage` / `.deb` / `.rpm` |
 
-## 安装说明
+## Installation Notes
 
-各平台签名和分发方式还在持续完善。请始终从官方 [GitHub Releases](https://github.com/tover0314-w/opentypeless/releases) 下载。
+Only install artifacts published by the [Rudy774 fork](https://github.com/rudy774/opentypeless/releases), or builds you create yourself from reviewed source. Public Windows installers must have a valid publisher signature, and public macOS builds must be Developer ID signed and notarized.
 
 ### Windows
 
-如果 Windows SmartScreen 提示“Windows 已保护你的电脑”：
-
-1. 点击 **更多信息**
-2. 点击 **仍要运行**
-
-如果安装包出现发布者验证提示：
-
-1. 右键 `.msi` 文件，选择 **属性**
-2. 勾选底部的 **解除锁定**，点击 **应用**
-3. 重新运行安装包
+If Windows cannot validate the publisher or SmartScreen reports an unrecognized app, stop and do not continue past the warning. Delete the installer and report the affected release in the [Rudy774 issue tracker](https://github.com/rudy774/opentypeless/issues).
 
 ### macOS
 
-macOS 构建使用 Developer ID 签名。如果首次启动仍被 Gatekeeper 拦截，可以执行：
-
-```bash
-xattr -cr /Applications/OpenTypeless.app
-```
-
-然后正常打开应用。
+If Gatekeeper reports that the app is from an unidentified developer, is damaged, or cannot be checked for malicious software, do not remove quarantine attributes. Delete the download and report the affected release in the [Rudy774 issue tracker](https://github.com/rudy774/opentypeless/issues).
 
 ### Linux
 
@@ -231,43 +220,11 @@ npm run tauri build
 
 API 密钥会优先存入系统密钥库，不支持时使用本地 fallback。BYOK 密钥不会发送到 OpenTypeless 服务器 — 所有 STT/LLM 请求直接发送到你配置的服务商。
 
-### Cloud 选项
+### Managed service status for this fork
 
-OpenTypeless 还提供可选的托管云端能力，这样你不需要自己配置 STT/LLM API key。Pro 和 Lifetime Starter 包含共享的 cloud words，可用于语音识别、AI 润色和 Ask Anything。BYOK 仍然完整支持。
+This fork currently supports bring-your-own-key and local providers. It does not include a hosted paid service. Account, entitlement, checkout, backup, and managed transcription features remain disabled unless you build and operate a compatible backend yourself.
 
-[了解更多关于 Pro 的信息](https://www.opentypeless.com)
-
-### BYOK（自备密钥）vs Cloud
-
-| | BYOK 模式 | Cloud 模式 |
-|---|---|---|
-| STT | 自己的 API 密钥或本地端点 | 托管 cloud words |
-| LLM | 自己的 API 密钥或本地端点 | 托管 cloud words |
-| 云依赖 | 无 — 所有请求直接发送到你的服务商 | 需要连接 www.opentypeless.com |
-| 费用 | 直接向服务商付费 | 可选 Pro 或 Lifetime Starter |
-
-所有核心功能 — 录音、转录、AI 润色、键盘/剪贴板输出、词典、历史记录 — 在 BYOK 模式下完全不依赖 OpenTypeless 服务器。
-
-### 自托管 / 无云依赖
-
-无需任何云依赖即可运行 OpenTypeless：
-
-1. 在设置中选择任意非 Cloud 的 STT 和 LLM 服务商
-2. 输入你自己的 API 密钥
-3. 完成 — 无需账户或连接 www.opentypeless.com
-
-如果你想将可选的云功能指向自己的后端，在构建前设置以下环境变量：
-
-| 变量 | 默认值 | 说明 |
-|---|---|---|
-| `VITE_API_BASE_URL` | `https://www.opentypeless.com` | 前端云 API 基础 URL |
-| `API_BASE_URL` | `https://www.opentypeless.com` | Rust 后端云 API 基础 URL |
-
-```bash
-# 示例：使用自定义后端构建
-VITE_API_BASE_URL=https://my-server.example.com API_BASE_URL=https://my-server.example.com npm run tauri build
-```
-
+A self-hosted managed backend must be configured explicitly at build time with both `VITE_MANAGED_API_BASE_URL` and `OPENTYPELESS_MANAGED_API_BASE_URL`. There is no production default. Both values must be the same owned HTTPS origin; see `docs/MANAGED_SERVICE_API.md` and `docs/COMMERCIALIZATION.md`.
 ## 架构
 
 **桌面端 Pipeline：**
@@ -328,9 +285,8 @@ STT 根据服务商不同支持 99+ 种语言。AI 润色和翻译支持 20+ 种
 
 ## 社区
 
-- 💬 [Discord](https://discord.gg/V6rRpJ4RGD) — 交流、获取帮助、分享反馈
-- 🗣️ [GitHub Discussions](https://github.com/tover0314-w/opentypeless/discussions) — 功能提案、问答
-- 🐛 [Issue Tracker](https://github.com/tover0314-w/opentypeless/issues) — Bug 报告和功能请求
+- 🗣️ [GitHub Discussions](https://github.com/rudy774/opentypeless/discussions) — 功能提案、问答
+- 🐛 [Issue Tracker](https://github.com/rudy774/opentypeless/issues) — Bug 报告和功能请求
 - 📖 [贡献指南](CONTRIBUTING.md) — 开发环境搭建和贡献规范
 - 🔒 [安全策略](SECURITY.md) — 负责任地报告漏洞
 - 🧭 [愿景](VISION.md) — 项目原则和路线图方向
@@ -339,15 +295,15 @@ STT 根据服务商不同支持 99+ 种语言。AI 润色和翻译支持 20+ 种
 
 欢迎贡献！请参阅 [CONTRIBUTING.md](CONTRIBUTING.md) 了解开发设置和指南。
 
-寻找入手点？查看标记为 [`good first issue`](https://github.com/tover0314-w/opentypeless/labels/good%20first%20issue) 的 issue。
+寻找入手点？查看标记为 [`good first issue`](https://github.com/rudy774/opentypeless/labels/good%20first%20issue) 的 issue。
 
 ## Star History
 
-<a href="https://star-history.com/#tover0314-w/opentypeless&Date">
+<a href="https://star-history.com/#rudy774/opentypeless&Date">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=tover0314-w/opentypeless&type=Date&theme=dark" />
-    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=tover0314-w/opentypeless&type=Date" />
-    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=tover0314-w/opentypeless&type=Date" />
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=rudy774/opentypeless&type=Date&theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=rudy774/opentypeless&type=Date" />
+    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=rudy774/opentypeless&type=Date" />
   </picture>
 </a>
 

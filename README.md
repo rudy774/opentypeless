@@ -18,27 +18,29 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/tover0314-w/opentypeless/actions/workflows/ci.yml"><img src="https://github.com/tover0314-w/opentypeless/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
-  <a href="https://github.com/tover0314-w/opentypeless/releases"><img src="https://img.shields.io/github/v/release/tover0314-w/opentypeless?color=2ABBA7" alt="Release" /></a>
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/tover0314-w/opentypeless" alt="License" /></a>
-  <a href="https://github.com/tover0314-w/opentypeless/stargazers"><img src="https://img.shields.io/github/stars/tover0314-w/opentypeless?style=social" alt="Stars" /></a>
-  <a href="https://discord.gg/V6rRpJ4RGD"><img src="https://img.shields.io/badge/Discord-Join%20us-5865F2?logo=discord&logoColor=white" alt="Discord" /></a>
+  <a href="https://github.com/rudy774/opentypeless/actions/workflows/ci.yml"><img src="https://github.com/rudy774/opentypeless/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="https://github.com/rudy774/opentypeless/releases"><img src="https://img.shields.io/github/v/release/rudy774/opentypeless?color=2ABBA7" alt="Release" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/rudy774/opentypeless" alt="License" /></a>
+  <a href="https://github.com/rudy774/opentypeless/stargazers"><img src="https://img.shields.io/github/stars/rudy774/opentypeless?style=social" alt="Stars" /></a>
 </p>
 
 <p align="center">
-  <a href="https://www.opentypeless.com"><strong>Website</strong></a> ·
-  <a href="https://github.com/tover0314-w/opentypeless/releases"><strong>Download</strong></a> ·
+  <a href="https://github.com/rudy774/opentypeless"><strong>Source</strong></a> ·
+  <a href="https://github.com/rudy774/opentypeless/releases"><strong>Download</strong></a> ·
   <a href="#getting-started"><strong>Run locally</strong></a> ·
-  <a href="https://github.com/tover0314-w/opentypeless/discussions"><strong>Discussions</strong></a>
+  <a href="https://github.com/rudy774/opentypeless/discussions"><strong>Discussions</strong></a>
 </p>
 
 <p align="center">
   If OpenTypeless helps your workflow, a GitHub star helps more people discover the project.
 </p>
 
+> [!IMPORTANT]
+> **Fork status:** This is the **Rudy774 fork**, which differs from the original OpenTypeless project. Source code, releases, and support are provided only through [github.com/rudy774/opentypeless](https://github.com/rudy774/opentypeless). This fork does **not** currently provide a hosted paid service, and automatic updates are disabled.
+
 ## What Makes the Rudy774 Fork Different
 
-This repository is a Windows-focused fork of the upstream [OpenTypeless project](https://github.com/tover0314-w/opentypeless). It keeps the original cross-platform desktop workflow while adding the following fork-specific changes:
+This repository is a Windows-focused fork of the original OpenTypeless project. The original source is acknowledged here for historical attribution; this fork's releases and support are provided only by Rudy774. It keeps the original cross-platform desktop workflow while adding the following fork-specific changes:
 
 | Fork change                                    | What it adds                                                                                                                                                                                                                                        |
 | ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -77,7 +79,9 @@ Before publishing changes, scan both the working tree and Git history for secret
   <strong>Dictate anywhere</strong> · <strong>Rewrite selected text</strong> · <strong>Ask one-shot voice questions</strong> · <strong>Bring your own keys or use managed cloud words</strong>
 </p>
 
-## What's New in v1.1.49
+## Inherited upstream capabilities
+
+The capabilities below originated in the upstream project before this fork. This is historical attribution, not a release-version or support claim.
 
 OpenTypeless now understands more of the workflow around your voice, not only the words you said:
 
@@ -118,7 +122,7 @@ Linux keeps conservative Ctrl-based defaults because global Right Alt handling i
 
 | App-aware AI polish                                                                                               | Local dictionary and corrections                                                                                   |
 | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| <img src="docs/images/v1.1.49-app-aware-polish.jpg" width="420" alt="OpenTypeless v1.1.49 app-aware AI polish" /> | <img src="docs/images/v1.1.49-dictionary.jpg" width="420" alt="OpenTypeless v1.1.49 dictionary and corrections" /> |
+| <img src="docs/images/v1.1.49-app-aware-polish.jpg" width="420" alt="OpenTypeless inherited upstream app-aware AI polish" /> | <img src="docs/images/v1.1.49-dictionary.jpg" width="420" alt="OpenTypeless inherited upstream dictionary and corrections" /> |
 
 <details>
 <summary>Onboarding and voice workspace</summary>
@@ -189,15 +193,15 @@ Most desktop dictation tools stop at transcription. OpenTypeless adds the AI rew
 | AI rewriting      | App-aware writing, local per-app style mappings, polish styles, streaming polish, selected-text context, and custom instructions                                      |
 | Ask Anything      | One-shot voice question flow: record in the capsule, think, then show a small answer note with copy support                                                           |
 | Voice actions     | Deterministic English, Simplified Chinese, and Traditional Chinese routing for editing, translation, Ask, and supported actions                                       |
-| STT providers     | Cloud STT, Apple Speech on macOS, ElevenLabs Scribe v2, Deepgram, AssemblyAI, GLM-ASR, OpenAI Whisper, Groq Whisper, SiliconFlow, Volcengine Doubao, custom endpoints |
-| LLM providers     | Cloud LLM or OpenAI-compatible APIs including OpenAI, DeepSeek, Claude via OpenRouter, Gemini, Groq, Qwen, Moonshot, Ollama, and more                                 |
+| STT providers     | Managed STT (operator-configured only), Apple Speech on macOS, ElevenLabs Scribe v2, Deepgram, AssemblyAI, GLM-ASR, OpenAI Whisper, Groq Whisper, SiliconFlow, Volcengine Doubao, custom endpoints |
+| LLM providers     | Managed LLM (operator-configured only) or OpenAI-compatible APIs including OpenAI, DeepSeek, Claude via OpenRouter, Gemini, Groq, Qwen, Moonshot, Ollama, and more                                 |
 | Output            | Keyboard simulation, clipboard paste/copy-only, Windows SendInput, clipboard restore, and output-failure diagnostics                                                  |
 | Language          | Auto-detect speech, dedicated translation shortcut, switchable target languages, and 20+ translation targets                                                          |
 | Dictionary        | Custom terms, import/export, and local correction rules for recurring transcription mistakes                                                                          |
 | Scenes            | Built-in scenes, local custom scenes, active scene metadata, import/export for reusable writing styles                                                                |
 | Privacy           | Local app detection and mappings, provider keys in the OS credential vault where available, plus BYOK and local/self-hosted paths                                     |
-| Account and quota | Optional Pro and Lifetime Starter plans with shared cloud words for voice and AI                                                                                      |
-| Desktop polish    | Dark/light/system theme, onboarding, local history search, auto-start, auto-update, cross-platform Tauri app                                                          |
+| Account and quota | Inactive integration surfaces for a future operator-owned managed service                                                                                     |
+| Desktop polish    | Dark/light/system theme, onboarding, local history search, auto-start, manual signed releases, cross-platform Tauri app                                                          |
 
 UI localization currently ships with complete English and Chinese copy, plus additional locale files that may still fall back to English for newer advanced features.
 
@@ -213,7 +217,7 @@ sequenceDiagram
 
   User->>Desktop: Hold dictation hotkey and speak
   Desktop->>Desktop: Detect local app category and style
-  Desktop->>STT: Send audio via BYOK or Cloud
+  Desktop->>STT: Send audio via BYOK or local
   STT-->>Desktop: Raw transcript
   Desktop->>LLM: Optional context-aware polish / translate / rewrite
   LLM-->>Desktop: Final text
@@ -232,8 +236,8 @@ sequenceDiagram
 
 ## Try It in 5 Minutes
 
-1. Download the latest build for your platform from [Releases](https://github.com/tover0314-w/opentypeless/releases).
-2. Choose **BYOK** for full provider control or **Cloud** if you want managed quota without API keys.
+1. Download the latest build for your platform from [Releases](https://github.com/rudy774/opentypeless/releases).
+2. Choose a BYOK or local provider. Managed Cloud remains inactive unless you build and configure a compatible backend.
 3. Pick speech recognition and AI polish providers in Settings.
 4. Set one or more shortcuts for Dictation, Ask Anything, and Translation.
 5. Open any desktop app, press the hotkey, speak, and let OpenTypeless type the polished result.
@@ -242,7 +246,7 @@ sequenceDiagram
 
 Download the latest version for your platform:
 
-**[Download from Releases](https://github.com/tover0314-w/opentypeless/releases)**
+**[Download from Releases](https://github.com/rudy774/opentypeless/releases)**
 
 | Platform | File                                         |
 | -------- | -------------------------------------------- |
@@ -252,30 +256,15 @@ Download the latest version for your platform:
 
 ## Installation Notes
 
-Release signing differs by platform while distribution is being improved. Always download from the official [GitHub Releases](https://github.com/tover0314-w/opentypeless/releases) page.
+Only install artifacts published by the [Rudy774 fork](https://github.com/rudy774/opentypeless/releases), or builds you create yourself from reviewed source. Public Windows installers must have a valid publisher signature, and public macOS builds must be Developer ID signed and notarized.
 
 ### Windows
 
-Windows SmartScreen may show "Windows protected your PC":
-
-1. Click **More info**
-2. Click **Run anyway**
-
-If the installer shows a publisher validation warning:
-
-1. Right-click the `.msi` file → **Properties**
-2. Check **Unblock** at the bottom → **Apply**
-3. Run the installer again
+If Windows cannot validate the publisher or SmartScreen reports an unrecognized app, stop and do not continue past the warning. Delete the installer and report the affected release in the [Rudy774 issue tracker](https://github.com/rudy774/opentypeless/issues).
 
 ### macOS
 
-macOS builds are Developer ID signed. If Gatekeeper still blocks first launch while notarization/stapling catches up, remove the quarantine attribute:
-
-```bash
-xattr -cr /Applications/OpenTypeless.app
-```
-
-Then open the app normally.
+If Gatekeeper reports that the app is from an unidentified developer, is damaged, or cannot be checked for malicious software, do not remove quarantine attributes. Delete the download and report the affected release in the [Rudy774 issue tracker](https://github.com/rudy774/opentypeless/issues).
 
 ### Linux
 
@@ -333,46 +322,36 @@ All settings are accessible from the in-app Settings panel:
 - **General** — manage multiple Dictation, Ask Anything, and Translation shortcuts, output mode, auto-start, and idle capsule visibility
 - **Dictionary** — add or import custom terms, export your dictionary, and create local correction rules for recurring transcription mistakes
 - **Scenes** — built-in and local prompt templates with import/export for reusable writing styles
-- **Account / Upgrade** — sign in, check cloud words, manage Pro or Lifetime Starter access
+- **Account / Upgrade** — inactive integration surfaces for a future owned service; this fork currently offers no account or paid plan
 
 API keys are stored locally in the OS credential vault where available, with a local fallback for unsupported environments. No BYOK keys are sent to OpenTypeless servers — STT/LLM requests go directly to the provider you configure.
 
-### Cloud Option
+### Managed Service Status
 
-OpenTypeless also offers optional managed cloud access so you do not need your own provider keys. Pro and Lifetime Starter plans include shared cloud words for speech recognition and AI rewriting. BYOK remains fully supported.
+This public fork does **not** ship with a managed cloud endpoint, paid plan, or updater. A normal source build is BYOK/local-only and never falls back to the upstream OpenTypeless service. Existing account and managed-provider client screens are integration surfaces for a future Rudy-owned backend, not an offer of a currently available service.
 
-[Learn more about Pro](https://www.opentypeless.com)
+All core features - recording, transcription, AI cleanup, output, dictionary, and history - work without a Rudy-managed service when you choose non-Cloud providers. Provider API keys stay on the device and requests go directly to the provider you configure.
 
-### BYOK vs Cloud
+Commercial operators must implement and verify the service contract, billing, policies, signing, and support requirements in [docs/COMMERCIALIZATION.md](docs/COMMERCIALIZATION.md). Do not advertise managed plans until that checklist passes against deployed infrastructure.
 
-|                  | BYOK Mode                                        | Cloud (Pro) Mode                            |
-| ---------------- | ------------------------------------------------ | ------------------------------------------- |
-| STT              | Your own API key or local endpoint               | Managed cloud words                         |
-| LLM              | Your own API key or local endpoint               | Managed cloud words                         |
-| Cloud dependency | None — all requests go directly to your provider | Requires connection to www.opentypeless.com |
-| Cost             | Pay your provider directly                       | Optional Pro or Lifetime Starter            |
+### Build-time managed identity
 
-All core features — recording, transcription, AI polish, keyboard/clipboard output, dictionary, history — work entirely offline from OpenTypeless servers in BYOK mode.
-
-### Self-Hosting / No Cloud
-
-To run OpenTypeless without any cloud dependency:
-
-1. Choose any non-Cloud STT and LLM provider in Settings
-2. Enter your own API keys
-3. That's it — no account or internet connection to www.opentypeless.com is needed
-
-If you want to point the optional cloud features at your own backend, set these environment variables before building:
-
-| Variable            | Default                        | Description                     |
-| ------------------- | ------------------------------ | ------------------------------- |
-| `VITE_API_BASE_URL` | `https://www.opentypeless.com` | Frontend cloud API base URL     |
-| `API_BASE_URL`      | `https://www.opentypeless.com` | Rust backend cloud API base URL |
+Managed access is deliberately opt-in. Copy `.env.commercial.example` to the ignored `.env.commercial`, replace every public placeholder with owned values, then run:
 
 ```bash
-# Example: build with a custom backend
-VITE_API_BASE_URL=https://my-server.example.com API_BASE_URL=https://my-server.example.com npm run tauri build
+node --env-file=.env.commercial scripts/generate-commercial-tauri-config.mjs
+node --env-file=.env.commercial scripts/check-commercial-release.mjs
 ```
+
+For a configured build, expose the same owned origin to both compile steps and apply the generated Tauri overlay:
+
+```bash
+VITE_MANAGED_API_BASE_URL=https://api.your-owned-domain.example \
+OPENTYPELESS_MANAGED_API_BASE_URL=https://api.your-owned-domain.example \
+npm run tauri build -- --config src-tauri/tauri.commercial.generated.json
+```
+
+The example domains intentionally do not represent a live service. The release guard rejects placeholders, upstream identities, mismatched frontend/Rust origins, missing overlays, and an enabled updater.
 
 ## Architecture
 
@@ -421,7 +400,7 @@ src-tauri/src/        # Rust backend
 ## FAQ
 
 **Is my audio sent to the cloud?**
-In BYOK mode, audio goes directly to your chosen STT provider or local endpoint. Nothing passes through OpenTypeless servers. In Cloud mode, audio is sent to the managed proxy for transcription and quota accounting.
+In BYOK mode, audio goes directly to your chosen STT provider or local endpoint. Nothing passes through OpenTypeless servers. The Cloud option is inactive in normal source builds; an operator-configured distribution would send audio to that operator's managed proxy for transcription and quota accounting.
 
 **Can I use it offline?**
 With a local Whisper-compatible STT endpoint and a local OpenAI-compatible LLM such as Ollama, the app can run without OpenTypeless cloud services.
@@ -430,13 +409,12 @@ With a local Whisper-compatible STT endpoint and a local OpenAI-compatible LLM s
 STT supports 99+ languages depending on the provider. AI polish and translation support 20+ target languages.
 
 **Is the app free?**
-Yes. The app is fully functional with your own API keys (BYOK). Cloud plans are optional.
+Yes. The app is fully functional with your own API keys (BYOK). This fork does not currently offer a managed paid plan.
 
 ## Community
 
-- 💬 [Discord](https://discord.gg/V6rRpJ4RGD) — Chat, get help, share feedback
-- 🗣️ [GitHub Discussions](https://github.com/tover0314-w/opentypeless/discussions) — Feature proposals, Q&A
-- 🐛 [Issue Tracker](https://github.com/tover0314-w/opentypeless/issues) — Bug reports and feature requests
+- 🗣️ [GitHub Discussions](https://github.com/rudy774/opentypeless/discussions) — Feature proposals, Q&A
+- 🐛 [Issue Tracker](https://github.com/rudy774/opentypeless/issues) — Bug reports and feature requests
 - 📖 [Contributing Guide](CONTRIBUTING.md) — Development setup and guidelines
 - 🔒 [Security Policy](SECURITY.md) — Report vulnerabilities responsibly
 - 🧭 [Vision](VISION.md) — Project principles and roadmap direction
@@ -445,15 +423,15 @@ Yes. The app is fully functional with your own API keys (BYOK). Cloud plans are 
 
 Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and guidelines.
 
-Looking for a place to start? Check out issues labeled [`good first issue`](https://github.com/tover0314-w/opentypeless/labels/good%20first%20issue).
+Looking for a place to start? Check out issues labeled [`good first issue`](https://github.com/rudy774/opentypeless/labels/good%20first%20issue).
 
 ## Star History
 
-<a href="https://star-history.com/#tover0314-w/opentypeless&Date">
+<a href="https://star-history.com/#rudy774/opentypeless&Date">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=tover0314-w/opentypeless&type=Date&theme=dark" />
-    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=tover0314-w/opentypeless&type=Date" />
-    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=tover0314-w/opentypeless&type=Date" />
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=rudy774/opentypeless&type=Date&theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=rudy774/opentypeless&type=Date" />
+    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=rudy774/opentypeless&type=Date" />
   </picture>
 </a>
 
