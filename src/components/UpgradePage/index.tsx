@@ -49,8 +49,11 @@ export function UpgradePage() {
 
   const hasCloudAccess = useAuthStore(hasManagedCloudAccess)
   const hasLifetimeAccess =
-    plan === 'lifetime_starter' || source === 'lifetime' || source === 'appsumo'
-  const hasMonthlyAccess = !hasLifetimeAccess && (plan === 'pro' || source === 'creem')
+    hasCloudAccess && (plan === 'lifetime_starter' || source === 'lifetime' || source === 'appsumo')
+  const hasMonthlyAccess =
+    hasCloudAccess &&
+    !hasLifetimeAccess &&
+    (plan === 'pro' || source === 'stripe' || source === 'creem')
   const visiblePlans = hasMonthlyAccess
     ? catalogue.filter((offer) => offer.product === 'lifetime_starter')
     : catalogue

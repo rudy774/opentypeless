@@ -44,7 +44,7 @@ export function PasswordDialog({
   const busy = loading || submitting
   const passwordMismatch = confirmPassword.length > 0 && newPassword !== confirmPassword
   const passwordOutOfRange =
-    newPassword.length > 0 && (newPassword.length < 8 || newPassword.length > 128)
+    newPassword.length > 0 && (newPassword.length < 12 || newPassword.length > 128)
   const formValid =
     newPassword.length >= 8 &&
     newPassword.length <= 128 &&
@@ -156,7 +156,7 @@ export function PasswordDialog({
           <div aria-live="polite">
             {passwordOutOfRange && (
               <p className="text-[12px] text-red-500" role="alert">
-                {t('account.passwordTooShort', 'Password must be 8 to 128 characters')}
+                {t('account.passwordTooShort', 'Password must be 12 to 128 characters')}
               </p>
             )}
             {passwordMismatch && (

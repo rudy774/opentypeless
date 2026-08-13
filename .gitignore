@@ -13,12 +13,14 @@ node_modules
 # Build output
 dist
 dist-ssr
+services/managed-api/build
 
 # Environment & secrets
 *.local
 .env
 .env.*
 !.env.commercial.example
+!services/managed-api/.env.example
 
 # Editor directories and files
 .vscode/*

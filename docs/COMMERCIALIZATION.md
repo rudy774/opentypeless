@@ -2,10 +2,7 @@
 
 ## Honest product boundary
 
-OpenTypeless is an MIT-licensed, local-first desktop client. This repository
-contains clients for optional accounts, checkout, quota, managed inference,
-backup, and updates; it does not contain the production service that operates
-them.
+OpenTypeless is an MIT-licensed, local-first desktop client. This repository contains both the local-first desktop client and a deployable managed-service implementation under `services/managed-api`. The service is still opt-in: no checked-in source build points at a live endpoint, and this repository does not create or operate the external production infrastructure required to sell it.
 
 The safest business model is:
 
@@ -30,8 +27,9 @@ regional-processing, subprocessor, privacy, and support policies.
 
 Do not sell a managed build until:
 
-1. A Rudy-owned API implements auth, subscription status, checkout/portal,
-   managed STT/LLM/Ask, backup, export, and deletion.
+1. The included managed API is deployed at a Rudy-owned HTTPS origin and passes
+   database, authentication, billing, provider, backup, export, deletion, and
+   recovery tests against that deployed environment.
 2. The packaged app no longer uses upstream accounts, API origins,
    repositories, support channels, identifiers, deep links, or update feeds.
 3. Rudy owns the updater endpoint and signing pair. Only the public updater key
@@ -89,10 +87,7 @@ Passing this local guard proves configuration consistency only. It cannot prove 
 
 ## Service and metrics foundation
 
-The future backend needs capability-based entitlements, a server-owned plan
-catalog, atomic usage reservations, stable error codes, encrypted/versioned
-backups, deletion/export, privacy-safe request tracing, webhook verification,
-capacity planning, incident response, and disaster recovery.
+The included `services/managed-api` implements capability-based entitlements, a Stripe-owned plan catalogue, atomic usage reservations, stable errors, encrypted/versioned backups, one-time encrypted exports, deletion, content-free request tracing, webhook verification, persistent rate limits, and stale-operation reconciliation. Its deployment and operations runbook is in [`services/managed-api/README.md`](../services/managed-api/README.md). Capacity planning, monitoring, incident response, backups, key rotation, and disaster recovery remain operator responsibilities.
 
 The desktop can add local aggregate metrics such as recording time, word count,
 session count, completion/fallback/failure rate, and p50/p95 STT, cleanup, and

@@ -18,15 +18,20 @@ const CLIENT_SOURCE_PATHS = {
   desktopAuthCallback: path.join(ROOT, 'src', 'lib', 'desktop-auth-callback.ts'),
   deepLink: path.join(ROOT, 'src', 'lib', 'deep-link.ts'),
   authStore: path.join(ROOT, 'src', 'stores', 'authStore.ts'),
+  serviceApp: path.join(ROOT, 'services', 'managed-api', 'src', 'app.ts'),
 }
 
 const REQUIRED_OPERATIONS = {
   '/api/health/ready': ['get'],
   '/api/plans': ['get'],
+  '/api/billing/stripe/webhook': ['post'],
+  '/billing/redirect': ['get'],
   '/api/auth/sign-in/email': ['post'],
   '/api/auth/sign-up/email': ['post'],
   '/api/auth/send-verification-email': ['post'],
   '/api/auth/desktop-oauth': ['get'],
+  '/api/auth/desktop/complete': ['get'],
+  '/auth/callback': ['get'],
   '/api/auth/desktop/exchange': ['post'],
   '/api/opentypeless/auth/request-password-reset': ['post'],
   '/api/auth/get-session': ['get'],
@@ -44,18 +49,24 @@ const REQUIRED_OPERATIONS = {
   '/api/backup/download': ['get'],
   '/api/scenes': ['get'],
   '/api/account/export': ['post'],
+  '/api/account/export/download': ['get'],
   '/api/account': ['delete'],
 }
 
 const PUBLIC_OPERATIONS = new Set([
   'get /api/health/ready',
   'get /api/plans',
+  'post /api/billing/stripe/webhook',
+  'get /billing/redirect',
   'post /api/auth/sign-in/email',
   'post /api/auth/sign-up/email',
   'post /api/auth/send-verification-email',
   'get /api/auth/desktop-oauth',
+  'get /api/auth/desktop/complete',
+  'get /auth/callback',
   'post /api/auth/desktop/exchange',
   'post /api/opentypeless/auth/request-password-reset',
+  'get /api/account/export/download',
 ])
 
 const IDEMPOTENT_OPERATIONS = new Set([
@@ -211,7 +222,7 @@ const STRICT_BACKUP_OBJECT_SCHEMAS = [
   'BackupDownload',
 ]
 function hasParameter(operation, name) {
-  return (operation.parameters ?? []).some(
+  return (operation?.parameters ?? []).some(
     (entry) => entry?.name === name || entry?.$ref === `#/components/parameters/${name}`,
   )
 }
@@ -399,6 +410,50 @@ export function validateManagedServiceContract(contract) {
   for (const status of ['400', '409', '410', '429']) {
     if (!exchange?.responses?.[status]) {
       fail(`/api/auth/desktop/exchange must define a ${status} failure response`)
+    }
+  }
+
+  const oauthComplete = contract?.paths?.['/api/auth/desktop/complete']?.get
+  const oauthCompleteDescription = oauthComplete?.description ?? ''
+  for (const term of [
+    'External-browser',
+    'atomically consumes',
+    'PKCE-bound',
+    'without a bearer token',
+  ]) {
+    if (!oauthCompleteDescription.includes(term)) {
+      fail(`/api/auth/desktop/complete must document ${term}`)
+    }
+  }
+  const webhook = contract?.paths?.['/api/billing/stripe/webhook']?.post
+  if (!hasParameter(webhook, 'Stripe-Signature')) {
+    fail('/api/billing/stripe/webhook must require Stripe-Signature')
+  }
+  for (const term of ['untouched bounded raw body', 'idempotently', 'retryable']) {
+    if (!(webhook?.description ?? '').includes(term)) {
+      fail(`/api/billing/stripe/webhook must document ${term}`)
+    }
+  }
+  const billingRedirect = contract?.paths?.['/billing/redirect']?.get
+  for (const term of ['ten-minute', 'HTTPS stripe.com', 'external browser']) {
+    if (!(billingRedirect?.description ?? '').includes(term)) {
+      fail(`/billing/redirect must document ${term}`)
+    }
+  }
+  const exportRequest = contract?.paths?.['/api/account/export']?.post
+  const exportDownload = contract?.paths?.['/api/account/export/download']?.get
+  for (const term of ['encrypted', 'hashed one-time token', '30-minute', 'never attached']) {
+    if (!(exportRequest?.description ?? '').includes(term)) {
+      fail(`/api/account/export must document ${term}`)
+    }
+  }
+  for (const term of [
+    'Atomically consumes',
+    'expires after 30 minutes',
+    'invalid after the first',
+  ]) {
+    if (!(exportDownload?.description ?? '').includes(term)) {
+      fail(`/api/account/export/download must document ${term}`)
     }
   }
 
@@ -733,6 +788,7 @@ export function validateManagedServiceContract(contract) {
     ]) ||
     !sameMembers(subscriptionStatus?.properties?.source?.enum, [
       'free',
+      'stripe',
       'creem',
       'lifetime',
       'appsumo',
@@ -791,6 +847,39 @@ export function loadManagedServiceClientSources() {
 export function validateManagedServiceClientParity(contract, sources) {
   const errors = []
   const fail = (message) => errors.push(message)
+  const serviceApp = sources?.serviceApp ?? ''
+  for (const route of [
+    '/api/billing/stripe/webhook',
+    '/api/health/ready',
+    '/api/plans',
+    '/auth/callback',
+    '/api/auth/desktop-oauth',
+    '/api/auth/desktop/complete',
+    '/api/auth/desktop/exchange',
+    '/api/opentypeless/auth/request-password-reset',
+    '/api/opentypeless/auth/set-password',
+    '/api/subscription/status',
+    '/api/checkout/create',
+    '/api/subscription/portal',
+    '/billing/redirect',
+    '/api/proxy/stt',
+    '/api/proxy/llm',
+    '/api/proxy/ask',
+    '/api/backup/upload',
+    '/api/backup/download',
+    '/api/scenes',
+    '/api/account/export',
+    '/api/account/export/download',
+    '/api/account',
+  ]) {
+    if (!serviceApp.includes(`'${route}'`) && !serviceApp.includes(`"${route}"`)) {
+      fail(`managed service implementation is missing ${route}`)
+    }
+  }
+  if (!serviceApp.includes("app.all('/api/auth/{*splat}', auth.handler)")) {
+    fail('managed service implementation must mount the Better Auth route family')
+  }
+
   const api = sources?.api ?? ''
   const plans = sourceBetween(api, 'export function getPlans(', '// Subscription')
   for (const fragment of ["request<unknown>('/api/plans')", '.then(parsePlanCatalogue)']) {
@@ -1029,7 +1118,7 @@ export function runManagedServiceContractCheck(contractPath = CONTRACT_PATH) {
     `Managed service contract matches the desktop client boundary (${operationCount} operations).`,
   )
   console.log(
-    'This check does not claim that a production service, billing, policies, or support exist.',
+    'This check validates the client contract; it does not claim that the service is deployed or that billing, policies, monitoring, or support are operational.',
   )
   return 0
 }

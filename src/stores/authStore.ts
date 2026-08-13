@@ -19,7 +19,7 @@ import {
   type SubscriptionPlan,
   type SubscriptionSource,
 } from '../lib/api'
-import { isActiveCloudPlan, MANAGED_SERVICE_CONFIGURED } from '../lib/constants'
+import { MANAGED_SERVICE_CONFIGURED } from '../lib/constants'
 import { toast } from '../components/toast-service'
 import i18n from '../i18n'
 
@@ -94,21 +94,26 @@ interface AuthState {
 }
 
 export function hasManagedCloudAccess(
-  state: Pick<AuthState, 'plan' | 'source' | 'cloudWordsLimit' | 'licenseStatus'>,
+  state: Pick<
+    AuthState,
+    'plan' | 'source' | 'subscriptionStatus' | 'cloudWordsLimit' | 'licenseStatus'
+  >,
 ): boolean {
   if (state.licenseStatus === 'refunded' || state.licenseStatus === 'deactivated') return false
-  if (state.source === 'appsumo') {
+  if (state.source === 'appsumo' && state.plan.startsWith('appsumo_tier')) {
     return state.cloudWordsLimit > 0 && state.licenseStatus === 'active'
   }
-  if (state.source === 'lifetime') {
-    return state.cloudWordsLimit > 0 || state.plan === 'lifetime_starter'
+  if (state.source === 'lifetime' && state.plan === 'lifetime_starter') {
+    return state.cloudWordsLimit > 0
   }
-  if (state.source === 'creem' && state.cloudWordsLimit > 0) {
-    return true
+  if (state.plan === 'pro' && (state.source === 'stripe' || state.source === 'creem')) {
+    return (
+      state.cloudWordsLimit > 0 &&
+      (state.subscriptionStatus === 'active' || state.subscriptionStatus === 'trialing')
+    )
   }
-  return isActiveCloudPlan(state.plan)
+  return false
 }
-
 function credentialCapabilityFromAccounts(
   accounts: Array<{ providerId: string }>,
 ): CredentialCapability {

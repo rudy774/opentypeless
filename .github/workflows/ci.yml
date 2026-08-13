@@ -38,14 +38,41 @@ jobs:
           cache: 'npm'
 
       - run: npm ci
-      - run: npm run service:contract:check
-      - run: npm run service:contract:test
       - run: npm run commercial:check:test
       - run: npm run release:version:test
       - run: npm run lint
       - run: npm run format:check
       - run: npm test
 
+  check-managed-service:
+    runs-on: ubuntu-latest
+    env:
+      MANAGED_SERVICE_TEST_DATABASE_URL: postgresql://postgres:test-only-password@127.0.0.1:5432/opentypeless_test
+    services:
+      postgres:
+        image: postgres:17-bookworm@sha256:4f736ae292687621d4dbe0d499ffd024a36bd2ee7d8ca6f2ccd4c800f047b394
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: test-only-password
+          POSTGRES_DB: opentypeless_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d opentypeless_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22.23.1
+          cache: 'npm'
+
+      - run: npm ci
+      - run: npm run service:verify
+      - run: docker build --file services/managed-api/Dockerfile --tag opentypeless-managed-api:ci .
   check-rust:
     needs: build-frontend
     strategy:
