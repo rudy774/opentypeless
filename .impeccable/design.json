@@ -1,0 +1,214 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-11T19:00:00.5095838-05:00",
+  "title": "Design System: OpenTypeless",
+  "extensions": {
+    "colorMeta": {
+      "signal-teal": {
+        "role": "primary",
+        "displayName": "Signal Teal",
+        "canonical": "#0f7465",
+        "tonalRamp": ["#062a25", "#09473e", "#0a5e52", "#0f7465", "#2a9785", "#63bbaa", "#afe8dc", "#e7f8f4"]
+      },
+      "signal-teal-hover": {
+        "role": "primary",
+        "displayName": "Deep Signal Teal",
+        "canonical": "#0a5e52",
+        "tonalRamp": ["#05231e", "#083a33", "#0a4b42", "#0a5e52", "#218071", "#57aa9b", "#a1ddcf", "#e3f5f1"]
+      },
+      "signal-wash": {
+        "role": "primary",
+        "displayName": "Signal Wash",
+        "canonical": "#d9f3ed",
+        "tonalRamp": ["#102d28", "#245048", "#3c7469", "#679b8f", "#93bdb3", "#b9dad2", "#d9f3ed", "#f1fbf8"]
+      },
+      "on-signal": {
+        "role": "neutral",
+        "displayName": "On Signal",
+        "canonical": "#ffffff",
+        "tonalRamp": ["#10221e", "#ffffff"]
+      },
+      "mist-canvas": {
+        "role": "neutral",
+        "displayName": "Mist Canvas",
+        "canonical": "#f3f7f6",
+        "tonalRamp": ["#18201e", "#34403d", "#56635f", "#7a8985", "#a1aeaa", "#c6cfcc", "#e3eae8", "#f3f7f6"]
+      },
+      "mist-field": {
+        "role": "neutral",
+        "displayName": "Mist Field",
+        "canonical": "#e9f0ee",
+        "tonalRamp": ["#17201e", "#303c39", "#4e5c58", "#71807c", "#98a6a2", "#bdc8c5", "#d9e2df", "#e9f0ee"]
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Paper",
+        "canonical": "#ffffff",
+        "tonalRamp": ["#1f2221", "#414442", "#646765", "#898c8a", "#b0b2b1", "#d0d2d1", "#ebedec", "#ffffff"]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Voice Ink",
+        "canonical": "#14211e",
+        "tonalRamp": ["#0b1512", "#14211e", "#263c36", "#3c5b53", "#638078", "#91aaa3", "#c1d2cd", "#edf4f2"]
+      },
+      "secondary-text": {
+        "role": "neutral",
+        "displayName": "Secondary Ink",
+        "canonical": "#50625d",
+        "tonalRamp": ["#17201e", "#2a3834", "#40514c", "#50625d", "#71847e", "#9caaa6", "#c5cfcc", "#eef2f1"]
+      },
+      "tertiary-text": {
+        "role": "neutral",
+        "displayName": "Tertiary Ink",
+        "canonical": "#556963",
+        "tonalRamp": ["#1b2422", "#34403d", "#455752", "#556963", "#7b8d87", "#a6b5b0", "#cdd6d3", "#f0f3f2"]
+      },
+      "hairline": {
+        "role": "neutral",
+        "displayName": "Green Hairline",
+        "canonical": "rgba(20, 50, 43, 0.13)",
+        "tonalRamp": ["#13221f", "#2c3936", "#4a5753", "#687671", "#8c9995", "#b1bbb8", "#d2d9d7", "#f2f5f4"]
+      },
+      "night-canvas": {
+        "role": "neutral",
+        "displayName": "Night Canvas",
+        "canonical": "#111817",
+        "tonalRamp": ["#0a0f0e", "#111817", "#26312e", "#43504c", "#687570", "#929e9a", "#c1cac7", "#edf2f0"]
+      },
+      "night-surface": {
+        "role": "neutral",
+        "displayName": "Night Surface",
+        "canonical": "#202c29",
+        "tonalRamp": ["#0c1211", "#202c29", "#354440", "#53635e", "#74847f", "#9ba8a4", "#c6cfcc", "#eef3f1"]
+      },
+      "night-ink": {
+        "role": "neutral",
+        "displayName": "Night Ink",
+        "canonical": "#f0f6f4",
+        "tonalRamp": ["#19201e", "#35403d", "#56635f", "#7b8985", "#a0aca8", "#c3cdca", "#dee6e3", "#f0f6f4"]
+      },
+      "night-signal": {
+        "role": "primary",
+        "displayName": "Night Signal",
+        "canonical": "#4acdb5",
+        "tonalRamp": ["#092b25", "#0d4c40", "#176f5f", "#289781", "#4acdb5", "#78deca", "#afece0", "#e7faf5"]
+      },
+      "night-on-signal": {
+        "role": "neutral",
+        "displayName": "Night On Signal",
+        "canonical": "#10221e",
+        "tonalRamp": ["#10221e", "#ffffff"]
+      }
+    },
+    "typographyMeta": {
+      "headline": { "displayName": "Command Headline", "purpose": "The Home configuration statement only." },
+      "title": { "displayName": "Operational Title", "purpose": "Page and card titles." },
+      "body": { "displayName": "Desktop Body", "purpose": "Instructions, transcripts, and field values." },
+      "label": { "displayName": "Control Label", "purpose": "Groups, metadata, and compact actions." },
+      "data": { "displayName": "Shortcut Data", "purpose": "Keycaps and measurements only." }
+    },
+    "shadows": [
+      { "name": "low-definition", "value": "0 1px 2px rgba(17, 42, 36, 0.08)", "purpose": "Selected controls and subtle lifted states." },
+      { "name": "command-depth", "value": "0 14px 34px rgba(17, 42, 36, 0.14)", "purpose": "The Home command deck only." },
+      { "name": "floating-depth", "value": "0 18px 48px rgba(10, 26, 22, 0.22)", "purpose": "Menus, dialogs, and transient overlays." }
+    ],
+    "motion": [
+      { "name": "state-ease", "value": "cubic-bezier(0.33, 1, 0.68, 1)", "purpose": "Fast color and opacity state changes." },
+      { "name": "meter-response", "value": "transform 75ms ease-out, opacity 75ms ease-out", "purpose": "Live capsule microphone bars." }
+    ],
+    "breakpoints": [
+      { "name": "compact-navigation", "value": "720px" },
+      { "name": "split-content", "value": "760px" },
+      { "name": "expanded-padding", "value": "900px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The single strongest action in a local flow.",
+      "html": "<button class=\"ds-button-primary\">Save Changes</button>",
+      "css": ".ds-button-primary { background: var(--color-accent); color: var(--color-on-accent); border: 0; border-radius: 8px; padding: 7px 14px; font: 600 12px 'Segoe UI Variable Text', 'Segoe UI', sans-serif; transition: background-color 160ms ease-out; } .ds-button-primary:hover { background: var(--color-accent-hover); } .ds-button-primary:focus-visible { outline: 2px solid var(--color-border-focus); outline-offset: 2px; }"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "A secondary action with quiet containment.",
+      "html": "<button class=\"ds-button-ghost\">Settings</button>",
+      "css": ".ds-button-ghost { background: transparent; color: var(--color-text-secondary); border: 1px solid var(--color-border); border-radius: 8px; padding: 7px 12px; font: 500 12px 'Segoe UI Variable Text', 'Segoe UI', sans-serif; transition: background-color 160ms ease-out, color 160ms ease-out, border-color 160ms ease-out; } .ds-button-ghost:hover { background: var(--color-bg-secondary); color: var(--color-text-primary); border-color: rgba(15,116,101,.3); } .ds-button-ghost:focus-visible { outline: 2px solid var(--color-border-focus); outline-offset: 2px; }"
+    },
+    {
+      "name": "Active Navigation Item",
+      "kind": "nav",
+      "refersTo": "nav-active",
+      "description": "The current destination in a labeled desktop rail.",
+      "html": "<a class=\"ds-nav-active\" href=\"#/\">Home</a>",
+      "css": ".ds-nav-active { display: flex; align-items: center; height: 40px; padding: 0 12px; border-radius: 10px; background: var(--color-accent-light); color: var(--color-accent); text-decoration: none; font: 500 13px 'Segoe UI Variable Text', 'Segoe UI', sans-serif; } .ds-nav-active:hover { background: var(--color-accent-light); color: var(--color-accent-hover); } .ds-nav-active:focus-visible { outline: 2px solid var(--color-border-focus); outline-offset: 2px; }"
+    },
+    {
+      "name": "Operational Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "A flat bordered surface for one supporting information group.",
+      "html": "<section class=\"ds-card\"><h3>Setup summary</h3><p>Speech Recognition · ElevenLabs Scribe v2</p></section>",
+      "css": ".ds-card { background: var(--color-bg-elevated); color: var(--color-text-primary); border: 1px solid var(--color-border); border-radius: 12px; padding: 20px; font-family: 'Segoe UI Variable Text', 'Segoe UI', sans-serif; } .ds-card h3 { margin: 0; font-size: 16px; font-weight: 600; letter-spacing: -.02em; } .ds-card p { margin: 14px 0 0; color: var(--color-text-secondary); font-size: 12px; }"
+    },
+    {
+      "name": "Search Field",
+      "kind": "input",
+      "description": "A low-noise search control for History and collections.",
+      "html": "<input class=\"ds-search\" type=\"search\" placeholder=\"Search history…\" aria-label=\"Search history\" />",
+      "css": ".ds-search { height: 40px; width: 100%; box-sizing: border-box; border: 1px solid var(--color-border); border-radius: 10px; background: var(--color-bg-elevated); color: var(--color-text-primary); padding: 0 12px; font: 400 13px 'Segoe UI Variable Text', 'Segoe UI', sans-serif; transition: border-color 160ms ease-out; } .ds-search::placeholder { color: var(--color-text-tertiary); } .ds-search:hover { border-color: rgba(15,116,101,.28); } .ds-search:focus-visible { outline: 2px solid var(--color-border-focus); outline-offset: 2px; }"
+    },
+    {
+      "name": "Segmented Control",
+      "kind": "custom",
+      "description": "A compact mutually exclusive choice for time range and output behavior.",
+      "html": "<div class=\"ds-segmented\"><button class=\"ds-segmented-active\">Day</button><button>Week</button><button>Month</button></div>",
+      "css": ".ds-segmented { display: inline-flex; gap: 2px; padding: 2px; border: 1px solid var(--color-border); border-radius: 9px; background: var(--color-bg-secondary); } .ds-segmented button { border: 0; border-radius: 7px; background: transparent; color: var(--color-text-tertiary); padding: 6px 10px; font: 500 12px 'Segoe UI Variable Text', 'Segoe UI', sans-serif; } .ds-segmented .ds-segmented-active { background: var(--color-bg-elevated); color: var(--color-text-primary); box-shadow: 0 1px 2px rgba(17,42,36,.08); } .ds-segmented button:hover { color: var(--color-text-primary); } .ds-segmented button:focus-visible { outline: 2px solid var(--color-border-focus); outline-offset: 2px; }"
+    },
+    {
+      "name": "Command Deck",
+      "kind": "custom",
+      "refersTo": "command-deck",
+      "description": "The signature configuration, shortcut, and speech-route surface on Home.",
+      "html": "<section class=\"ds-command\"><span class=\"ds-status\">✓ Configured</span><h2>Welcome to OpenTypeless</h2><p>Speech Recognition → AI Polish → Text output</p><kbd>Ctrl</kbd> + <kbd>F10</kbd></section>",
+      "css": ".ds-command { background: #14211e; color: #fff; border-radius: 16px; padding: 24px; box-shadow: 0 14px 34px rgba(17,42,36,.14); font-family: 'Segoe UI Variable Text', 'Segoe UI', sans-serif; } .ds-command h2 { margin: 22px 0 8px; font-size: 28px; line-height: 1.12; letter-spacing: -.04em; } .ds-command p { color: rgba(255,255,255,.65); font-size: 13px; } .ds-status { display: inline-block; border: 1px solid rgba(93,220,197,.25); border-radius: 9999px; background: rgba(93,220,197,.1); color: #8ce8d7; padding: 5px 10px; font-size: 11px; font-weight: 600; } .ds-command kbd { display: inline-block; border: 1px solid rgba(255,255,255,.14); border-radius: 7px; background: rgba(255,255,255,.08); padding: 6px 10px; font: 600 12px 'Cascadia Mono', monospace; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Quiet Signal Route",
+    "overview": "OpenTypeless should feel like a calm voice-routing instrument, not a statistics dashboard or an AI chat surface. A mist canvas, paper controls, ink command surface, and restrained teal signal make configuration easy to identify without making the tray-first utility demand attention. The system is compact, operational, and native to Windows. Product-specific route diagrams explain where speech goes; everything else stays flat, legible, and familiar.",
+    "keyCharacteristics": [
+      "One dark command surface establishes configuration, shortcut state, and the speech route.",
+      "Paper and mist layers create structure with hairline borders rather than decoration.",
+      "Teal identifies current state, signal, and primary action.",
+      "Labeled navigation and plain-language provider names favor recognition.",
+      "Motion is sparse, reduced-motion aware, and transform-based."
+    ],
+    "rules": [
+      { "name": "The Signal Scarcity Rule", "body": "Teal earns attention by remaining rare; use it for current state and action, not as ambient decoration.", "section": "colors" },
+      { "name": "The Role-Preservation Rule", "body": "Dark mode changes values, never semantic roles: canvas stays quiet, surfaces stay distinct, and teal remains the signal.", "section": "colors" },
+      { "name": "The Data-Is-Data Rule", "body": "Monospace is reserved for shortcuts and measurements; provider names, navigation, and body copy stay in Segoe UI.", "section": "typography" },
+      { "name": "The Flat-by-Default Rule", "body": "A surface does not receive elevation merely because it is a card; elevation communicates importance or temporary layering.", "section": "elevation" },
+      { "name": "The Capsule Exception Rule", "body": "The floating live-transcription capsule may be pill-shaped; ordinary panels and navigation must not borrow that silhouette.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do make configuration, the shortcut, and the output route legible within five seconds.",
+      "Do use friendly provider names such as ElevenLabs Scribe v2 and Google Gemini.",
+      "Do keep permanent surfaces flat and separated by tone or hairline borders.",
+      "Do preserve visible keyboard focus, text-backed state, localization, narrow-window support, and reduced motion.",
+      "Do clamp long history text and provide an explicit expansion path."
+    ],
+    "donts": [
+      "Don't expose storage enums such as elevenlabs, gemini, or keyboard as user-facing values.",
+      "Don't reintroduce nested navigation rails, duplicated Home navigation actions, or dashboard card inventory.",
+      "Don't use glossy gradients, indiscriminate shadows, hover scaling, or jelly wobble on permanent UI.",
+      "Don't use all-caps eyebrow copy as decoration or shrink important helper text below 12px.",
+      "Don't animate layout properties for live microphone feedback."
+    ]
+  }
+}

@@ -10,7 +10,6 @@ import type {
   PipelineState,
   VoiceMode,
 } from '../stores/appStore'
-import { getHistory } from '../lib/tauri'
 import { toast } from '../components/toast-service'
 import { capsuleErrorKeyFromPayload, type PipelineErrorPayload } from '../lib/capsuleError'
 import { invalidateCloudSessionOnce } from '../lib/cloud-session'
@@ -39,7 +38,7 @@ export function useTauriEvents() {
     setLastContext,
     setPipelineError,
     setAccessibilityTrusted,
-    setHistory,
+    markActivityChanged,
     applyPersistedConfigPatch,
     setHotkeyRegistrationError,
   } = useAppStore()
@@ -76,11 +75,9 @@ export function useTauriEvents() {
         // Don't clear pipelineError here — CapsuleError auto-resets after 2.5s.
         // Clearing here would swallow errors from failed start() calls that
         // transition Recording → Idle in rapid succession.
-        getHistory(200, 0)
-          .then(setHistory)
-          .catch((err) => {
-            console.error('Failed to refresh history:', err)
-          })
+        // Keep the always-on capsule free of SQLite work. Visible views
+        // refresh their own data from this lightweight revision signal.
+        markActivityChanged()
       }
     })
     addListener<VoiceMode | null>('pipeline:voice_mode', setActiveVoiceMode)
@@ -146,7 +143,7 @@ export function useTauriEvents() {
     setLastContext,
     setPipelineError,
     setAccessibilityTrusted,
-    setHistory,
+    markActivityChanged,
     applyPersistedConfigPatch,
     setHotkeyRegistrationError,
     t,

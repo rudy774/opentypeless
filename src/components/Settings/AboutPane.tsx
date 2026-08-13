@@ -96,9 +96,7 @@ export function AboutPane() {
               className="inline-flex items-center gap-1.5 rounded-[7px] border border-border bg-bg-secondary px-3 py-2 text-[12px] text-text-primary hover:border-border-focus disabled:opacity-60"
             >
               <Stethoscope size={13} />
-              {diagnosticsRunning
-                ? t('settings.diagnosticsRunning')
-                : t('settings.runDiagnostics')}
+              {diagnosticsRunning ? t('settings.diagnosticsRunning') : t('settings.runDiagnostics')}
             </button>
             <button
               type="button"
@@ -115,7 +113,7 @@ export function AboutPane() {
                 <div key={row.id} className="flex items-start justify-between gap-3 px-3 py-2">
                   <span className="text-[12px] capitalize text-text-secondary">{row.id}</span>
                   <span
-                    className={`text-right text-[11px] leading-relaxed ${
+                    className={`text-right text-[12px] leading-relaxed ${
                       row.status === 'error'
                         ? 'text-error'
                         : row.status === 'warning'
@@ -130,7 +128,7 @@ export function AboutPane() {
             </div>
           )}
           {diagnosticError && (
-            <p className="rounded-[8px] border border-error/30 bg-error/10 px-3 py-2 text-[11px] text-error">
+            <p className="rounded-[8px] border border-error/30 bg-error/10 px-3 py-2 text-[12px] text-error">
               {diagnosticError}
             </p>
           )}

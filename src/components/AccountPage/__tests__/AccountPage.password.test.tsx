@@ -169,7 +169,7 @@ describe('AccountPage password controls', () => {
     })
   })
 
-  it('backs up dictionary entries and correction rules in one compatible payload', async () => {
+  it('uploads a fresh database snapshot even when all UI caches are empty', async () => {
     signedIn('present')
     useAuthStore.setState({
       plan: 'pro',
@@ -177,8 +177,9 @@ describe('AccountPage password controls', () => {
       cloudWordsLimit: 1000,
       licenseStatus: 'active',
     })
-    const dictionary = [{ id: 7, word: 'OpenTypeless', pronunciation: null }]
-    const correctionRules = [
+    const persistedHistory = [{ id: 11, raw_text: 'persisted raw' }]
+    const persistedDictionary = [{ id: 7, word: 'OpenTypeless', pronunciation: null }]
+    const persistedCorrections = [
       {
         id: 9,
         pattern: 'open type less',
@@ -186,18 +187,27 @@ describe('AccountPage password controls', () => {
         enabled: true,
       },
     ]
-    useAppStore.setState({ dictionary, correctionRules })
+    useAppStore.setState({ history: [], dictionary: [], correctionRules: [] })
+    vi.mocked(tauri.exportBackupData).mockResolvedValue({
+      history: persistedHistory,
+      dictionary: {
+        entries: persistedDictionary,
+        correction_rules: persistedCorrections,
+      },
+    } as never)
     vi.mocked(api.uploadBackup).mockResolvedValue({ success: true })
 
     render(<AccountPage />)
     fireEvent.click(screen.getByRole('button', { name: 'Backup' }))
 
     await waitFor(() => {
+      expect(tauri.exportBackupData).toHaveBeenCalledTimes(1)
       expect(api.uploadBackup).toHaveBeenCalledWith(
         expect.objectContaining({
+          history: persistedHistory,
           dictionary: {
-            entries: dictionary,
-            correction_rules: correctionRules,
+            entries: persistedDictionary,
+            correction_rules: persistedCorrections,
           },
         }),
       )

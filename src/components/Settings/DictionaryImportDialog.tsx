@@ -42,22 +42,22 @@ export function DictionaryImportDialog({
           <h3 className="text-[14px] font-medium text-text-primary">
             {t('dictionary.importTitle')}
           </h3>
-          <p className="mt-0.5 truncate text-[11px] text-text-tertiary">{fileName}</p>
+          <p className="mt-0.5 truncate text-[12px] text-text-tertiary">{fileName}</p>
         </div>
         <div className="grid grid-cols-3 gap-3 px-4 py-3 text-center">
           <div>
             <p className="text-[16px] font-semibold text-text-primary">{report.accepted}</p>
-            <p className="text-[11px] text-text-tertiary">{t('dictionary.importAccepted')}</p>
+            <p className="text-[12px] text-text-tertiary">{t('dictionary.importAccepted')}</p>
           </div>
           <div>
             <p className="text-[16px] font-semibold text-text-primary">
               {report.skippedDuplicates}
             </p>
-            <p className="text-[11px] text-text-tertiary">{t('dictionary.importDuplicates')}</p>
+            <p className="text-[12px] text-text-tertiary">{t('dictionary.importDuplicates')}</p>
           </div>
           <div>
             <p className="text-[16px] font-semibold text-text-primary">{report.skippedInvalid}</p>
-            <p className="text-[11px] text-text-tertiary">{t('dictionary.importInvalid')}</p>
+            <p className="text-[12px] text-text-tertiary">{t('dictionary.importInvalid')}</p>
           </div>
         </div>
         {report.errors.length > 0 && (
@@ -65,7 +65,7 @@ export function DictionaryImportDialog({
             {report.errors.slice(0, 20).map((error) => (
               <p
                 key={`${error.row}-${error.code}`}
-                className="py-0.5 text-[11px] text-text-secondary"
+                className="py-0.5 text-[12px] text-text-secondary"
               >
                 {t('dictionary.importRowError', { row: error.row, code: error.code })}
               </p>
@@ -86,7 +86,7 @@ export function DictionaryImportDialog({
             autoFocus
             onClick={onConfirm}
             disabled={report.accepted === 0 || committing}
-            className="rounded-[8px] border-none bg-accent px-3 py-1.5 text-[12px] text-white hover:bg-accent-hover disabled:opacity-40"
+            className="rounded-[8px] border-none bg-accent px-3 py-1.5 text-[12px] text-on-accent hover:bg-accent-hover disabled:opacity-40"
           >
             {t('dictionary.confirmImport')}
           </button>

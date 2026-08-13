@@ -7,6 +7,22 @@ use tokio::sync::mpsc;
 pub enum CaptureState {
     Idle,
     Recording,
+    Starting,
+    Failed,
+}
+
+fn mark_input_callback_ready(state: &Arc<Mutex<CaptureState>>) {
+    let mut state = state.lock().unwrap_or_else(|error| error.into_inner());
+    if *state == CaptureState::Starting {
+        *state = CaptureState::Recording;
+    }
+}
+
+fn mark_capture_failed(state: &Arc<Mutex<CaptureState>>) {
+    let mut state = state.lock().unwrap_or_else(|error| error.into_inner());
+    if *state != CaptureState::Idle {
+        *state = CaptureState::Failed;
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -44,14 +60,16 @@ impl AudioCaptureHandle {
         let (audio_tx, audio_rx) = mpsc::channel::<Vec<u8>>(200);
         let (stop_tx, stop_rx) = std::sync::mpsc::channel::<()>();
         let volume = Arc::new(Mutex::new(0.0f32));
-        let state = Arc::new(Mutex::new(CaptureState::Recording));
+        let state = Arc::new(Mutex::new(CaptureState::Starting));
 
         let vol_clone = volume.clone();
         let state_clone = state.clone();
 
         // Audio capture must run on a dedicated OS thread because cpal::Stream is !Send
         std::thread::spawn(move || {
+            let failure_state = state_clone.clone();
             if let Err(e) = run_capture(config, audio_tx, stop_rx, vol_clone, state_clone) {
+                mark_capture_failed(&failure_state);
                 tracing::error!("Audio capture thread error: {}", e);
             }
         });
@@ -80,8 +98,34 @@ impl AudioCaptureHandle {
     pub fn state(&self) -> CaptureState {
         *self.state.lock().unwrap_or_else(|e| e.into_inner())
     }
-}
+    /// Wait until the operating-system input stream has actually started.
+    pub async fn wait_until_ready(&self, timeout: std::time::Duration) -> Result<u64> {
+        let started_at = std::time::Instant::now();
+        loop {
+            match self.state() {
+                CaptureState::Recording => {
+                    return Ok(started_at.elapsed().as_millis() as u64);
+                }
+                CaptureState::Failed => {
+                    return Err(anyhow::anyhow!("Audio input stream failed to start"));
+                }
+                CaptureState::Idle => {
+                    return Err(anyhow::anyhow!(
+                        "Audio input stream stopped before it was ready"
+                    ));
+                }
+                CaptureState::Starting => {}
+            }
 
+            if started_at.elapsed() >= timeout {
+                return Err(anyhow::anyhow!(
+                    "Timed out while starting the audio input stream"
+                ));
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+        }
+    }
+}
 /// Downsample audio from `from_rate` to `to_rate` (simple linear interpolation, mono).
 fn downsample(samples: &[f32], from_rate: u32, to_rate: u32) -> Vec<f32> {
     if from_rate == to_rate {
@@ -152,10 +196,17 @@ fn run_capture(
     let target_channels = config.channels;
     let samples_per_chunk = (target_rate * config.chunk_duration_ms / 1000) as usize;
     let buffer: Arc<Mutex<Vec<i16>>> = Arc::new(Mutex::new(Vec::with_capacity(samples_per_chunk)));
+    let callback_state = state.clone();
+    let error_state = state.clone();
 
     let stream = device.build_input_stream(
         &stream_config,
         move |data: &[f32], _: &cpal::InputCallbackInfo| {
+            if data.is_empty() {
+                return;
+            }
+            mark_input_callback_ready(&callback_state);
+
             // Calculate RMS volume from raw data
             let rms = (data.iter().map(|s| s * s).sum::<f32>() / data.len() as f32).sqrt();
             if let Ok(mut v) = volume.lock() {
@@ -193,16 +244,16 @@ fn run_capture(
                 let _ = sender.try_send(bytes);
             }
         },
-        |err| {
+        move |err| {
+            mark_capture_failed(&error_state);
             tracing::error!("Audio capture error: {}", err);
         },
         None,
     )?;
 
     stream.play()?;
-    *state.lock().unwrap_or_else(|e| e.into_inner()) = CaptureState::Recording;
     tracing::info!(
-        "Audio capture started (device: {}Hz {}ch -> target: {}Hz {}ch)",
+        "Audio capture stream requested (device: {}Hz {}ch -> target: {}Hz {}ch)",
         device_sample_rate,
         device_channels,
         target_rate,
@@ -217,4 +268,64 @@ fn run_capture(
     *state.lock().unwrap_or_else(|e| e.into_inner()) = CaptureState::Idle;
     tracing::info!("Audio capture stopped");
     Ok(())
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_handle(state: CaptureState) -> AudioCaptureHandle {
+        let (stop_tx, _stop_rx) = std::sync::mpsc::channel();
+        AudioCaptureHandle {
+            stop_tx: Some(stop_tx),
+            volume: Arc::new(Mutex::new(0.0)),
+            state: Arc::new(Mutex::new(state)),
+        }
+    }
+
+    #[tokio::test]
+    async fn readiness_wait_succeeds_only_after_first_input_callback() {
+        let handle = test_handle(CaptureState::Starting);
+        let callback_state = handle.state.clone();
+
+        let (result, ()) = tokio::join!(
+            handle.wait_until_ready(std::time::Duration::from_millis(100)),
+            async move {
+                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+                mark_input_callback_ready(&callback_state);
+            }
+        );
+
+        assert!(result.is_ok());
+        assert_eq!(handle.state(), CaptureState::Recording);
+    }
+
+    #[tokio::test]
+    async fn readiness_wait_surfaces_callback_failure() {
+        let handle = test_handle(CaptureState::Starting);
+        let callback_state = handle.state.clone();
+
+        let (result, ()) = tokio::join!(
+            handle.wait_until_ready(std::time::Duration::from_millis(100)),
+            async move {
+                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+                mark_capture_failed(&callback_state);
+            }
+        );
+
+        let error = result.unwrap_err();
+        assert!(error.to_string().contains("failed to start"));
+        assert_eq!(handle.state(), CaptureState::Failed);
+    }
+
+    #[tokio::test]
+    async fn readiness_wait_times_out_without_an_input_callback() {
+        let handle = test_handle(CaptureState::Starting);
+        let error = handle
+            .wait_until_ready(std::time::Duration::from_millis(10))
+            .await
+            .unwrap_err();
+
+        assert!(error.to_string().contains("Timed out"));
+        assert_eq!(handle.state(), CaptureState::Starting);
+    }
 }

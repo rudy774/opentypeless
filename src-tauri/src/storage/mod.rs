@@ -1194,6 +1194,9 @@ pub struct HistoryEntry {
     pub polished_text: String,
     pub language: Option<String>,
     pub duration_ms: Option<i64>,
+    pub stt_ms: Option<i64>,
+    pub llm_ms: Option<i64>,
+    pub total_ms: Option<i64>,
     pub active_scene_id: Option<String>,
     pub active_scene_source: Option<String>,
     pub active_scene_name: Option<String>,
@@ -1201,6 +1204,32 @@ pub struct HistoryEntry {
     pub active_scene_prompt_truncated: bool,
     pub output_status: Option<String>,
     pub output_error: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ActivityRangeMetrics {
+    pub recording_ms: i64,
+    pub saved_transcriptions: u64,
+    /// Unicode code points in polished output, including whitespace.
+    pub output_chars: i64,
+    pub active_days: u64,
+    pub recorded_fallbacks: u64,
+    pub transformed_outputs: u64,
+    pub excluded_duration_count: u64,
+    pub average_total_ms: Option<f64>,
+    pub timing_sample_count: u64,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LocalActivityMetricsSummary {
+    pub day: ActivityRangeMetrics,
+    pub week: ActivityRangeMetrics,
+    pub month: ActivityRangeMetrics,
+    pub total_recordings: u64,
+    /// Count across all retained history, not only the current month.
+    pub excluded_duration_count: u64,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
@@ -1265,6 +1294,13 @@ pub struct HistoryStore {
     conn: Mutex<Connection>,
 }
 
+#[derive(Debug, Clone)]
+pub struct BackupSnapshot {
+    pub history: Vec<HistoryEntry>,
+    pub dictionary: Vec<DictionaryEntry>,
+    pub correction_rules: Vec<CorrectionRule>,
+}
+
 impl HistoryStore {
     pub fn new(db_path: PathBuf) -> Result<Self> {
         let conn = Connection::open(&db_path)?;
@@ -1285,6 +1321,9 @@ impl HistoryStore {
                 polished_text TEXT NOT NULL DEFAULT '',
                 language TEXT,
                 duration_ms INTEGER,
+                stt_ms INTEGER,
+                llm_ms INTEGER,
+                total_ms INTEGER,
                 active_scene_id TEXT,
                 active_scene_source TEXT,
                 active_scene_name TEXT,
@@ -1333,6 +1372,9 @@ impl HistoryStore {
                     polished_text,
                     language,
                     duration_ms,
+                    stt_ms,
+                    llm_ms,
+                    total_ms,
                     active_scene_id,
                     active_scene_source,
                     active_scene_name,
@@ -1341,7 +1383,7 @@ impl HistoryStore {
                     output_status,
                     output_error
                 )
-             VALUES (?1, '', '', ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)",
+             VALUES (?1, '', '', ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21)",
                 rusqlite::params![
                     entry.created_at,
                     entry.context_profile_id,
@@ -1354,6 +1396,9 @@ impl HistoryStore {
                     entry.polished_text,
                     entry.language,
                     entry.duration_ms,
+                    entry.stt_ms,
+                    entry.llm_ms,
+                    entry.total_ms,
                     entry.active_scene_id,
                     entry.active_scene_source,
                     entry.active_scene_name,
@@ -1416,6 +1461,9 @@ impl HistoryStore {
                 polished_text,
                 language,
                 duration_ms,
+                stt_ms,
+                llm_ms,
+                total_ms,
                 active_scene_id,
                 active_scene_source,
                 active_scene_name,
@@ -1425,36 +1473,93 @@ impl HistoryStore {
                 output_error
              FROM history ORDER BY id DESC LIMIT ?1 OFFSET ?2",
         )?;
-        let rows = stmt.query_map(rusqlite::params![limit, offset], |row| {
-            Ok(HistoryEntry {
-                id: row.get(0)?,
-                created_at: row.get(1)?,
-                context_profile_id: row.get(2)?,
-                context_label: row.get(3)?,
-                context_icon_key: row.get(4)?,
-                context_family: context_family_from_db(&row.get::<_, String>(5)?),
-                browser_access_status: BrowserAccessStatus::from_history_value(
-                    row.get::<_, Option<String>>(6)?.as_deref(),
-                ),
-                provider_kind: HistoryProviderKind::from_db_value(&row.get::<_, String>(7)?),
-                raw_text: row.get(8)?,
-                polished_text: row.get(9)?,
-                language: row.get(10)?,
-                duration_ms: row.get(11)?,
-                active_scene_id: row.get(12)?,
-                active_scene_source: row.get(13)?,
-                active_scene_name: row.get(14)?,
-                active_scene_prompt_chars: row.get(15)?,
-                active_scene_prompt_truncated: row.get(16)?,
-                output_status: row.get(17)?,
-                output_error: row.get(18)?,
-            })
-        })?;
+        let rows = stmt.query_map(rusqlite::params![limit, offset], history_entry_from_row)?;
         let mut entries = Vec::new();
         for row in rows {
             entries.push(row?);
         }
         Ok(entries)
+    }
+
+    pub async fn count(&self) -> Result<u64> {
+        let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
+        let count = conn.query_row("SELECT COUNT(*) FROM history", [], |row| {
+            row.get::<_, u64>(0)
+        })?;
+        Ok(count)
+    }
+
+    /// Reads every cloud-backup section from one SQLite read transaction.
+    ///
+    /// History, dictionary entries, and correction rules share this database.
+    /// Keeping the reads in one transaction prevents a concurrent write from
+    /// producing a mixed-generation backup. Explicit caps and exact-count
+    /// checks fail closed instead of silently uploading a partial snapshot.
+    pub async fn export_backup_snapshot(&self) -> Result<BackupSnapshot> {
+        let mut conn = self.conn.lock().unwrap_or_else(|error| error.into_inner());
+        let transaction = conn.transaction()?;
+
+        let history_count = backup_snapshot_count(&transaction, "SELECT COUNT(*) FROM history")?;
+        let dictionary_count =
+            backup_snapshot_count(&transaction, "SELECT COUNT(*) FROM dictionary")?;
+        let correction_count =
+            backup_snapshot_count(&transaction, "SELECT COUNT(*) FROM correction_rules")?;
+
+        ensure_backup_snapshot_bound(
+            history_count,
+            DEFAULT_HISTORY_MAX_ENTRIES as usize,
+            "backup_history_too_large",
+        )?;
+        ensure_backup_snapshot_bound(
+            dictionary_count,
+            MAX_BACKUP_DICTIONARY_ENTRIES,
+            "backup_dictionary_too_large",
+        )?;
+        ensure_backup_snapshot_bound(
+            correction_count,
+            MAX_BACKUP_CORRECTION_RULES,
+            "backup_corrections_too_large",
+        )?;
+
+        let history = read_backup_history(&transaction, history_count)?;
+        let dictionary = read_backup_dictionary(&transaction, dictionary_count)?;
+        let correction_rules = read_backup_corrections(&transaction, correction_count)?;
+        transaction.commit()?;
+
+        Ok(BackupSnapshot {
+            history,
+            dictionary,
+            correction_rules,
+        })
+    }
+
+    pub async fn local_activity_metrics(
+        &self,
+        day_start: &str,
+        week_start: &str,
+        month_start: &str,
+        now: &str,
+    ) -> Result<LocalActivityMetricsSummary> {
+        let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
+        let day = activity_range_metrics(&conn, day_start, now)?;
+        let week = activity_range_metrics(&conn, week_start, now)?;
+        let month = activity_range_metrics(&conn, month_start, now)?;
+        let (total_recordings, excluded_duration_count) = conn.query_row(
+            "SELECT
+                COUNT(*),
+                COALESCE(SUM(CASE WHEN duration_ms > ?1 THEN 1 ELSE 0 END), 0)
+             FROM history",
+            rusqlite::params![MAX_COUNTED_TRANSCRIPTION_DURATION_MS],
+            |row| Ok((row.get::<_, u64>(0)?, row.get::<_, u64>(1)?)),
+        )?;
+
+        Ok(LocalActivityMetricsSummary {
+            day,
+            week,
+            month,
+            total_recordings,
+            excluded_duration_count,
+        })
     }
 
     pub async fn transcription_time_stats(
@@ -1568,6 +1673,9 @@ impl HistoryStore {
                             polished_text,
                             language,
                             duration_ms,
+                            stt_ms,
+                            llm_ms,
+                            total_ms,
                             active_scene_id,
                             active_scene_source,
                             active_scene_name,
@@ -1575,7 +1683,7 @@ impl HistoryStore {
                             active_scene_prompt_truncated,
                             output_status,
                             output_error
-                        ) VALUES (?1, '', '', ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)",
+                        ) VALUES (?1, '', '', ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21)",
                         rusqlite::params![
                             entry.created_at,
                             entry.context_profile_id,
@@ -1588,6 +1696,9 @@ impl HistoryStore {
                             entry.polished_text,
                             entry.language,
                             entry.duration_ms,
+                            entry.stt_ms,
+                            entry.llm_ms,
+                            entry.total_ms,
                             entry.active_scene_id,
                             entry.active_scene_source,
                             entry.active_scene_name,
@@ -1624,6 +1735,199 @@ impl HistoryStore {
         transaction.commit()?;
         Ok(())
     }
+}
+
+fn history_entry_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<HistoryEntry> {
+    Ok(HistoryEntry {
+        id: row.get(0)?,
+        created_at: row.get(1)?,
+        context_profile_id: row.get(2)?,
+        context_label: row.get(3)?,
+        context_icon_key: row.get(4)?,
+        context_family: context_family_from_db(&row.get::<_, String>(5)?),
+        browser_access_status: BrowserAccessStatus::from_history_value(
+            row.get::<_, Option<String>>(6)?.as_deref(),
+        ),
+        provider_kind: HistoryProviderKind::from_db_value(&row.get::<_, String>(7)?),
+        raw_text: row.get(8)?,
+        polished_text: row.get(9)?,
+        language: row.get(10)?,
+        duration_ms: row.get(11)?,
+        stt_ms: row.get(12)?,
+        llm_ms: row.get(13)?,
+        total_ms: row.get(14)?,
+        active_scene_id: row.get(15)?,
+        active_scene_source: row.get(16)?,
+        active_scene_name: row.get(17)?,
+        active_scene_prompt_chars: row.get(18)?,
+        active_scene_prompt_truncated: row.get(19)?,
+        output_status: row.get(20)?,
+        output_error: row.get(21)?,
+    })
+}
+
+fn backup_snapshot_count(conn: &Connection, query: &str) -> Result<usize> {
+    let count = conn.query_row(query, [], |row| row.get::<_, u64>(0))?;
+    Ok(usize::try_from(count)?)
+}
+
+fn ensure_backup_snapshot_bound(count: usize, maximum: usize, error: &str) -> Result<()> {
+    if count > maximum {
+        anyhow::bail!("{}", error);
+    }
+    Ok(())
+}
+
+fn read_backup_history(conn: &Connection, expected_count: usize) -> Result<Vec<HistoryEntry>> {
+    let mut statement = conn.prepare(
+        "SELECT
+            id,
+            created_at,
+            context_profile_id,
+            context_label,
+            context_icon_key,
+            context_family,
+            browser_access_status,
+            provider_kind,
+            raw_text,
+            polished_text,
+            language,
+            duration_ms,
+            stt_ms,
+            llm_ms,
+            total_ms,
+            active_scene_id,
+            active_scene_source,
+            active_scene_name,
+            active_scene_prompt_chars,
+            active_scene_prompt_truncated,
+            output_status,
+            output_error
+         FROM history
+         ORDER BY id DESC
+         LIMIT ?1",
+    )?;
+    let rows = statement.query_map(
+        rusqlite::params![DEFAULT_HISTORY_MAX_ENTRIES],
+        history_entry_from_row,
+    )?;
+    let entries = rows.collect::<rusqlite::Result<Vec<_>>>()?;
+    ensure_backup_snapshot_complete(entries.len(), expected_count)?;
+    Ok(entries)
+}
+
+fn read_backup_dictionary(
+    conn: &Connection,
+    expected_count: usize,
+) -> Result<Vec<DictionaryEntry>> {
+    let mut statement = conn.prepare(
+        "SELECT id, word, pronunciation
+         FROM dictionary
+         ORDER BY id ASC
+         LIMIT ?1",
+    )?;
+    let rows = statement.query_map(
+        rusqlite::params![MAX_BACKUP_DICTIONARY_ENTRIES as i64],
+        |row| {
+            Ok(DictionaryEntry {
+                id: row.get(0)?,
+                word: row.get(1)?,
+                pronunciation: row.get(2)?,
+            })
+        },
+    )?;
+    let entries = rows.collect::<rusqlite::Result<Vec<_>>>()?;
+    ensure_backup_snapshot_complete(entries.len(), expected_count)?;
+    Ok(entries)
+}
+
+fn read_backup_corrections(
+    conn: &Connection,
+    expected_count: usize,
+) -> Result<Vec<CorrectionRule>> {
+    let mut statement = conn.prepare(
+        "SELECT id, pattern, replacement, enabled
+         FROM correction_rules
+         ORDER BY id ASC
+         LIMIT ?1",
+    )?;
+    let rows = statement.query_map(
+        rusqlite::params![MAX_BACKUP_CORRECTION_RULES as i64],
+        |row| {
+            Ok(CorrectionRule {
+                id: row.get(0)?,
+                pattern: row.get(1)?,
+                replacement: row.get(2)?,
+                enabled: row.get::<_, i64>(3)? != 0,
+            })
+        },
+    )?;
+    let entries = rows.collect::<rusqlite::Result<Vec<_>>>()?;
+    ensure_backup_snapshot_complete(entries.len(), expected_count)?;
+    Ok(entries)
+}
+
+fn ensure_backup_snapshot_complete(actual: usize, expected: usize) -> Result<()> {
+    if actual != expected {
+        anyhow::bail!("backup_snapshot_incomplete");
+    }
+    Ok(())
+}
+
+fn activity_range_metrics(
+    conn: &Connection,
+    start: &str,
+    now: &str,
+) -> Result<ActivityRangeMetrics> {
+    conn.query_row(
+        "SELECT
+            COALESCE(SUM(CASE
+                WHEN duration_ms > 0 AND duration_ms <= ?3 THEN duration_ms
+                ELSE 0
+            END), 0),
+            COUNT(*),
+            COALESCE(SUM(length(polished_text)), 0),
+            COUNT(DISTINCT substr(created_at, 1, 10)),
+            COALESCE(SUM(CASE
+                WHEN output_status IS NOT NULL OR output_error IS NOT NULL THEN 1
+                ELSE 0
+            END), 0),
+            COALESCE(SUM(CASE
+                WHEN output_status IS NULL
+                    AND output_error IS NULL
+                    AND length(trim(polished_text)) > 0
+                    AND trim(raw_text) <> trim(polished_text) THEN 1
+                ELSE 0
+            END), 0),
+            COALESCE(SUM(CASE
+                WHEN duration_ms > ?3 THEN 1
+                ELSE 0
+            END), 0),
+            AVG(CASE
+                WHEN total_ms IS NOT NULL AND total_ms >= 0 THEN total_ms
+            END),
+            COALESCE(SUM(CASE
+                WHEN total_ms IS NOT NULL AND total_ms >= 0 THEN 1
+                ELSE 0
+            END), 0)
+         FROM history
+         WHERE created_at >= ?1 AND created_at <= ?2",
+        rusqlite::params![start, now, MAX_COUNTED_TRANSCRIPTION_DURATION_MS],
+        |row| {
+            Ok(ActivityRangeMetrics {
+                recording_ms: row.get(0)?,
+                saved_transcriptions: row.get(1)?,
+                output_chars: row.get(2)?,
+                active_days: row.get(3)?,
+                recorded_fallbacks: row.get(4)?,
+                transformed_outputs: row.get(5)?,
+                excluded_duration_count: row.get(6)?,
+                average_total_ms: row.get(7)?,
+                timing_sample_count: row.get(8)?,
+            })
+        },
+    )
+    .map_err(Into::into)
 }
 
 fn prepare_backup_dictionary(
@@ -1724,6 +2028,9 @@ fn ensure_history_optional_columns(conn: &Connection) -> Result<()> {
             "provider_kind",
             "ALTER TABLE history ADD COLUMN provider_kind TEXT NOT NULL DEFAULT 'local'",
         ),
+        ("stt_ms", "ALTER TABLE history ADD COLUMN stt_ms INTEGER"),
+        ("llm_ms", "ALTER TABLE history ADD COLUMN llm_ms INTEGER"),
+        ("total_ms", "ALTER TABLE history ADD COLUMN total_ms INTEGER"),
     ] {
         if !columns.contains(name) {
             conn.execute(ddl, [])?;
@@ -3151,6 +3458,9 @@ mod tests {
             polished_text: format!("polished {id}"),
             language: None,
             duration_ms: None,
+            stt_ms: None,
+            llm_ms: None,
+            total_ms: None,
             active_scene_id: None,
             active_scene_source: None,
             active_scene_name: None,
@@ -3242,6 +3552,20 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn history_store_count_is_not_limited_by_page_size() {
+        let store = temp_history_store("count");
+        for id in 1..=3 {
+            store
+                .add(test_history_entry(id, &format!("2026-07-0{id}T00:00:00")))
+                .await
+                .unwrap();
+        }
+
+        assert_eq!(store.list(2, 0).await.unwrap().len(), 2);
+        assert_eq!(store.count().await.unwrap(), 3);
+    }
+
+    #[tokio::test]
     async fn history_store_aggregates_transcription_time_by_calendar_cutoff() {
         let store = temp_history_store("transcription-time");
         for (id, created_at, duration_ms) in [
@@ -3308,6 +3632,144 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn history_store_aggregates_privacy_safe_local_activity_metrics() {
+        let store = temp_history_store("local-activity");
+
+        let mut month_only = test_history_entry(1, "2026-07-01T09:00:00");
+        month_only.raw_text = "a b".to_string();
+        month_only.polished_text = "a b".to_string();
+        month_only.duration_ms = Some(1_000);
+        month_only.total_ms = Some(100);
+        store.add(month_only).await.unwrap();
+
+        let mut week = test_history_entry(2, "2026-07-14T09:00:00");
+        week.raw_text = "hi".to_string();
+        week.polished_text = " hi ".to_string();
+        week.duration_ms = Some(2_000);
+        week.total_ms = Some(300);
+        week.output_status = Some("clipboard_fallback".to_string());
+        store.add(week).await.unwrap();
+
+        let mut day = test_history_entry(3, "2026-07-19T09:00:00");
+        day.raw_text = "hello".to_string();
+        day.polished_text = "Hello!".to_string();
+        day.duration_ms = Some(3_000);
+        day.total_ms = Some(500);
+        store.add(day).await.unwrap();
+
+        let mut invalid_duration = test_history_entry(4, "2026-07-19T10:00:00");
+        invalid_duration.raw_text = "bad".to_string();
+        invalid_duration.polished_text = "bad".to_string();
+        invalid_duration.duration_ms = Some(-500);
+        invalid_duration.output_status = Some("clipboard_fallback".to_string());
+        store.add(invalid_duration).await.unwrap();
+
+        let mut current_outlier = test_history_entry(5, "2026-07-19T11:00:00");
+        current_outlier.raw_text = "x".to_string();
+        current_outlier.polished_text = "x".to_string();
+        current_outlier.duration_ms = Some(MAX_COUNTED_TRANSCRIPTION_DURATION_MS + 1);
+        current_outlier.total_ms = Some(700);
+        store.add(current_outlier).await.unwrap();
+
+        let mut prior_outlier = test_history_entry(6, "2026-06-30T11:00:00");
+        prior_outlier.duration_ms = Some(MAX_COUNTED_TRANSCRIPTION_DURATION_MS + 2);
+        store.add(prior_outlier).await.unwrap();
+
+        let mut future = test_history_entry(7, "2026-07-20T09:00:00");
+        future.polished_text = "future".to_string();
+        future.duration_ms = Some(9_000);
+        future.total_ms = Some(900);
+        store.add(future).await.unwrap();
+        let summary = store
+            .local_activity_metrics(
+                "2026-07-19T00:00:00",
+                "2026-07-13T00:00:00",
+                "2026-07-01T00:00:00",
+                "2026-07-19T23:59:59",
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(summary.total_recordings, 7);
+        assert_eq!(summary.excluded_duration_count, 2);
+        assert_eq!(
+            summary.day,
+            ActivityRangeMetrics {
+                recording_ms: 3_000,
+                saved_transcriptions: 3,
+                output_chars: 10,
+                active_days: 1,
+                recorded_fallbacks: 1,
+                transformed_outputs: 1,
+                average_total_ms: Some(600.0),
+                timing_sample_count: 2,
+                excluded_duration_count: 1,
+            }
+        );
+        assert_eq!(
+            summary.week,
+            ActivityRangeMetrics {
+                recording_ms: 5_000,
+                saved_transcriptions: 4,
+                output_chars: 14,
+                active_days: 2,
+                recorded_fallbacks: 2,
+                transformed_outputs: 1,
+                average_total_ms: Some(500.0),
+                timing_sample_count: 3,
+                excluded_duration_count: 1,
+            }
+        );
+        assert_eq!(
+            summary.month,
+            ActivityRangeMetrics {
+                recording_ms: 6_000,
+                saved_transcriptions: 5,
+                output_chars: 17,
+                active_days: 3,
+                recorded_fallbacks: 2,
+                transformed_outputs: 1,
+                average_total_ms: Some(400.0),
+                timing_sample_count: 4,
+                excluded_duration_count: 1,
+            }
+        );
+    }
+
+    #[test]
+    fn local_activity_metrics_serialize_with_frontend_camel_case_contract() {
+        let value = serde_json::to_value(LocalActivityMetricsSummary {
+            day: ActivityRangeMetrics {
+                recording_ms: 1,
+                saved_transcriptions: 2,
+                output_chars: 3,
+                active_days: 4,
+                recorded_fallbacks: 5,
+                transformed_outputs: 6,
+                average_total_ms: Some(8.5),
+                timing_sample_count: 9,
+                excluded_duration_count: 7,
+            },
+            total_recordings: 9,
+            excluded_duration_count: 10,
+            ..LocalActivityMetricsSummary::default()
+        })
+        .unwrap();
+
+        assert_eq!(value["totalRecordings"], 9);
+        assert_eq!(value["excludedDurationCount"], 10);
+        assert_eq!(value["day"]["recordingMs"], 1);
+        assert_eq!(value["day"]["savedTranscriptions"], 2);
+        assert_eq!(value["day"]["outputChars"], 3);
+        assert_eq!(value["day"]["activeDays"], 4);
+        assert_eq!(value["day"]["recordedFallbacks"], 5);
+        assert_eq!(value["day"]["transformedOutputs"], 6);
+        assert_eq!(value["day"]["excludedDurationCount"], 7);
+        assert_eq!(value["day"]["averageTotalMs"], 8.5);
+        assert_eq!(value["day"]["timingSampleCount"], 9);
+    }
+
+    #[tokio::test]
     async fn history_store_prunes_by_retention_days_policy() {
         let store = temp_history_store("days");
         let policy = HistoryRetentionPolicy {
@@ -3332,6 +3794,61 @@ mod tests {
         let entries = store.list(10, 0).await.unwrap();
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].polished_text, "polished 2");
+    }
+
+    #[tokio::test]
+    async fn backup_snapshot_reads_all_persisted_sections_beyond_ui_page_size() {
+        let (history, dictionary) = temp_backup_stores("export-snapshot");
+        for id in 1..=205 {
+            history
+                .add(test_history_entry(id, "2026-07-01T00:00:00"))
+                .await
+                .unwrap();
+        }
+        dictionary
+            .add("OpenTypeless", Some("open typeless"))
+            .await
+            .unwrap();
+        dictionary
+            .add_correction("open type less", "OpenTypeless")
+            .await
+            .unwrap();
+
+        let snapshot = history.export_backup_snapshot().await.unwrap();
+
+        assert_eq!(snapshot.history.len(), 205);
+        assert_eq!(snapshot.history[0].raw_text, "raw 205");
+        assert_eq!(snapshot.history[204].raw_text, "raw 1");
+        assert_eq!(snapshot.dictionary.len(), 1);
+        assert_eq!(snapshot.dictionary[0].word, "OpenTypeless");
+        assert_eq!(snapshot.correction_rules.len(), 1);
+        assert_eq!(snapshot.correction_rules[0].pattern, "open type less");
+    }
+
+    #[tokio::test]
+    async fn backup_snapshot_rejects_history_over_the_hard_cap() {
+        let (history, _dictionary) = temp_backup_stores("export-cap");
+        {
+            let mut conn = history
+                .conn
+                .lock()
+                .unwrap_or_else(|error| error.into_inner());
+            let transaction = conn.transaction().unwrap();
+            for index in 0..=DEFAULT_HISTORY_MAX_ENTRIES {
+                transaction
+                    .execute(
+                        "INSERT INTO history (created_at, raw_text, polished_text)
+                         VALUES ('2026-07-01T00:00:00', ?1, ?1)",
+                        rusqlite::params![format!("entry {index}")],
+                    )
+                    .unwrap();
+            }
+            transaction.commit().unwrap();
+        }
+
+        let error = history.export_backup_snapshot().await.unwrap_err();
+
+        assert_eq!(error.to_string(), "backup_history_too_large");
     }
 
     #[tokio::test]
@@ -3393,6 +3910,31 @@ mod tests {
         let restored_rules = dictionary.correction_rules().await.unwrap();
         assert_eq!(restored_rules.len(), 1);
         assert!(!restored_rules[0].enabled);
+    }
+
+    #[tokio::test]
+    async fn backup_restore_preserves_optional_pipeline_timings() {
+        let (history, _dictionary) = temp_backup_stores("timing-restore");
+        let mut restored_entry = test_history_entry(1, "2026-07-01T00:00:00");
+        restored_entry.stt_ms = Some(90);
+        restored_entry.llm_ms = Some(60);
+        restored_entry.total_ms = Some(180);
+
+        history
+            .restore_backup_data(
+                Some(vec![restored_entry]),
+                None,
+                None,
+                &HistoryRetentionPolicy::default(),
+                "2026-07-13T00:00:00",
+            )
+            .await
+            .unwrap();
+
+        let entries = history.list(10, 0).await.unwrap();
+        assert_eq!(entries[0].stt_ms, Some(90));
+        assert_eq!(entries[0].llm_ms, Some(60));
+        assert_eq!(entries[0].total_ms, Some(180));
     }
 
     #[tokio::test]
@@ -3464,6 +4006,22 @@ mod tests {
             entries[0].output_error.as_deref(),
             Some("LLM failed after partial streaming insert")
         );
+    }
+
+    #[tokio::test]
+    async fn history_store_persists_optional_pipeline_timings() {
+        let store = temp_history_store("pipeline-timings");
+        let mut entry = test_history_entry(1, "2026-07-01T00:00:00");
+        entry.stt_ms = Some(120);
+        entry.llm_ms = Some(80);
+        entry.total_ms = Some(240);
+
+        store.add(entry).await.unwrap();
+
+        let entries = store.list(10, 0).await.unwrap();
+        assert_eq!(entries[0].stt_ms, Some(120));
+        assert_eq!(entries[0].llm_ms, Some(80));
+        assert_eq!(entries[0].total_ms, Some(240));
     }
 
     #[tokio::test]
@@ -3576,6 +4134,9 @@ mod tests {
         assert_eq!(entries[1].provider_kind, HistoryProviderKind::Local);
         assert_eq!(entries[0].context_profile_id, "general.native");
         assert_eq!(entries[0].context_label, "General");
+        assert!(entries.iter().all(|entry| entry.stt_ms.is_none()));
+        assert!(entries.iter().all(|entry| entry.llm_ms.is_none()));
+        assert!(entries.iter().all(|entry| entry.total_ms.is_none()));
 
         let conn = Connection::open(path).unwrap();
         let raw_values: (String, String) = conn

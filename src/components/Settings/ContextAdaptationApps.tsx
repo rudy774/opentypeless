@@ -41,10 +41,10 @@ export function ContextAdaptationApps({ disabled }: { disabled: boolean }) {
           <AppLogo iconKey={app.iconKey} family={app.family} />
         </span>
       ))}
-      <span className="context-app-count--full ml-0.5 flex-none text-[11px] text-text-tertiary">
+      <span className="context-app-count--full ml-0.5 flex-none text-[12px] text-text-tertiary">
         +63
       </span>
-      <span className="context-app-count--compact ml-0.5 flex-none text-[11px] text-text-tertiary">
+      <span className="context-app-count--compact ml-0.5 flex-none text-[12px] text-text-tertiary">
         +65
       </span>
     </div>

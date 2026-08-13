@@ -1,7 +1,14 @@
-import { Settings, Mic, Sparkles, BookOpen, Info, LayoutGrid } from 'lucide-react'
-import { motion } from 'framer-motion'
+import {
+  ArrowLeft,
+  AudioLines,
+  BookOpen,
+  Info,
+  LayoutGrid,
+  Mic,
+  Settings,
+  Sparkles,
+} from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { spring } from '../../lib/animations'
 
 const PANES = [
   { id: 'general', labelKey: 'settings.general', icon: Settings },
@@ -23,40 +30,50 @@ export function SettingsSidebar({ activePane, onSelect }: Props) {
   const { t } = useTranslation()
 
   return (
-    <div className="w-[200px] h-full jelly-surface-flat border-r border-border flex flex-col py-4 px-2 gap-0.5">
-      <h2 className="text-[13px] font-semibold text-text-primary px-3 pb-3">
-        {t('settings.title')}
-      </h2>
-      {PANES.map((pane) => {
-        const Icon = pane.icon
-        const isActive = activePane === pane.id
-        return (
-          <motion.button
-            key={pane.id}
-            onClick={() => onSelect(pane.id)}
-            whileHover={{ scale: 1.03 }}
-            whileTap={{ scaleX: 1.05, scaleY: 0.95 }}
-            transition={spring.jellyGentle}
-            className={`flex items-center gap-2.5 w-full px-3 py-2 rounded-[8px] text-[13px] border-none cursor-pointer transition-colors text-left relative ${
-              isActive
-                ? 'text-text-primary font-medium'
-                : 'bg-transparent text-text-secondary hover:text-text-primary'
-            }`}
-          >
-            {isActive && (
-              <motion.div
-                layoutId="settings-nav-indicator"
-                className="absolute inset-0 jelly-nav-active"
-                transition={spring.jellyGentle}
-              />
-            )}
-            <span className="relative z-10 flex items-center gap-2.5">
-              <Icon size={16} />
-              {t(pane.labelKey)}
-            </span>
-          </motion.button>
-        )
-      })}
-    </div>
+    <aside className="flex h-full w-[216px] shrink-0 flex-col border-r border-border bg-bg-elevated px-3 py-4 max-[721px]:w-[72px] max-[721px]:px-2">
+      <div className="flex items-center gap-3 px-2 pb-5 pt-1" data-tauri-drag-region>
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[11px] bg-[#142a25] text-[#67d8c3] dark:bg-accent-light dark:text-accent">
+          <AudioLines size={18} aria-hidden="true" />
+        </span>
+        <div className="min-w-0 max-[721px]:hidden">
+          <p className="truncate text-[14px] font-semibold tracking-[-0.02em]">{t('app.name')}</p>
+          <p className="mt-0.5 truncate text-[12px] text-text-tertiary">{t('settings.title')}</p>
+        </div>
+      </div>
+
+      <a
+        href="#/"
+        aria-label={t('nav.home')}
+        className="mb-4 flex h-9 w-full items-center gap-2.5 rounded-[9px] border border-border bg-transparent px-3 text-[12px] font-medium text-text-secondary transition-colors hover:bg-bg-secondary hover:text-text-primary max-[721px]:justify-center max-[721px]:px-0"
+      >
+        <ArrowLeft size={15} className="shrink-0" aria-hidden="true" />
+        <span className="max-[721px]:hidden">{t('nav.home')}</span>
+      </a>
+
+      <nav className="space-y-1" aria-label={t('settings.title')}>
+        {PANES.map((pane) => {
+          const Icon = pane.icon
+          const isActive = activePane === pane.id
+          const label = t(pane.labelKey)
+          return (
+            <button
+              key={pane.id}
+              type="button"
+              onClick={() => onSelect(pane.id)}
+              aria-label={label}
+              aria-current={isActive ? 'page' : undefined}
+              className={`flex h-10 w-full items-center gap-3 rounded-[10px] px-3 text-left text-[13px] font-medium transition-colors max-[721px]:justify-center max-[721px]:px-0 ${
+                isActive
+                  ? 'bg-accent-light text-accent'
+                  : 'bg-transparent text-text-secondary hover:bg-bg-secondary hover:text-text-primary'
+              }`}
+            >
+              <Icon size={17} className="shrink-0" aria-hidden="true" />
+              <span className="truncate max-[721px]:hidden">{label}</span>
+            </button>
+          )
+        })}
+      </nav>
+    </aside>
   )
 }

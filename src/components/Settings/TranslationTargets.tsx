@@ -72,7 +72,7 @@ export function TranslationTargets({ value, onChange }: TranslationTargetsProps)
   return (
     <div className="space-y-2">
       <div className="flex min-w-0 items-center gap-2">
-        <span className="flex-none text-[11px] text-text-tertiary">
+        <span className="flex-none text-[12px] text-text-tertiary">
           {t('settings.targetLanguage')}
         </span>
         <select
@@ -96,7 +96,7 @@ export function TranslationTargets({ value, onChange }: TranslationTargetsProps)
             aria-expanded={managing}
             aria-label={t('settings.manageTranslationTargets')}
             title={t('settings.manageTranslationTargets')}
-            className="flex h-8 flex-none items-center gap-1 rounded-[6px] border border-border bg-transparent px-2 text-[11px] text-text-secondary hover:border-border-focus hover:text-text-primary"
+            className="flex h-8 flex-none items-center gap-1 rounded-[6px] border border-border bg-transparent px-2 text-[12px] text-text-secondary hover:border-border-focus hover:text-text-primary"
           >
             {t('settings.manageTranslationTargets')}
             <ChevronDown

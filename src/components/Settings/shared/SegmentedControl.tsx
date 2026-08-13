@@ -1,6 +1,3 @@
-import { useId } from 'react'
-import { motion } from 'framer-motion'
-
 interface Props {
   options: { value: string; label: string }[]
   value: string
@@ -8,28 +5,21 @@ interface Props {
 }
 
 export function SegmentedControl({ options, value, onChange }: Props) {
-  const id = useId()
-
   return (
-    <div className="flex bg-bg-tertiary/50 rounded-[10px] p-0.5 gap-0.5">
+    <div className="flex gap-0.5 rounded-[9px] border border-border bg-bg-secondary p-0.5">
       {options.map((opt) => (
         <button
           key={opt.value}
+          type="button"
           onClick={() => onChange(opt.value)}
-          className={`relative flex-1 px-3 py-1.5 text-[13px] rounded-[8px] border-none cursor-pointer transition-colors ${
+          aria-pressed={value === opt.value}
+          className={`flex-1 rounded-[7px] px-3 py-1.5 text-[13px] transition-colors ${
             value === opt.value
-              ? 'text-text-primary font-medium'
+              ? 'bg-bg-elevated font-medium text-text-primary shadow-sm'
               : 'text-text-secondary hover:text-text-primary bg-transparent'
           }`}
         >
-          {value === opt.value && (
-            <motion.div
-              layoutId={`segment-bg-${id}`}
-              className="absolute inset-0 rounded-[8px] jelly-nav-active"
-              transition={{ type: 'spring', stiffness: 400, damping: 18 }}
-            />
-          )}
-          <span className="relative z-10">{opt.label}</span>
+          {opt.label}
         </button>
       ))}
     </div>

@@ -349,25 +349,18 @@ mod tests {
     }
 
     #[test]
-    fn ask_window_config_uses_floating_note_chrome() {
+    fn ask_window_is_not_created_during_application_startup() {
         let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let tauri_config: serde_json::Value = serde_json::from_str(
             &std::fs::read_to_string(manifest_dir.join("tauri.conf.json")).unwrap(),
         )
         .unwrap();
-        let ask = tauri_config["app"]["windows"]
+
+        assert!(tauri_config["app"]["windows"]
             .as_array()
             .unwrap()
             .iter()
-            .find(|window| window["label"].as_str() == Some("ask"))
-            .unwrap();
-
-        assert_eq!(ask["decorations"].as_bool(), Some(false));
-        assert_eq!(ask["transparent"].as_bool(), Some(true));
-        assert_eq!(ask["shadow"].as_bool(), Some(false));
-        assert_eq!(ask["resizable"].as_bool(), Some(false));
-        assert_eq!(ask["width"].as_i64(), Some(400));
-        assert_eq!(ask["height"].as_i64(), Some(220));
+            .all(|window| window["label"].as_str() != Some("ask")));
     }
 
     #[test]
@@ -794,7 +787,8 @@ pub fn run() {
             None,
         ))
         .plugin(tauri_plugin_process::init())
-        .plugin(tauri_plugin_updater::Builder::new().build())
+        // Updater disabled until the fork owns its release feed and signing identity.
+        // Keep the dependency installed so future owned updater wiring remains compatible.
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             // Deep-link URL forwarding is handled automatically by the
@@ -1162,8 +1156,11 @@ pub fn run() {
             commands::stt::bench_stt_connection,
             commands::llm::fetch_llm_models,
             commands::history::get_history,
+            commands::history::get_history_count,
             commands::history::get_transcription_time_stats,
+            commands::history::get_local_activity_metrics,
             commands::history::clear_history,
+            commands::backup::export_backup_data,
             commands::backup::restore_backup_data,
             commands::dictionary::get_dictionary,
             commands::dictionary::add_dictionary_entry,

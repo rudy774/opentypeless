@@ -875,6 +875,17 @@ struct HistoryOutputMetadata {
     error: Option<String>,
 }
 
+#[derive(Debug, Clone, Copy)]
+struct HistoryTimingMetadata {
+    stt_ms: i64,
+    llm_ms: i64,
+    total_ms: i64,
+}
+
+fn duration_millis_i64(duration: std::time::Duration) -> i64 {
+    i64::try_from(duration.as_millis()).unwrap_or(i64::MAX)
+}
+
 fn voice_execution_fallback_message(
     reason: Option<crate::voice_intent::executor::VoiceExecutionFallbackReason>,
 ) -> &'static str {
@@ -1654,6 +1665,20 @@ impl PipelineHandle {
                 return Ok(());
             }
         };
+        let microphone_ready_ms = match handle
+            .wait_until_ready(std::time::Duration::from_secs(2))
+            .await
+        {
+            Ok(elapsed_ms) => elapsed_ms,
+            Err(error) => {
+                tracing::error!("Audio capture did not become ready: {}", error);
+                let _ = self
+                    .app_handle
+                    .emit("pipeline:error", format!("Audio capture failed: {error}"));
+                self.set_state(PipelineState::Idle);
+                return Ok(());
+            }
+        };
 
         // Store the audio handle's volume reference.
         // Check abort_flag first — if abort() was called while we were connecting
@@ -1726,6 +1751,7 @@ impl PipelineHandle {
         tracing::info!(
             provider = %config_data.stt_provider,
             language = %config_data.stt_language,
+            microphone_ready_ms,
             force_translate = options.force_translate,
             ready_ms = start_requested_at.elapsed().as_millis() as u64,
             pipeline_lock_wait_ms,
@@ -1759,7 +1785,7 @@ impl PipelineHandle {
                     .as_ref()
                     .map(|h| h.get_volume())
                     .unwrap_or(0.0);
-                let _ = app_handle.emit("audio:volume", vol);
+                let _ = app_handle.emit_to("capsule", "audio:volume", vol);
             }
         });
 
@@ -1831,7 +1857,7 @@ impl PipelineHandle {
                                             acc.push_str(&text);
                                             let current = acc.clone();
                                             drop(acc);
-                                            let _ = app_handle.emit("stt:final", &current);
+                                            let _ = app_handle.emit_to("capsule", "stt:final", &current);
                                         }
                                     }
                                     Some(Ok(None)) => {}
@@ -1866,7 +1892,7 @@ impl PipelineHandle {
                                     active_session_id_ref.as_ref(),
                                     stt_control.id,
                                 ) {
-                                    let _ = app_handle.emit("stt:partial", &text);
+                                    let _ = app_handle.emit_to("capsule", "stt:partial", &text);
                                 }
                             }
                             Ok(Some(TranscriptEvent::Final { text, .. })) => {
@@ -1880,7 +1906,7 @@ impl PipelineHandle {
                                     acc.push(' ');
                                     let current = acc.clone();
                                     drop(acc);
-                                    let _ = app_handle.emit("stt:final", &current);
+                                    let _ = app_handle.emit_to("capsule", "stt:final", &current);
                                 }
                             }
                             Ok(Some(TranscriptEvent::Error { message })) => {
@@ -2194,6 +2220,11 @@ impl PipelineHandle {
             &final_text,
             &app_ctx,
             duration_ms,
+            HistoryTimingMetadata {
+                stt_ms: duration_millis_i64(stt_elapsed),
+                llm_ms: duration_millis_i64(llm_elapsed),
+                total_ms: duration_millis_i64(total_elapsed),
+            },
             &config,
             HistoryOutputMetadata {
                 status: polish_outcome.history_output_status,
@@ -2407,7 +2438,7 @@ impl PipelineHandle {
         // immediately; optional target-app insertion is drained by a worker.
         let app_handle = self.app_handle.clone();
         let on_chunk: llm::ChunkCallback = Box::new(move |chunk: &str| {
-            let _ = app_handle.emit("llm:chunk", chunk);
+            let _ = app_handle.emit_to("capsule", "llm:chunk", chunk);
             if let Some(sender) = streaming_sender.as_ref() {
                 let _ = sender.send(chunk.to_string());
             }
@@ -2825,6 +2856,7 @@ impl PipelineHandle {
         final_text: &str,
         app_ctx: &RecordingContext,
         duration_ms: Option<i64>,
+        timing: HistoryTimingMetadata,
         config: &storage::AppConfig,
         output: HistoryOutputMetadata,
     ) {
@@ -2849,6 +2881,9 @@ impl PipelineHandle {
             polished_text: final_text.to_string(),
             language: None,
             duration_ms,
+            stt_ms: Some(timing.stt_ms),
+            llm_ms: Some(timing.llm_ms),
+            total_ms: Some(timing.total_ms),
             active_scene_id: scene_diagnostics.id,
             active_scene_source: scene_diagnostics.source,
             active_scene_name: scene_diagnostics.name,
@@ -3612,10 +3647,7 @@ mod tests {
             "Cloud LLM access denied".to_string(),
         ));
         assert_eq!(err.code, "llm_failed");
-        assert_eq!(
-            err.details.as_deref(),
-            Some("Auth error: Cloud LLM access denied")
-        );
+        assert_eq!(err.details.as_deref(), Some("Authentication failed"));
     }
 
     #[test]

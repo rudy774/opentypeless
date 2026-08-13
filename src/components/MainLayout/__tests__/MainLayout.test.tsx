@@ -1,5 +1,5 @@
 import React from 'react'
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MainLayout } from '../index'
 
@@ -46,6 +46,7 @@ vi.mock('react-i18next', () => ({
         'nav.upgrade': 'Upgrade',
         'nav.account': 'Account',
         'nav.mainNavigation': 'Main navigation',
+        'nav.skipToContent': 'Skip to content',
       })[key] ?? key,
   }),
 }))
@@ -69,5 +70,19 @@ describe('MainLayout', () => {
     )
 
     expect(screen.queryByRole('button', { name: 'Ask' })).not.toBeInTheDocument()
+  })
+
+  it('moves focus to main content without changing the hash route', () => {
+    window.location.hash = '#/history'
+    render(
+      <MainLayout>
+        <div>content</div>
+      </MainLayout>,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Skip to content' }))
+
+    expect(window.location.hash).toBe('#/history')
+    expect(document.activeElement).toBe(document.getElementById('main-content'))
   })
 })

@@ -255,6 +255,12 @@ describe('appStore', () => {
       expect(getState().history).toHaveLength(1)
       expect(getState().history[0].raw_text).toBe('hello')
     })
+    it('increments the activity revision without retaining another history page', () => {
+      expect(getState().activityRevision).toBe(0)
+      getState().markActivityChanged()
+      getState().markActivityChanged()
+      expect(getState().activityRevision).toBe(2)
+    })
   })
 
   describe('dictionary', () => {
